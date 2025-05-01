@@ -1,12 +1,12 @@
 import numpy as np
-from Robots import FreeFlyer, BlueROV
+from Utilities.Robots import FreeFlyer, BlueROV
 import matplotlib.pyplot as plt
 import copy
 
 # reach-avoid gurobi optimization problem
 # might want to add integer variables later so we can use gurobi to solve the problem
 import gurobipy as gp
-from helpers import HyperRectangle
+from Utilities.helpers import HyperRectangle
 
 # hyperparameters
 N = 100     # number of time steps
