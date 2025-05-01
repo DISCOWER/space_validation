@@ -99,22 +99,23 @@ class WaypointMPC:
 
 if __name__ == "__main__":
     robot = BlueROV2()
-    mpc = WaypointMPC(robot, N=10, dt=0.1)
+    dt = 0.1
+    mpc = WaypointMPC(robot, N=10, dt=dt)
 
     x0 = np.array([0, 0, 1, 0, 0, 0, 
                    0, 0, 0, 0, 0, 0])
     xdes = np.array([1, 1, 0, 0, 0, np.pi/2,
                      0, 0, 0, 0, 0, 0])
 
-    Nsim = 30
+    Nsim = 40
     x = x0
     x_hist = np.zeros((robot.n_x, Nsim))
     for i in range(Nsim):
         X_pred, U_pred = mpc.solve(x, xdes)
         # print(f"X_pred: {X_pred}")
-        x = X_pred[:,1]
-        x_hist[:,i] = x
-        
+        x = robot.step(x,U_pred[:,0],dt) + np.random.normal(0, 0.01, robot.n_x)
+        x_hist[:,i] = np.array(x).squeeze()
+
 
     # 2D top down plot of the trajectory
     fig, ax = plt.subplots()

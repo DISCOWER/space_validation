@@ -1,11 +1,16 @@
 import numpy as np
-from Utilities.Robots import FreeFlyer, BlueROV
 import matplotlib.pyplot as plt
 import copy
 
 # reach-avoid gurobi optimization problem
 # might want to add integer variables later so we can use gurobi to solve the problem
 import gurobipy as gp
+
+import os
+import sys
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, parent_dir)
+from Utilities.Robots import FreeFlyer, BlueROV, BlueROV2
 from Utilities.helpers import HyperRectangle
 
 # hyperparameters
@@ -93,18 +98,34 @@ axs[1].set_ylabel('Control input')
 plt.savefig("figures/sp_trajectory.png")
 
 # feedback linearization controller for the underwater robot to behave like a free flyer
-uw_robot = BlueROV()
+uw_robot = BlueROV2()
 
-u_fbl = lambda x, v: np.linalg.pinv(uw_robot.gx(x))@(robot.fx(x) + robot.gx(x)@v - uw_robot.fx(x))
+# u_fbl = lambda x, v: np.linalg.pinv(uw_robot.gx(x))@(robot.fx(x) + robot.gx(x)@v - uw_robot.fx(x))
+#! bluerov2
+def u_fbl(x, v):
+    # add 4 zeros behind x[0:2] and 4 zeros behind x[2:4]
+    x_uw = np.zeros((uw_robot.n_x,))
+    x_uw[0:2] = x[0:2]
+    x_uw[6:8] = x[2:4]
+    # add 4 zeros behind v[0:2]
+    v_uw = np.zeros((uw_robot.n_u,))
+    v_uw[0:2] = v[0:2]
+    # compute the control input
+    u_fbl = np.linalg.pinv(uw_robot.gx(x_uw)[[0,1,6,7],0:2])@(robot.fx(x) + robot.gx(x)@v - uw_robot.fx(x_uw)[[0,1,6,7]])
+    u_fbl = np.concatenate((u_fbl, np.zeros((4,1))))
+    return u_fbl
 
 x = copy.deepcopy(x_ff[0, :])
-x_hist = np.zeros((N, 4))
-u_hist = np.zeros((N, 2))
+x_hist = np.zeros((N, uw_robot.n_x))
+u_hist = np.zeros((N, uw_robot.n_u))
 for i in range(N):
     u = u_fbl(x, u_ff[i, :])
-    x = uw_robot.step(x, u, dt)
+    x = uw_robot.step(np.concatenate((x[0:2],np.zeros((4,)),x[2:4],np.zeros((4,)))), u, dt)
+    x = np.array(x).squeeze()
+    u = np.array(u).squeeze()
     x_hist[i, :] = x
     u_hist[i, :] = u
+    x = np.concatenate((x[0:2],x[6:8]))
 
 fig, axs = plt.subplots(1,2, figsize=(10, 5))
 axs[0].plot(x_hist[:, 0], x_hist[:, 1], 'g-')
