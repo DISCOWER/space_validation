@@ -5,6 +5,7 @@ import copy
 # reach-avoid gurobi optimization problem
 # might want to add integer variables later so we can use gurobi to solve the problem
 import gurobipy as gp
+import casadi as cs
 
 import os
 import sys
@@ -19,29 +20,30 @@ dt = 0.1    # time step size
 bigM = 1e4
 
 # specification
-X0 = HyperRectangle(np.array([0, 0, 0, 0]), np.array([0, 0, 0, 0]))
+X0 = HyperRectangle(np.array([0, 0, 0, 0]), np.array([0.1, 0.1, 0, 0]))
 Xf = HyperRectangle(np.array([0.95, 0.95, 0, 0]), np.array([1, 1, 0, 0]))
+XA = HyperRectangle(np.array([0.2, 0.8, -0.1, -0.1]), np.array([0.4, 1.0, 0.1, 0.1]))
 
 Obs = [HyperRectangle(np.array([0.4, -0.1, 0, 0]), np.array([0.6, 0.6, 0, 0])),
        HyperRectangle(np.array([0.75, 0.5, 0, 0]), np.array([0.9, 1.1, 0, 0]))]
 
 World = HyperRectangle(np.array([0, 0, -bigM, -bigM]), np.array([1, 1, bigM, bigM]))
 # robot
-robot = FreeFlyer()
+sp_robot = FreeFlyer()
 
 # create planner
-if False:
+if True:
     opt = gp.Model("prob1")
-    x_vars = opt.addMVar((N, robot.n_x), lb=-np.inf, ub=np.inf, name="x")
-    u_vars = opt.addMVar((N, robot.n_u), lb=-np.inf, ub=np.inf, name="u")
+    x_vars = opt.addMVar((N, sp_robot.n_x), lb=-np.inf, ub=np.inf, name="x")
+    u_vars = opt.addMVar((N, sp_robot.n_u), lb=-np.inf, ub=np.inf, name="u")
     alpha_vars = opt.addVar(lb=0, ub=1, name="alpha")
 
     for i in range(N):
-        opt.addConstrs((u_vars[i, j] >= alpha_vars*robot.U.lower_bounds[j] for j in range(2)))
-        opt.addConstrs((u_vars[i, j] <= alpha_vars*robot.U.upper_bounds[j] for j in range(2)))
+        opt.addConstrs((u_vars[i, j] >= alpha_vars*sp_robot.U.lower_bounds[j] for j in range(2)))
+        opt.addConstrs((u_vars[i, j] <= alpha_vars*sp_robot.U.upper_bounds[j] for j in range(2)))
 
     # constraints
-    opt.addConstrs((x_vars[i+1,:] == robot.step(x_vars[i, :], u_vars[i, :], dt) for i in range(N-1)))
+    opt.addConstrs((x_vars[i+1,:] == sp_robot.step(x_vars[i, :], u_vars[i, :], dt) for i in range(N-1)))
     opt.addConstrs((x_vars[i, :] >= World.lower_bounds for i in range(N)))
     opt.addConstrs((x_vars[i, :] <= World.upper_bounds for i in range(N)))
 
@@ -49,16 +51,18 @@ if False:
     opt.addConstr(x_vars[0, :] <= X0.upper_bounds)
     opt.addConstr(x_vars[-1, :] >= Xf.lower_bounds)
     opt.addConstr(x_vars[-1, :] <= Xf.upper_bounds)
+    opt.addConstr(x_vars[int(N/2), :] >= XA.lower_bounds)
+    opt.addConstr(x_vars[int(N/2), :] <= XA.upper_bounds)
 
-    for obs in Obs:
-        z_vars = opt.addMVar((N, 4), vtype=gp.GRB.BINARY, name="z")
-        for i in range(N):
-            # x_vars[i,0:2] should be outside one of the faces of the obstacle
-            opt.addConstr(x_vars[i,0] <= obs.lower_bounds[0] + bigM*(1-z_vars[i,0]))
-            opt.addConstr(x_vars[i,0] >= obs.upper_bounds[0] - bigM*(1-z_vars[i,1]))
-            opt.addConstr(x_vars[i,1] <= obs.lower_bounds[1] + bigM*(1-z_vars[i,2]))
-            opt.addConstr(x_vars[i,1] >= obs.upper_bounds[1] - bigM*(1-z_vars[i,3]))
-            opt.addConstr(gp.quicksum(z_vars[i,:]) >= 1)
+    # for obs in Obs:
+    #     z_vars = opt.addMVar((N, 4), vtype=gp.GRB.BINARY, name="z")
+    #     for i in range(N):
+    #         # x_vars[i,0:2] should be outside one of the faces of the obstacle
+    #         opt.addConstr(x_vars[i,0] <= obs.lower_bounds[0] + bigM*(1-z_vars[i,0]))
+    #         opt.addConstr(x_vars[i,0] >= obs.upper_bounds[0] - bigM*(1-z_vars[i,1]))
+    #         opt.addConstr(x_vars[i,1] <= obs.lower_bounds[1] + bigM*(1-z_vars[i,2]))
+    #         opt.addConstr(x_vars[i,1] >= obs.upper_bounds[1] - bigM*(1-z_vars[i,3]))
+    #         opt.addConstr(gp.quicksum(z_vars[i,:]) >= 1)
 
     # objective
     opt.setObjective(alpha_vars, gp.GRB.MINIMIZE)
@@ -87,8 +91,9 @@ else:
 fig, axs = plt.subplots(1,2, figsize=(10, 5))
 axs[0].plot(x_ff[:, 0], x_ff[:, 1], 'g-')
 X0.plot(axs[0], color='green', alpha=0.5)
-Xf.plot(axs[0], color='blue', alpha=0.5)
-[obs.plot(axs[0], color='red', alpha=0.5) for obs in Obs]
+Xf.plot(axs[0], color='green', alpha=0.5)
+XA.plot(axs[0], color='blue', alpha=0.5)
+# [obs.plot(axs[0], color='red', alpha=0.5) for obs in Obs]
 axs[0].set_aspect('equal', adjustable='box')
 
 axs[1].plot(u_ff[:,0])
@@ -111,27 +116,37 @@ def u_fbl(x, v):
     v_uw = np.zeros((uw_robot.n_u,))
     v_uw[0:2] = v[0:2]
     # compute the control input
-    u_fbl = np.linalg.pinv(uw_robot.gx(x_uw)[[0,1,6,7],0:2])@(robot.fx(x) + robot.gx(x)@v - uw_robot.fx(x_uw)[[0,1,6,7]])
+    u_fbl = np.linalg.pinv(uw_robot.gx(x_uw)[[0,1,6,7],0:2])@(sp_robot.fx(x) + sp_robot.gx(x)@v - uw_robot.fx(x_uw)[[0,1,6,7]])
     u_fbl = np.concatenate((u_fbl, np.zeros((4,1))))
     return u_fbl
 
+def u_fbl_cs(x, v):
+    x_uw = cs.blockcat([[x[0], x[1], 0, 0, 0, 0, x[2], x[3], 0, 0, 0, 0]])
+    v_uw = cs.blockcat([[v[0], v[1], 0, 0, 0, 0]])
+    fx = uw_robot.fx(x_uw.T)[[0,1,6,7]]
+    gx = uw_robot.gx(x_uw.T)[[0,1,6,7],0:2]
+    gx_inv = cs.DM(np.linalg.pinv(np.array(gx)))
+    u_fbl = cs.mtimes(gx_inv, sp_robot.fx(x) + sp_robot.gx(x)@v - fx)
+    return u_fbl
+
 x = copy.deepcopy(x_ff[0, :])
-x_hist = np.zeros((N, uw_robot.n_x))
-u_hist = np.zeros((N, uw_robot.n_u))
+x_hist = np.zeros((N, sp_robot.n_x))
+u_hist = np.zeros((N, sp_robot.n_u))
 for i in range(N):
-    u = u_fbl(x, u_ff[i, :])
-    x = uw_robot.step(np.concatenate((x[0:2],np.zeros((4,)),x[2:4],np.zeros((4,)))), u, dt)
+    u = u_fbl(x, u_ff[i, :])[0:2]
+    x = uw_robot.step(np.concatenate((x[0:2],np.zeros((4,)),x[2:4],np.zeros((4,)))), 
+                      np.concatenate((u,np.zeros((4,1)))), dt)[[0,1,6,7]]
     x = np.array(x).squeeze()
     u = np.array(u).squeeze()
     x_hist[i, :] = x
     u_hist[i, :] = u
-    x = np.concatenate((x[0:2],x[6:8]))
 
 fig, axs = plt.subplots(1,2, figsize=(10, 5))
 axs[0].plot(x_hist[:, 0], x_hist[:, 1], 'g-')
 X0.plot(axs[0], color='green', alpha=0.5)
-Xf.plot(axs[0], color='blue', alpha=0.5)
-[obs.plot(axs[0], color='red', alpha=0.5) for obs in Obs]
+Xf.plot(axs[0], color='green', alpha=0.5)
+XA.plot(axs[0], color='blue', alpha=0.5)
+# [obs.plot(axs[0], color='red', alpha=0.5) for obs in Obs]
 axs[0].set_aspect('equal', adjustable='box')
 axs[1].plot(u_hist[:,0])
 axs[1].plot(u_hist[:,1])
@@ -141,7 +156,7 @@ plt.savefig("figures/sp_trajectory_uw.png")
 
 
 u_max = np.max(np.abs(u_hist), axis=0)
-print(f"Alpha for uw: {np.max(u_max/uw_robot.U.upper_bounds)}")
+print(f"Alpha for uw: {np.max(u_max/uw_robot.U.upper_bounds[0:2])}")
 
 # So now we have to find \phi (for now deltaT) such that
 # alpha for uw is equal to alpha for the free flyer
@@ -159,8 +174,8 @@ if False:
     dt_vars.Start = dt
 
     for i in range(N):
-        opt.addConstrs((u_vars[i, j] >= alpha*(robot.U.lower_bounds[j]-u_fbl(x_vars[i,:],u_vars[i,:])[j]) for j in range(2)))
-        opt.addConstrs((u_vars[i, j] <= alpha*(robot.U.upper_bounds[j]-u_fbl(x_vars[i,:],u_vars[i,:])[j]) for j in range(2)))
+        opt.addConstrs((u_vars[i, j] >= alpha*(uw_robot.U.lower_bounds[j]-u_fbl(x_vars[i,:],u_vars[i,:])[j]) for j in range(2)))
+        opt.addConstrs((u_vars[i, j] <= alpha*(uw_robot.U.upper_bounds[j]-u_fbl(x_vars[i,:],u_vars[i,:])[j]) for j in range(2)))
 
     # constraints
     opt.addConstrs((x_vars[i+1,:] == uw_robot.step(x_vars[i, :], u_vars[i, :], dt_vars) for i in range(N-1)))
@@ -202,6 +217,57 @@ if False:
     dt_uw = dt_vars.X
     save_vars = {'x_uw': x_uw, 'u_uw': u_uw, 'dt_uw': dt_uw}
     np.savez("solutions/uw_solution.npz", **save_vars)
+elif True:
+    # gradient-based optimization with casadi
+    ocp = cs.Opti()
+    x_vars = ocp.variable(4, N)
+    u_vars = ocp.variable(2, N)
+    dt_vars = ocp.variable(1)
+
+    ocp.set_initial(x_vars, x_hist.T)
+    ocp.set_initial(u_vars, u_hist.T)
+    ocp.set_initial(dt_vars, 0.01)
+
+    ocp.subject_to(dt_vars >= 0)
+
+    for i in range(N):
+        ocp.subject_to(u_fbl_cs(x_vars[:,i],u_vars[:,i])[0:2] >= alpha*(uw_robot.U.lower_bounds[0:2]))
+        ocp.subject_to(u_fbl_cs(x_vars[:,i],u_vars[:,i])[0:2] <= alpha*(uw_robot.U.upper_bounds[0:2]))
+
+    # constraints
+    for i in range(N-1):
+        ocp.subject_to(x_vars[:,i+1] == sp_robot.step(x_vars[:,i], u_vars[:,i], dt_vars))
+    
+    ocp.subject_to(x_vars[:,0] >= X0.lower_bounds)
+    ocp.subject_to(x_vars[:,0] <= X0.upper_bounds)
+    ocp.subject_to(x_vars[:,-1] >= Xf.lower_bounds)
+    ocp.subject_to(x_vars[:,-1] <= Xf.upper_bounds)
+    ocp.subject_to(x_vars[:,int(N/2)] >= XA.lower_bounds)
+    ocp.subject_to(x_vars[:,int(N/2)] <= XA.upper_bounds)
+
+    #TODO: add obstacle avoidance constraints
+
+    # objective
+    cost_eq = dt_vars
+    # for i in range(N):
+    #     cost_eq += (u_vars[:,i]).T@(u_vars[:,i])
+    ocp.minimize(cost_eq)
+    opts = {'ipopt.print_level': 0, 'print_time': 0, 'ipopt.sb': 'yes',
+            'verbose':False, 'ipopt.tol': 1e-6, 'ipopt.max_iter': 1000}
+    ocp.solver('ipopt',opts)
+
+    try:
+        sol = ocp.solve()
+        x_uw = sol.value(x_vars).T
+        u_uw = sol.value(u_vars).T
+        dt_uw = sol.value(dt_vars)
+        print(f"Solution found")
+    except Exception as e:
+        print(f"Solution not found: {e}")
+        print(e)
+        x_uw = np.zeros_like(x_ff)
+        u_uw = np.zeros_like(u_ff)
+        dt_uw = dt
 else:
     # load the solution
     data = np.load("solutions/uw_solution.npz")
@@ -209,17 +275,27 @@ else:
     u_uw = data['u_uw']
     dt_uw = data['dt_uw']
 
+u_uw_fbl = np.array([u_fbl(x_uw[i,:],u_uw[i,:])[0:2].squeeze() for i in range(N)])
+u_max = np.max(np.abs(u_uw_fbl), axis=0)
+print(f"Replanned alpha for uw: {np.max([u_max/(uw_robot.U.upper_bounds[0:2]) for i in range(N)])}")
+print(f"Replanned dt for uw: {dt_uw}")
+
 # plot the trajectory
 fig, axs = plt.subplots(1,2, figsize=(10, 5))
-axs[0].plot(x_ff[:, 0], x_ff[:, 1], 'g-')
-axs[0].plot(x_uw[:, 0], x_uw[:, 1], 'c-')
+axs[0].plot(x_ff[:, 0], x_ff[:, 1], 'g-', label='sp trajectory')
+axs[0].plot(x_uw[:, 0], x_uw[:, 1], 'c-', label='uw trajectory')
 X0.plot(axs[0], color='green', alpha=0.5)
-Xf.plot(axs[0], color='blue', alpha=0.5)
-[obs.plot(axs[0], color='red', alpha=0.5) for obs in Obs]
+Xf.plot(axs[0], color='green', alpha=0.5)
+XA.plot(axs[0], color='blue', alpha=0.5)
+axs[0].legend()
+# [obs.plot(axs[0], color='red', alpha=0.5) for obs in Obs]
 axs[0].set_aspect('equal', adjustable='box')
 
-axs[1].plot(u_uw[:,0])
-axs[1].plot(u_uw[:,1])
+axs[1].plot(u_uw[:,0],'r',label='effective sp input')
+axs[1].plot(u_uw[:,1],'r--')
+axs[1].plot(u_uw_fbl[:,0],'b',label='effective uw input')
+axs[1].plot(u_uw_fbl[:,1],'b--')
 axs[1].set_xlabel('Time step')
 axs[1].set_ylabel('Control input')
+axs[1].legend()
 plt.savefig("figures/sp_uw_trajectory.png")

@@ -44,13 +44,14 @@ class FreeFlyer(Robot):
     def __init__(self):
         super().__init__(n_x=4, n_u=2)
         # dynamics in the form: dx = f(x) + g(x)u
+        self.mass = 16.8
         self.fx = lambda x: np.array([[0,0,1,0],
                                       [0,0,0,1],
                                       [0,0,0,0],
                                       [0,0,0,0]])@x
-        self.gx = lambda x: np.array([[0, 0], [0, 0], [1, 0], [0, 1]])
+        self.gx = lambda x: np.array([[0, 0], [0, 0], [1/self.mass, 0], [0, 1/self.mass]])
 
-        self.U = HyperRectangle(np.array([-1, -1]), np.array([1, 1]))
+        self.U = HyperRectangle(np.array([-3, -3]), np.array([3, 3]))
 
 
 class BlueROV(Robot):
