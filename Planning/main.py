@@ -87,6 +87,8 @@ else:
     u_ff = data['u_ff']
     alpha = data['alpha']
 
+t_sp = np.linspace(0, N*dt, N)
+
 # plot the trajectory
 fig, axs = plt.subplots(1,2, figsize=(10, 5))
 axs[0].plot(x_ff[:, 0], x_ff[:, 1], 'g-')
@@ -275,27 +277,55 @@ else:
     u_uw = data['u_uw']
     dt_uw = data['dt_uw']
 
+t_uw = np.linspace(0, dt_uw*N, N)
 u_uw_fbl = np.array([u_fbl(x_uw[i,:],u_uw[i,:])[0:2].squeeze() for i in range(N)])
 u_max = np.max(np.abs(u_uw_fbl), axis=0)
 print(f"Replanned alpha for uw: {np.max([u_max/(uw_robot.U.upper_bounds[0:2]) for i in range(N)])}")
 print(f"Replanned dt for uw: {dt_uw}")
 
 # plot the trajectory
-fig, axs = plt.subplots(1,2, figsize=(10, 5))
-axs[0].plot(x_ff[:, 0], x_ff[:, 1], 'g-', label='sp trajectory')
-axs[0].plot(x_uw[:, 0], x_uw[:, 1], 'c-', label='uw trajectory')
-X0.plot(axs[0], color='green', alpha=0.5)
-Xf.plot(axs[0], color='green', alpha=0.5)
-XA.plot(axs[0], color='blue', alpha=0.5)
-axs[0].legend()
-# [obs.plot(axs[0], color='red', alpha=0.5) for obs in Obs]
-axs[0].set_aspect('equal', adjustable='box')
+fig, axs = plt.subplots(2,2, figsize=(10, 10))
+axs[0,0].plot(x_ff[:, 0], x_ff[:, 1], 'g-', label='sp trajectory')
+axs[0,0].plot(x_uw[:, 0], x_uw[:, 1], 'c-', label='uw trajectory')
+X0.plot(axs[0,0], color='green', alpha=0.5)
+Xf.plot(axs[0,0], color='green', alpha=0.5)
+XA.plot(axs[0,0], color='blue', alpha=0.5)
+axs[0,0].legend()
+axs[0,0].grid()
+axs[0,0].set_aspect('equal', adjustable='box')
 
-axs[1].plot(u_uw[:,0],'r',label='effective sp input')
-axs[1].plot(u_uw[:,1],'r--')
-axs[1].plot(u_uw_fbl[:,0],'b',label='effective uw input')
-axs[1].plot(u_uw_fbl[:,1],'b--')
-axs[1].set_xlabel('Time step')
-axs[1].set_ylabel('Control input')
-axs[1].legend()
+axs[0,1].plot(t_sp, x_ff[:, 0], 'g-', label='sp trajectory')
+axs[0,1].plot(t_sp, x_ff[:, 1], 'g--')
+axs[0,1].plot(t_uw, x_uw[:, 0], 'c-', label='uw trajectory')
+axs[0,1].plot(t_uw, x_uw[:, 1], 'c--')
+axs[0,1].set_xlabel('Time step')
+axs[0,1].set_ylabel('Position')
+axs[0,1].grid()
+axs[0,1].legend()
+
+axs[1,0].plot(t_sp, x_ff[:, 2], 'g-', label='sp trajectory')
+axs[1,0].plot(t_sp, x_ff[:, 3], 'g--')
+axs[1,0].plot(t_uw, x_uw[:, 2], 'c-', label='uw trajectory')
+axs[1,0].plot(t_uw, x_uw[:, 3], 'c--')
+axs[1,0].set_xlabel('Time step')
+axs[1,0].set_ylabel('Velocity')
+axs[1,0].grid()
+axs[1,0].legend()
+
+# axs[1,1].plot(t_uw,u_uw[:,0],'r',label='effective sp input')
+# axs[1,1].plot(t_uw,u_uw[:,1],'r--')
+axs[1,1].plot(t_sp,u_ff[:,0],'g',label='effective sp input')
+axs[1,1].plot(t_sp,u_ff[:,1],'g--')
+axs[1,1].axhline(sp_robot.U.lower_bounds[0], color='g', linestyle='-.')
+axs[1,1].axhline(sp_robot.U.upper_bounds[0], color='g', linestyle='-.')
+axs[1,1].plot(t_uw,u_uw_fbl[:,0],'c',label='effective uw input')
+axs[1,1].plot(t_uw,u_uw_fbl[:,1],'c--')
+axs[1,1].axhline(uw_robot.U.lower_bounds[0], color='c', linestyle='-.')
+axs[1,1].axhline(uw_robot.U.upper_bounds[0], color='c', linestyle='-.')
+axs[1,1].set_xlabel('Time step')
+axs[1,1].set_ylabel('Control input')
+axs[1,1].grid()
+axs[1,1].legend()
+
+plt.tight_layout()
 plt.savefig("figures/sp_uw_trajectory.png")
