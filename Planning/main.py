@@ -53,10 +53,10 @@ if True:
     opt.addConstr(x_vars[0, :] <= X0.upper_bounds)
     opt.addConstr(x_vars[-1, :] >= Xf.lower_bounds)
     opt.addConstr(x_vars[-1, :] <= Xf.upper_bounds)
-    opt.addConstr(x_vars[int(N/2), :] >= XA.lower_bounds)
-    opt.addConstr(x_vars[int(N/2), :] <= XA.upper_bounds)
 
     # spatial robustness of the specification (stay-in at N/2)
+    # opt.addConstr(x_vars[int(N/2), :] >= XA.lower_bounds)
+    # opt.addConstr(x_vars[int(N/2), :] <= XA.upper_bounds)
     delta = opt.addVar(lb=0, ub=np.inf, name="spatial_robustness")
     for face_idx in range(len(XA.b)):
         c = -XA.A[face_idx, :]@x_vars[int(N/2), 0:2] + XA.b[face_idx]
@@ -276,13 +276,19 @@ elif True:
     ocp.subject_to(x_vars[:,int(N/2)] >= XA.lower_bounds)
     ocp.subject_to(x_vars[:,int(N/2)] <= XA.upper_bounds)
 
+    # spatial robustness of the specification (stay-in at N/2)
+    delta = ocp.variable(1)
+    for face_idx in range(len(XA.b)):
+        c = -cs.mtimes(np.array([XA.A[face_idx, :]]),x_vars[0:2,int(N/2)]) + XA.b[face_idx]
+        ocp.subject_to(c >= delta)
+
     #TODO: add obstacle avoidance constraints
 
     # objective
-    cost_eq = dt_vars
+    cost_var = 100*dt_vars - 10000*delta
     # for i in range(N):
     #     cost_eq += (u_vars[:,i]).T@(u_vars[:,i])
-    ocp.minimize(cost_eq)
+    ocp.minimize(cost_var)
     opts = {'ipopt.print_level': 0, 'print_time': 0, 'ipopt.sb': 'yes',
             'verbose':False, 'ipopt.tol': 1e-6, 'ipopt.max_iter': 1000}
     ocp.solver('ipopt',opts)
