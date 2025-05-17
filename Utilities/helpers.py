@@ -11,7 +11,17 @@ class HyperRectangle():
         self.center = (self.lower_bounds + self.upper_bounds) / 2
         self.size = self.upper_bounds - self.lower_bounds
         self.volume = np.prod(self.size)
-    
+
+        # obtain the inequalities of the hyperrectangle in the form of Ax <= b
+        self.A = np.array([[-1, 0],
+                           [1, 0],
+                           [0, -1],
+                           [0, 1]])
+        self.b = np.array([-self.lower_bounds[0],
+                           self.upper_bounds[0],
+                           -self.lower_bounds[1],
+                           self.upper_bounds[1]])
+
     def is_inside(self, point:np.ndarray) -> bool:
         assert len(point) == self.dim, "Point must have the same dimension as the hyperrectangle."
         return np.all(point >= self.lower_bounds) and np.all(point <= self.upper_bounds)

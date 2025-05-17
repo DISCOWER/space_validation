@@ -5,6 +5,8 @@ import copy
 # reach-avoid gurobi optimization problem
 # might want to add integer variables later so we can use gurobi to solve the problem
 import gurobipy as gp
+scs = {getattr(gp.GRB.status,k): k for k in dir(gp.GRB.status) if k[0].isupper()}
+
 import casadi as cs
 
 import os
@@ -54,6 +56,12 @@ if True:
     opt.addConstr(x_vars[int(N/2), :] >= XA.lower_bounds)
     opt.addConstr(x_vars[int(N/2), :] <= XA.upper_bounds)
 
+    # spatial robustness of the specification (stay-in at N/2)
+    delta = opt.addVar(lb=0, ub=np.inf, name="spatial_robustness")
+    for face_idx in range(len(XA.b)):
+        c = -XA.A[face_idx, :]@x_vars[int(N/2), 0:2] + XA.b[face_idx]
+        opt.addConstr(c >= delta)
+
     # for obs in Obs:
     #     z_vars = opt.addMVar((N, 4), vtype=gp.GRB.BINARY, name="z")
     #     for i in range(N):
@@ -65,7 +73,17 @@ if True:
     #         opt.addConstr(gp.quicksum(z_vars[i,:]) >= 1)
 
     # objective
-    opt.setObjective(alpha_vars, gp.GRB.MINIMIZE)
+    # #TODO: this breaks the solution of prob 2 and is incredibly slow
+    # #TODO: asses whether this affects the value of alpha_vars
+    # quad_cost = opt.addVar(lb=0, ub=np.inf, name="quad_cost")
+    # quad_vars = opt.addMVar((N,), lb=0, ub=np.inf, name="quad_vars")
+    quad_cost = 0
+    for i in range(N):
+        quad_cost += u_vars[i,0]*u_vars[i,0] + u_vars[i,1]*u_vars[i,1]
+    
+    cost_var = opt.addVar(lb=-np.inf, ub=np.inf, name="cost")
+    opt.addConstr(cost_var == quad_cost + 100*alpha_vars - 10000*delta)
+    opt.setObjective(cost_var, gp.GRB.MINIMIZE)
     opt.setParam('OutputFlag', 0)  # Suppress Gurobi output
     opt.optimize()
     if opt.status == gp.GRB.OPTIMAL:
@@ -73,7 +91,7 @@ if True:
         print(f"Alpha: {alpha_vars.X}")
     else:
         print(f"No optimal solution found")
-        print(f"Status: {opt.status}")
+        print(f"Status: {scs[opt.status]}")
 
     x_ff = x_vars.X
     u_ff = u_vars.X
@@ -100,6 +118,10 @@ axs[0].set_aspect('equal', adjustable='box')
 
 axs[1].plot(u_ff[:,0])
 axs[1].plot(u_ff[:,1])
+axs[1].axhline(sp_robot.U.lower_bounds[0], color='g', linestyle='-.')
+axs[1].axhline(sp_robot.U.upper_bounds[0], color='g', linestyle='-.')
+axs[1].axhline(alpha*sp_robot.U.lower_bounds[0], color='b', linestyle='--')
+axs[1].axhline(alpha*sp_robot.U.upper_bounds[0], color='b', linestyle='--')
 axs[1].set_xlabel('Time step')
 axs[1].set_ylabel('Control input')
 plt.savefig("figures/sp_trajectory.png")
@@ -240,6 +262,13 @@ elif True:
     for i in range(N-1):
         ocp.subject_to(x_vars[:,i+1] == sp_robot.step(x_vars[:,i], u_vars[:,i], dt_vars))
     
+    # for i in range(N):
+    #     ocp.subject_to(x_vars[0:2,i] == x_hist[i,0:2])
+    #TODO: seems to be a singularity around i=50
+    # points = [10, 20, 30, 40, 50, 60, 70, 80, 90]
+    # for i in points:
+    #     ocp.subject_to(x_vars[0:2,i] == x_hist[i,0:2])
+
     ocp.subject_to(x_vars[:,0] >= X0.lower_bounds)
     ocp.subject_to(x_vars[:,0] <= X0.upper_bounds)
     ocp.subject_to(x_vars[:,-1] >= Xf.lower_bounds)
