@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from scipy.spatial import ConvexHull
 
 class HyperRectangle():
     def __init__(self, lower_bounds:np.ndarray, upper_bounds:np.ndarray):
@@ -30,3 +32,59 @@ class HyperRectangle():
         rect = plt.Rectangle(self.lower_bounds[:2], self.size[0], self.size[1], 
                              alpha=alpha, color=color)
         ax.add_patch(rect)
+
+class Zonotope():
+    def __init__(self, x=None, G=None, Gdiag=None):
+        # assert not both G and Gdiag are not given
+        assert not (G is None and Gdiag is None)
+
+        self.x = x
+        if G is not None:
+            self.G = G
+            self.Gdiag = np.diag(G)
+        else:
+            self.Gdiag = Gdiag
+            try:
+                self.G = np.diag(Gdiag)
+            except:
+                self.G = None
+
+    def compute_vertices(self):
+        V = self.x.copy()
+        for iVertex in range(self.G.shape[1]):
+            translation = self.G[:, iVertex]
+            V = np.vstack([V + translation, V - translation])
+            if iVertex > self.G.shape[0] -1:
+                try:
+                    V = V[ConvexHull(V).vertices]
+                except:
+                    raise ValueError("Could not compute convex hull")
+        return V
+
+    def linear_transform(self, A:np.ndarray):
+        print(f"A: {A}, G: {self.G} \n A@G: {A @ self.G}")
+        return Zonotope(x=A @ self.x, G=A @ self.G)
+
+    def plot(self, ax:plt.Axes, color='r',alpha=0.2, label=""):
+        vertices = self.compute_vertices()
+        # order vertices according to their angle
+        keys = np.arctan2(vertices[:,1]-self.x[1], vertices[:,0]-self.x[0])
+        vertices = vertices[np.argsort(keys)]
+        vertices = np.vstack((vertices, vertices[0]))  # close the polygon
+
+        # and plot
+        poly = patches.Polygon(vertices, closed=True, color=color, alpha=alpha)
+        poly.set_label(label)
+        ax.add_patch(poly)
+
+        # if self.Gdiag is not None:
+        #     # make a rectangle from the center x and the widths in each 
+        #     # dimension given by the diagonal of G
+        #     # we plot only 2D
+        #     eps = 1e-4
+        #     rect = patches.Rectangle((self.x[0]-self.Gdiag[0], self.x[1]-self.Gdiag[1]),
+        #                        2*self.Gdiag[0]+eps, 2*self.Gdiag[1]+eps,
+        #                        color=color, alpha=alpha)
+        #     rect.set_label(label)
+        #     ax.add_patch(rect)
+            
