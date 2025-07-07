@@ -136,18 +136,9 @@ def quant_MU(opt:gp.Model, pred:Pred, items):
                                     name=f"rho_faces_MU_{pred.print()}_i{i}")
             pred.rho_faces.append(rho_faces)
             for face in range(N_faces):
-                # rho_cps = opt.addMVar((2,), vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY,
-                #                       name=f"rho_cps_MU_{pred.print()}_i{i}_face{face}")
                 ineqs = pred.preds[0].H @ items.x_vars[i,:dim] - pred.preds[0].b
                 opt.addConstr(ineqs[face] == -rho_faces[face], name=f"rho_faces_MU_{pred.print()}_i{i}_face{face}")
-                # for idx, cp in enumerate([i, min(i+1,N-1)]):
-                #     ineqs = pred.preds[0].H @ items.x_vars[cp,:dim] - pred.preds[0].b
-                #     # c should be greater than 0 for satisfaction
-                #     opt.addConstr(ineqs[face] == -rho_cps[idx], name=f"rho_MU_{pred.print()}_i{cp}_face{face}")
-                # opt.addConstr(rho_faces[face] == gp.max_([rc for rc in rho_cps]), name=f"rho_faces_MU_{pred.print()}_i{i}_face{face}")
-                # opt.addConstrs((rho_faces[face] >= rho_cps[rc] for rc in range(2)), name=f"rho_faces_MU_{pred.print()}_i{i}_face{face}")
             opt.addConstr(pred.rhos[i] == gp.min_([rf for rf in rho_faces]), name=f"rho_MU_{pred.print()}_i{i}")
-            # opt.addConstrs((pred.rhos[i] <= rho_faces[rf] for rf in range(N_faces)), name=f"rho_MU_{pred.print()}_i{i}")
 
     except Exception as e:
         print(f"Error in quant_MU: {e}")

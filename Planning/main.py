@@ -12,7 +12,7 @@ import os
 import sys
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
-from Utilities.Robots import FreeFlyer, BlueROV, BlueROV2
+from Utilities.Robots import LinearFreeFlyer, FreeFlyer, LinearBlueROV, BlueROV
 from Utilities.helpers import HyperRectangle, Polytope
 from Utilities.stl import Pred, Spec, quant_parse_operator
 
@@ -31,7 +31,7 @@ tf = N*dt   # final time
 bigM = 1e4
 
 # Robot
-sp_robot = FreeFlyer()
+sp_robot = LinearFreeFlyer()
 
 # Specification
 X0 = HyperRectangle(np.array([0, 0, -0.1, -0.1]), np.array([0.1, 0.1, 0.1, 0.1]))
@@ -127,7 +127,7 @@ axs[1].set_ylabel('Control input')
 plt.savefig("figures/sp_trajectory.png")
 
 # feedback linearization controller for the underwater robot to behave like a free flyer
-uw_robot = BlueROV2()
+uw_robot = BlueROV()
 
 # u_fbl = lambda x, v: np.linalg.pinv(uw_robot.gx(x))@(robot.fx(x) + robot.gx(x)@v - uw_robot.fx(x))
 #! bluerov2

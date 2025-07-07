@@ -1,6 +1,7 @@
 import numpy as np
 import casadi as cs
 from Utilities.helpers import HyperRectangle
+from Utilities.helpers import skew_symmetric, q_to_rot_mat
 
 
 class Robot:
@@ -40,7 +41,7 @@ class Robot:
         return self.x
 
 
-class FreeFlyer(Robot):
+class LinearFreeFlyer(Robot):
     def __init__(self):
         super().__init__(n_x=4, n_u=2)
         # dynamics in the form: dx = f(x) + g(x)u
@@ -53,8 +54,56 @@ class FreeFlyer(Robot):
 
         self.U = HyperRectangle(np.array([-3, -3]), np.array([3, 3]))
 
+class FreeFlyer(Robot):
+    def __init__(self,six_dof=False):
+        nx = 6 if six_dof else 13
+        nu = 3 if six_dof else 6
+        super().__init__(n_x=nx, n_u=nu)
 
-class BlueROV(Robot):
+        # dynamics in the form: dx = f(x) + g(x)u
+        self.mass = 16.8
+        self.inertia = np.diag((0.1454, 0.1366, 0.1594))
+        self.max_thrust = 1.
+        self.max_torque = 0.5
+
+        self.fx = lambda x: self._fx(x)
+        self.gx = lambda x: self._gx(x)
+
+        if six_dof:
+            self.U = HyperRectangle(
+                np.array([-self.max_thrust]*2 + [-self.max_torque]*1),
+                np.array([self.max_thrust]*2 + [self.max_torque]*1)
+            )
+        else:
+            self.U = HyperRectangle(
+                np.array([-self.max_thrust]*3 + [-self.max_torque]*3),
+                np.array([self.max_thrust]*3 + [self.max_torque]*3)
+            )
+
+    def _fx(self, x):
+        p, v, q, w = x[0:3], x[3:6], x[6:10], x[10:13]
+        fx = cs.blockcat([
+            [v],
+            [cs.MX.zeros(3,)],
+            [0.5 * cs.mtimes(skew_symmetric(w), q)],
+            [cs.DM(np.linalg.inv(self.inertia)) @ (-cs.cross(w, self.inertia @ w))]
+        ])
+        return fx
+    
+    def _gx(self, x):
+        p, v, q, w = x[0:3], x[3:6], x[6:10], x[10:13]
+        gx = cs.blockcat([
+            [cs.MX.zeros((3, 6))],
+            [q_to_rot_mat(q)/self.mass],
+            [cs.MX.zeros((4, 6))],
+            [cs.DM(np.linalg.inv(self.inertia))]
+        ])
+        return gx
+
+
+
+        
+class LinearBlueROV(Robot):
     def __init__(self):
         super().__init__(n_x=4, n_u=2)
         # dynamics in the form: dx = f(x) + g(x)u
@@ -66,7 +115,7 @@ class BlueROV(Robot):
 
         self.U = HyperRectangle(np.array([-2, -2]), np.array([2, 2]))
 
-class BlueROV2(Robot):
+class BlueROV(Robot):
     def __init__(self):
         # from https://www.mdpi.com/2077-1312/10/12/1898
         super().__init__(n_x=12, n_u=6)
