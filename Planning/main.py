@@ -23,8 +23,8 @@ class OptProbItems:
         self.times = times
 
 # hyperparameters
-N = 100     # number of time steps
-dt = 0.1    # time step size
+N = 50     # number of time steps
+dt = 0.25    # time step size
 t0 = 0      # initial time
 tf = N*dt   # final time
 
@@ -35,10 +35,10 @@ sp_robot = FreeFlyer()
 
 # Specification
 X0 = HyperRectangle(np.array([0, 0, -0.1, -0.1]), np.array([0.1, 0.1, 0.1, 0.1]))
-Xf = HyperRectangle(np.array([0.95, 0.95, -0.1, -0.1]), np.array([1, 1, 0.1, 0.1]))
-XA = HyperRectangle(np.array([0.2, 0.8, -1, -1]), np.array([0.4, 1.0, 1, 1]))
-Obs = [HyperRectangle(np.array([0.4, -0.1, -np.inf, -np.inf]), np.array([0.6, 0.6, np.inf, np.inf])),
-       HyperRectangle(np.array([0.75, 0.5, -np.inf, -np.inf]), np.array([0.9, 1.1, np.inf, np.inf]))]
+Xf = HyperRectangle(np.array([0.90, 0.90, -0.1, -0.1]), np.array([1, 1, 0.1, 0.1]))
+XA = HyperRectangle(np.array([0.2, 0.8]), np.array([0.4, 1.0]))
+Obs = [HyperRectangle(np.array([0.4, -0.1]), np.array([0.6, 0.6])),
+       HyperRectangle(np.array([0.75, 0.8]), np.array([0.9, 1.1]))]
 World = HyperRectangle(np.array([0, 0, -bigM, -bigM]), np.array([1, 1, bigM, bigM]))
 
 phi = Pred("AND", preds=[
@@ -46,6 +46,8 @@ phi = Pred("AND", preds=[
     Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)])]),
     Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)])]),
     Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)])]),
+    Pred("G", [t0,tf], preds=[Pred("NEG", preds=[Pred("MU", preds=[Polytope(Obs[0])])])]),
+    Pred("G", [t0,tf], preds=[Pred("NEG", preds=[Pred("MU", preds=[Polytope(Obs[1])])])])
 ])
 spec = Spec(phi, t0, tf)
 
@@ -81,6 +83,10 @@ if True:
         print(f"Optimal solution found")
         print(f"\nAlpha from solving Prob 1: {alpha_vars.X}")
         print(f"Spatial robustness: {spec.phi.rho.X}")
+        for pred in spec.phi.preds:
+            print(f"rhos: {pred.preds[-1].rhos.X }")
+        # print(f"rhos: {[rf.X for rf in spec.phi.preds[-1].preds[0].preds[0].rho_faces]}")
+        
         print(f"This is how much control is necessary to satisfy the specification")
     else:
         print(f"No optimal solution found")
@@ -103,10 +109,11 @@ t_sp = np.linspace(0, N*dt, N)
 # plot the trajectory
 fig, axs = plt.subplots(1,2, figsize=(10, 5))
 axs[0].plot(x_ff[:, 0], x_ff[:, 1], 'g-')
+axs[0].plot(x_ff[:, 0], x_ff[:, 1], 'go')
 X0.plot(axs[0], color='green', alpha=0.5)
 Xf.plot(axs[0], color='green', alpha=0.5)
 XA.plot(axs[0], color='blue', alpha=0.5)
-# [obs.plot(axs[0], color='red', alpha=0.5) for obs in Obs]
+[obs.plot(axs[0], color='red', alpha=0.5) for obs in Obs]
 axs[0].set_aspect('equal', adjustable='box')
 
 axs[1].plot(u_ff[:,0])
