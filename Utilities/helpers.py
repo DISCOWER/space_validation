@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from scipy.spatial import ConvexHull
+import gurobipy as gp
 
 class HyperRectangle():
     def __init__(self, lower_bounds:np.ndarray, upper_bounds:np.ndarray):
@@ -77,14 +78,38 @@ class Zonotope():
         poly.set_label(label)
         ax.add_patch(poly)
 
-        # if self.Gdiag is not None:
-        #     # make a rectangle from the center x and the widths in each 
-        #     # dimension given by the diagonal of G
-        #     # we plot only 2D
-        #     eps = 1e-4
-        #     rect = patches.Rectangle((self.x[0]-self.Gdiag[0], self.x[1]-self.Gdiag[1]),
-        #                        2*self.Gdiag[0]+eps, 2*self.Gdiag[1]+eps,
-        #                        color=color, alpha=alpha)
-        #     rect.set_label(label)
-        #     ax.add_patch(rect)
-            
+class Polytope():
+    def __init__(self, H:np.ndarray, b:np.ndarray):
+        self.H = H
+        self.b = b
+        self.dim = H.shape[1]
+        self.N_faces = H.shape[0]  # Number of faces in the area
+    
+    def __init__(self, rectangle:HyperRectangle):
+        self.dim = len(rectangle.lower_bounds)
+        self.N_faces = 2 * self.dim
+        self.H = np.zeros((self.N_faces, self.dim))
+        self.b = np.zeros(self.N_faces)
+        for i in range(self.dim):
+            self.H[i, i] = -1
+            self.b[i] = -rectangle.lower_bounds[i]
+            self.H[i + self.dim, i] = 1
+            self.b[i + self.dim] = rectangle.upper_bounds[i]
+        print(f"Polytope created with {self.N_faces} faces and dimension {self.dim}")
+
+    def print(self):
+        return f"Area_[faces={self.N_faces}]"
+
+    def constrain_point_inside(self, prog:gp.Model, point:gp.Var):
+        for i in range(self.N_faces):
+            prog.addConstr(self.H[i, 0:self.dim] @ point[0:self.dim] <= self.b[i])
+
+    def constrain_point_outside(self, prog:gp.Model, point:gp.Var):
+        zs = prog.addVars(self.N_faces, vtype=gp.GRB.BINARY, name="zs")
+        for i in range(self.N_faces):
+            prog.addConstr(self.H[i, 0:self.dim] @ point[0:self.dim] >= self.b[i] - (1 - zs[i]) * 1e6)
+        prog.addConstr(gp.quicksum([z for z in zs]) >= 1, name="at_least_one_face_outside")
+    
+    def plot(self, ax:plt.Axes, color='blue', alpha=0.5, label=""):
+        # todo
+        pass

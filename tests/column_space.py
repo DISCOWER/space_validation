@@ -14,8 +14,6 @@ D = Zonotope(x=np.zeros((2,)), Gdiag=np.array([0.4, 0.4]))
 
 # check if B is in the column space of C
 # find a matrix K such that B = CK
-
-
 def exists_K(B, C, tol=1e-8):
     # Check if each column of B lies in the column space of 
     for i in range(B.shape[1]):

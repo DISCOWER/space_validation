@@ -8,37 +8,57 @@ import gurobipy as gp
 scs = {getattr(gp.GRB.status,k): k for k in dir(gp.GRB.status) if k[0].isupper()}
 
 import casadi as cs
-
 import os
 import sys
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
 from Utilities.Robots import FreeFlyer, BlueROV, BlueROV2
-from Utilities.helpers import HyperRectangle
+from Utilities.helpers import HyperRectangle, Polytope
+from Utilities.stl import Pred, Spec, quant_parse_operator
+
+class OptProbItems:
+    def __init__(self, x_vars:gp.Var, u_vars:gp.Var, times:np.ndarray):
+        self.x_vars = x_vars
+        self.u_vars = u_vars
+        self.times = times
 
 # hyperparameters
 N = 100     # number of time steps
 dt = 0.1    # time step size
+t0 = 0      # initial time
+tf = N*dt   # final time
+
 bigM = 1e4
 
-# specification
-X0 = HyperRectangle(np.array([0, 0, 0, 0]), np.array([0.1, 0.1, 0, 0]))
-Xf = HyperRectangle(np.array([0.95, 0.95, 0, 0]), np.array([1, 1, 0, 0]))
-XA = HyperRectangle(np.array([0.2, 0.8, -0.1, -0.1]), np.array([0.4, 1.0, 0.1, 0.1]))
-
-Obs = [HyperRectangle(np.array([0.4, -0.1, 0, 0]), np.array([0.6, 0.6, 0, 0])),
-       HyperRectangle(np.array([0.75, 0.5, 0, 0]), np.array([0.9, 1.1, 0, 0]))]
-
-World = HyperRectangle(np.array([0, 0, -bigM, -bigM]), np.array([1, 1, bigM, bigM]))
-# robot
+# Robot
 sp_robot = FreeFlyer()
+
+# Specification
+X0 = HyperRectangle(np.array([0, 0, -0.1, -0.1]), np.array([0.1, 0.1, 0.1, 0.1]))
+Xf = HyperRectangle(np.array([0.95, 0.95, -0.1, -0.1]), np.array([1, 1, 0.1, 0.1]))
+XA = HyperRectangle(np.array([0.2, 0.8, -1, -1]), np.array([0.4, 1.0, 1, 1]))
+Obs = [HyperRectangle(np.array([0.4, -0.1, -np.inf, -np.inf]), np.array([0.6, 0.6, np.inf, np.inf])),
+       HyperRectangle(np.array([0.75, 0.5, -np.inf, -np.inf]), np.array([0.9, 1.1, np.inf, np.inf]))]
+World = HyperRectangle(np.array([0, 0, -bigM, -bigM]), np.array([1, 1, bigM, bigM]))
+
+phi = Pred("AND", preds=[
+    Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)])]),
+    Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)])]),
+    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)])]),
+    Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)])]),
+])
+spec = Spec(phi, t0, tf)
+
 
 # create planner
 if True:
     opt = gp.Model("prob1")
-    x_vars = opt.addMVar((N, sp_robot.n_x), lb=-np.inf, ub=np.inf, name="x")
-    u_vars = opt.addMVar((N, sp_robot.n_u), lb=-np.inf, ub=np.inf, name="u")
+    x_vars = opt.addMVar((N, sp_robot.n_x), lb=-np.inf, ub=np.inf, name="X")
+    u_vars = opt.addMVar((N, sp_robot.n_u), lb=-np.inf, ub=np.inf, name="U")
+    times = np.linspace(0, tf, N)
+
     alpha_vars = opt.addVar(lb=0, ub=1, name="alpha")
+    opt.update()
 
     for i in range(N):
         opt.addConstrs((u_vars[i, j] >= alpha_vars*sp_robot.U.lower_bounds[j] for j in range(2)))
@@ -46,45 +66,21 @@ if True:
 
     # constraints
     opt.addConstrs((x_vars[i+1,:] == sp_robot.step(x_vars[i, :], u_vars[i, :], dt) for i in range(N-1)))
-    opt.addConstrs((x_vars[i, :] >= World.lower_bounds for i in range(N)))
-    opt.addConstrs((x_vars[i, :] <= World.upper_bounds for i in range(N)))
 
-    opt.addConstr(x_vars[0, :] >= X0.lower_bounds)
-    opt.addConstr(x_vars[0, :] <= X0.upper_bounds)
-    opt.addConstr(x_vars[-1, :] >= Xf.lower_bounds)
-    opt.addConstr(x_vars[-1, :] <= Xf.upper_bounds)
+    X = [var for var in opt.getVars() if "X" in var.VarName]
 
-    # spatial robustness of the specification (stay-in at N/2)
-    # opt.addConstr(x_vars[int(N/2), :] >= XA.lower_bounds)
-    # opt.addConstr(x_vars[int(N/2), :] <= XA.upper_bounds)
-    delta = opt.addVar(lb=0, ub=np.inf, name="spatial_robustness")
-    for face_idx in range(len(XA.b)):
-        c = -XA.A[face_idx, :]@x_vars[int(N/2), 0:2] + XA.b[face_idx]
-        opt.addConstr(c >= delta)
+    items = OptProbItems(x_vars, u_vars, times)
+    quant_parse_operator(opt, spec.phi, items)
 
-    # for obs in Obs:
-    #     z_vars = opt.addMVar((N, 4), vtype=gp.GRB.BINARY, name="z")
-    #     for i in range(N):
-    #         # x_vars[i,0:2] should be outside one of the faces of the obstacle
-    #         opt.addConstr(x_vars[i,0] <= obs.lower_bounds[0] + bigM*(1-z_vars[i,0]))
-    #         opt.addConstr(x_vars[i,0] >= obs.upper_bounds[0] - bigM*(1-z_vars[i,1]))
-    #         opt.addConstr(x_vars[i,1] <= obs.lower_bounds[1] + bigM*(1-z_vars[i,2]))
-    #         opt.addConstr(x_vars[i,1] >= obs.upper_bounds[1] - bigM*(1-z_vars[i,3]))
-    #         opt.addConstr(gp.quicksum(z_vars[i,:]) >= 1)
-
-    # objective
-    # quad_cost = 0
-    # for i in range(N):
-    #     quad_cost += u_vars[i,0]*u_vars[i,0] + u_vars[i,1]*u_vars[i,1]
-    
     cost_var = opt.addVar(lb=-np.inf, ub=np.inf, name="cost")
-    opt.addConstr(cost_var == 100*alpha_vars - 10000*delta) # quad_cost
+    opt.addConstr(cost_var == 1*alpha_vars - 100*spec.phi.rho) # quad_cost
     opt.setObjective(cost_var, gp.GRB.MINIMIZE)
     opt.setParam('OutputFlag', 0)  # Suppress Gurobi output
     opt.optimize()
     if opt.status == gp.GRB.OPTIMAL:
         print(f"Optimal solution found")
         print(f"\nAlpha from solving Prob 1: {alpha_vars.X}")
+        print(f"Spatial robustness: {spec.phi.rho.X}")
         print(f"This is how much control is necessary to satisfy the specification")
     else:
         print(f"No optimal solution found")
