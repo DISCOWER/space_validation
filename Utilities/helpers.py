@@ -5,6 +5,25 @@ from scipy.spatial import ConvexHull
 import gurobipy as gp
 import casadi as cs
 
+# check if B is in the column space of C
+# find a matrix K such that B = CK
+def exists_K(B, C, tol=1e-8):
+    # Check if each column of B lies in the column space of 
+    for i in range(B.shape[1]):
+        b = B[:, i]
+        # Solve Ck ≈ b using least squares
+        k, residuals, rank, s = np.linalg.lstsq(C, b, rcond=None)
+        if np.linalg.norm(C @ k - b) > tol:
+            return False
+    return True
+
+def compute_K(B, C, tol=1e-8):
+    if exists_K(B, C, tol):
+        return B @ np.linalg.pinv(C)
+    else:
+        raise ValueError("No K exists such that B = K C")
+    
+
 class HyperRectangle():
     def __init__(self, lower_bounds:np.ndarray, upper_bounds:np.ndarray):
         self.lower_bounds = lower_bounds
@@ -26,6 +45,30 @@ class HyperRectangle():
                            -self.lower_bounds[1],
                            self.upper_bounds[1]])
 
+    def sum(self, other):
+        assert self.dim == other.dim, "Hyperrectangles must have the same dimension."
+        new_lower_bounds = self.lower_bounds + other.lower_bounds
+        new_upper_bounds = self.upper_bounds + other.upper_bounds
+        return HyperRectangle(new_lower_bounds, new_upper_bounds)
+
+    def subtract(self, other):
+        assert self.dim == other.dim, "Hyperrectangles must have the same dimension."
+        new_lower_bounds = self.lower_bounds - other.lower_bounds
+        new_upper_bounds = self.upper_bounds - other.upper_bounds
+        return HyperRectangle(new_lower_bounds, new_upper_bounds)
+    
+    def divide(self, other):
+        assert self.dim == other.dim, "Hyperrectangles must have the same dimension."
+        new_lower_bounds = self.lower_bounds / other.lower_bounds
+        new_upper_bounds = self.upper_bounds / other.upper_bounds
+        return new_lower_bounds
+    
+    def scalar_multiply(self, scalar:float):
+        assert isinstance(scalar, (int, float)), "Scalar must be a number."
+        new_lower_bounds = self.lower_bounds * scalar
+        new_upper_bounds = self.upper_bounds * scalar
+        return HyperRectangle(new_lower_bounds, new_upper_bounds)
+    
     def is_inside(self, point:np.ndarray) -> bool:
         assert len(point) == self.dim, "Point must have the same dimension as the hyperrectangle."
         return np.all(point >= self.lower_bounds) and np.all(point <= self.upper_bounds)

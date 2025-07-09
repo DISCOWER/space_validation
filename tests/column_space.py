@@ -2,7 +2,7 @@ import numpy as np
 
 import sys 
 sys.path.append("..")
-from Utilities.helpers import Zonotope
+from Utilities.helpers import Zonotope, exists_K, compute_K
 
 
 B = np.array([[1, 0], [0, 1]])
@@ -10,26 +10,6 @@ C = np.array([[1, 1], [0, 1]])
 
 U = Zonotope(x=np.zeros((2,)), Gdiag=np.array([1, 1]))
 D = Zonotope(x=np.zeros((2,)), Gdiag=np.array([0.4, 0.4]))
-
-
-# check if B is in the column space of C
-# find a matrix K such that B = CK
-def exists_K(B, C, tol=1e-8):
-    # Check if each column of B lies in the column space of 
-    for i in range(B.shape[1]):
-        b = B[:, i]
-        # Solve Ck ≈ b using least squares
-        k, residuals, rank, s = np.linalg.lstsq(C, b, rcond=None)
-        if np.linalg.norm(C @ k - b) > tol:
-            return False
-    return True
-
-def compute_K(B, C, tol=1e-8):
-    if exists_K(B, C, tol):
-        return B @ np.linalg.pinv(C)
-    else:
-        raise ValueError("No K exists such that B = K C")
-    
 
 K = compute_K(B, C)
 print(f"K: {K}")

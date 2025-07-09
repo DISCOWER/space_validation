@@ -1,7 +1,8 @@
 import numpy as np
 import casadi as cs
-from Utilities.helpers import HyperRectangle
+from Utilities.helpers import HyperRectangle, Zonotope
 from Utilities.helpers import skew_symmetric, q_to_rot_mat
+from Utilities.helpers import compute_K
 
 
 class Robot:
@@ -46,18 +47,38 @@ class LinearFreeFlyer(Robot):
         super().__init__(n_x=4, n_u=2)
         # dynamics in the form: dx = f(x) + g(x)u
         self.mass = 16.8
-        self.fx = lambda x: np.array([[0,0,1,0],
-                                      [0,0,0,1],
-                                      [0,0,0,0],
-                                      [0,0,0,0]])@x
-        self.gx = lambda x: np.array([[0, 0], [0, 0], [1/self.mass, 0], [0, 1/self.mass]])
+
+        self.A = np.array([[0,0,1,0],
+                           [0,0,0,1],
+                           [0,0,0,0],
+                           [0,0,0,0]])
+        self.B = np.array([[0, 0],
+                           [0, 0],
+                           [1/self.mass, 0],
+                           [0, 1/self.mass]])
+        self.C = np.array([[0, 0],
+                           [0, 0],
+                           [1/20, 0],
+                           [0, 1/20]])
+        self.K = compute_K(self.C, self.B)
+
+        self.fx = lambda x: self.A@x
+        self.gx = lambda x: self.B
 
         self.U = HyperRectangle(np.array([-3, -3]), np.array([3, 3]))
+        self.D = HyperRectangle(np.array([-1, -1]), np.array([1, 1]))
+
+        # self.U_effective = minkowski_difference(self.U, self.K@self.D)
+        self.KD = HyperRectangle(
+            self.K[2:,2:]@self.D.lower_bounds,
+            self.K[2:,2:]@self.D.upper_bounds
+        )
+        self.U_effective = self.U.subtract(self.KD)
 
 class FreeFlyer(Robot):
-    def __init__(self,six_dof=False):
-        nx = 6 if six_dof else 13
-        nu = 3 if six_dof else 6
+    def __init__(self):
+        nx = 13
+        nu = 6
         super().__init__(n_x=nx, n_u=nu)
 
         # dynamics in the form: dx = f(x) + g(x)u
@@ -69,16 +90,10 @@ class FreeFlyer(Robot):
         self.fx = lambda x: self._fx(x)
         self.gx = lambda x: self._gx(x)
 
-        if six_dof:
-            self.U = HyperRectangle(
-                np.array([-self.max_thrust]*2 + [-self.max_torque]*1),
-                np.array([self.max_thrust]*2 + [self.max_torque]*1)
-            )
-        else:
-            self.U = HyperRectangle(
-                np.array([-self.max_thrust]*3 + [-self.max_torque]*3),
-                np.array([self.max_thrust]*3 + [self.max_torque]*3)
-            )
+        self.U = HyperRectangle(
+            np.array([-self.max_thrust]*3 + [-self.max_torque]*3),
+            np.array([self.max_thrust]*3 + [self.max_torque]*3)
+        )
 
     def _fx(self, x):
         p, v, q, w = x[0:3], x[3:6], x[6:10], x[10:13]
