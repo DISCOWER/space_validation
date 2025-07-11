@@ -1,17 +1,33 @@
 import gurobipy as gp
+from Utilities.helpers import Polytope
+import numpy as np
+
+class OptProbItems:
+    def __init__(self, x_vars:gp.Var, u_vars:gp.Var, times:np.ndarray):
+        self.x_vars = x_vars
+        self.u_vars = u_vars
+        self.times = times
+
 
 def in_interval(items, I, i):
     t = items.times[i]
     return I[0] <= t <= I[1]
 
 class Pred():
-    def __init__(self, type, I=[0,0], preds=[]):
+    def __init__(self, type, I=[0,0], preds=[], dims=[]):
         self.type = type
         self.I = I          # Time interval
         self.preds = preds  # List of child predicates (e.g. \phi1 Until_I \phi2 -> preds=[\phi1, \phi2])
         self.rho = None     # Variable for the satisfaction degree
         self.rhos = None    # Variables for the satisfaction degree in MU operator
         self.area = None    # Area for MU operator
+
+        # check that if preds[0] is a Polytope, dims is of same lenght as preds[0].H.shape[1]
+        if len(preds) > 0 and isinstance(preds[0], Polytope):
+            if len(dims) != preds[0].H.shape[1]:
+                raise ValueError("dims must be of same length as preds[0].H.shape[1]")
+        self.dims = dims    # Dimensions that need to be considered for the polytope inequalities
+
     def print(self):
         return f"{self.type}_[{self.I[0]},{self.I[1]}]"
     
@@ -57,7 +73,7 @@ def quant_parse_operator(opt:gp.Model,pred:Pred, items):
         ValueError(f"Unknown operator {pred.type}")
 
 
-def quant_AND(opt:gp.Model, pred:Pred, items):
+def quant_AND(opt:gp.Model, pred:Pred, items:OptProbItems):
     pred.rho = opt.addVar(vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, 
                           name=f"rho_AND_{pred.print()}")
     try:
@@ -67,7 +83,7 @@ def quant_AND(opt:gp.Model, pred:Pred, items):
         print(f"Error in quant_AND: {e}")
     opt.update()
 
-def quant_OR(opt:gp.Model, pred:Pred, items):
+def quant_OR(opt:gp.Model, pred:Pred, items:OptProbItems):
     pred.rho = opt.addVar(vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, 
                           name=f"rho_OR_{pred.print()}")
     try:
@@ -91,7 +107,7 @@ def quant_EVENTUALLY(opt:gp.Model, pred:Pred, items):
         print(f"Error in quant_EVENTUALLY: {e}")
     opt.update()
 
-def quant_ALWAYS(opt:gp.Model, pred:Pred, items):
+def quant_ALWAYS(opt:gp.Model, pred:Pred, items:OptProbItems):
     pred.rho = opt.addVar(vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, 
                           name=f"rho_G_{pred.print()}")
     try:
@@ -106,7 +122,7 @@ def quant_ALWAYS(opt:gp.Model, pred:Pred, items):
         print(f"Error in quant_ALWAYS: {e}")
     opt.update()
 
-def quant_UNTIL(opt:gp.Model, pred:Pred, items):
+def quant_UNTIL(opt:gp.Model, pred:Pred, items:OptProbItems):
     pred.rho = opt.addVar(vtype=gp.GRB.CONTINUOUS, name=f"rho_U_{pred.print()}")
     try:
         rhos = []
@@ -121,11 +137,11 @@ def quant_UNTIL(opt:gp.Model, pred:Pred, items):
     except Exception as e:
         print(f"Error in quant_UNTIL: {e}")
 
-def quant_MU(opt:gp.Model, pred:Pred, items):
+def quant_MU(opt:gp.Model, pred:Pred, items:OptProbItems):
     print(f"quant_MU: {pred.print()}")
     N = items.x_vars.shape[0]
     N_faces = pred.preds[0].N_faces
-    dim = pred.preds[0].dim
+    dims = pred.dims
 
     pred.rhos = opt.addMVar((N,), vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, 
                             name=f"rho_MU_{pred.print()}")
@@ -136,7 +152,7 @@ def quant_MU(opt:gp.Model, pred:Pred, items):
                                     name=f"rho_faces_MU_{pred.print()}_i{i}")
             pred.rho_faces.append(rho_faces)
             for face in range(N_faces):
-                ineqs = pred.preds[0].H @ items.x_vars[i,:dim] - pred.preds[0].b
+                ineqs = pred.preds[0].H @ items.x_vars[i,dims] - pred.preds[0].b
                 opt.addConstr(ineqs[face] == -rho_faces[face], name=f"rho_faces_MU_{pred.print()}_i{i}_face{face}")
             opt.addConstr(pred.rhos[i] == gp.min_([rf for rf in rho_faces]), name=f"rho_MU_{pred.print()}_i{i}")
 
@@ -144,7 +160,7 @@ def quant_MU(opt:gp.Model, pred:Pred, items):
         print(f"Error in quant_MU: {e}")
     opt.update()
 
-def quant_NEG(opt:gp.Model, pred:Pred, items):
+def quant_NEG(opt:gp.Model, pred:Pred, items:OptProbItems):
     print(f"quant_NEG: {pred.print()}")
     if pred.preds[0].type == "MU":
         pred.rhos = opt.addMVar((items.x_vars.shape[0],), vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, 

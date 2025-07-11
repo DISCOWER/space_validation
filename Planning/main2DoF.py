@@ -12,15 +12,10 @@ import os
 import sys
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
-from Utilities.Robots import LinearFreeFlyer, FreeFlyer, LinearBlueROV, BlueROV
+from Utilities.Robots import LinearFreeFlyer2DoF, FreeFlyer, LinearBlueROV, BlueROV
 from Utilities.helpers import HyperRectangle, Polytope
-from Utilities.stl import Pred, Spec, quant_parse_operator
+from Utilities.stl import Pred, Spec, quant_parse_operator, OptProbItems
 
-class OptProbItems:
-    def __init__(self, x_vars:gp.Var, u_vars:gp.Var, times:np.ndarray):
-        self.x_vars = x_vars
-        self.u_vars = u_vars
-        self.times = times
 
 # hyperparameters
 N = 30     # number of time steps
@@ -31,23 +26,23 @@ tf = N*dt   # final time
 bigM = 1e4
 
 # Robot
-sp_robot = LinearFreeFlyer()
+sp_robot = LinearFreeFlyer2DoF()
 
 # Specification
-X0 = HyperRectangle(np.array([0, 0, -0.1, -0.1]), np.array([0.1, 0.1, 0.1, 0.1]))
-Xf = HyperRectangle(np.array([0.90, 0.90, -0.1, -0.1]), np.array([1, 1, 0.1, 0.1]))
+X0 = HyperRectangle(np.array([0, 0]), np.array([0.1, 0.1]))
+Xf = HyperRectangle(np.array([0.90, 0.90]), np.array([1, 1]))
 XA = HyperRectangle(np.array([0.2, 0.8]), np.array([0.4, 1.0]))
 Obs = [HyperRectangle(np.array([0.4, -0.1]), np.array([0.6, 0.6])),
        HyperRectangle(np.array([0.75, 0.8]), np.array([0.9, 1.1]))]
-World = HyperRectangle(np.array([0, 0, -bigM, -bigM]), np.array([1, 1, bigM, bigM]))
+World = HyperRectangle(np.array([0, 0, -10, -10]), np.array([1, 1, 10, 10]))
 
 phi = Pred("AND", preds=[
-    Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)])]),
-    Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)])]),
-    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)])]),
-    Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)])]),
-    Pred("G", [t0,tf], preds=[Pred("NEG", preds=[Pred("MU", preds=[Polytope(Obs[0])])])]),
-    Pred("G", [t0,tf], preds=[Pred("NEG", preds=[Pred("MU", preds=[Polytope(Obs[1])])])])
+    Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)], dims=[0,1])]),
+    Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1])]),
+    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1])]),
+    Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)], dims=[0,1,2,3])]),
+    Pred("G", [t0,tf], preds=[Pred("NEG", preds=[Pred("MU", preds=[Polytope(Obs[0])], dims=[0,1])])]),
+    Pred("G", [t0,tf], preds=[Pred("NEG", preds=[Pred("MU", preds=[Polytope(Obs[1])], dims=[0,1])])])
 ])
 spec = Spec(phi, t0, tf)
 

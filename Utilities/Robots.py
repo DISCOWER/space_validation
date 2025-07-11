@@ -42,7 +42,7 @@ class Robot:
         return self.x
 
 
-class LinearFreeFlyer(Robot):
+class LinearFreeFlyer2DoF(Robot):
     def __init__(self):
         super().__init__(n_x=4, n_u=2)
         # dynamics in the form: dx = f(x) + g(x)u
@@ -72,6 +72,43 @@ class LinearFreeFlyer(Robot):
         self.KD = HyperRectangle(
             self.K[2:,2:]@self.D.lower_bounds,
             self.K[2:,2:]@self.D.upper_bounds
+        )
+        self.U_effective = self.U.subtract(self.KD)
+
+class LinearFreeFlyer6DoF(Robot):
+    def __init__(self):
+        super().__init__(n_x=12, n_u=6)
+        # dynamics in the form: dx = f(x) + g(x)u
+        self.mass = 16.8
+        self.inertia = 0.314
+
+        self.A = np.zeros((12, 12))
+        self.A[0:6, 6:12] = np.eye(6)
+
+        self.B = np.zeros((12, 6))
+        self.B[6:12, :] = np.array([[1/self.mass, 0, 0, 0, 0, 0],
+                                    [0, 1/self.mass, 0, 0, 0, 0],
+                                    [0, 0, 1/self.mass, 0, 0, 0],
+                                    [0, 0, 0, 1/self.inertia, 0, 0],
+                                    [0, 0, 0, 0, 1/self.inertia, 0],
+                                    [0, 0, 0, 0, 0, 1/self.inertia]])
+        
+        self.C = np.zeros((12, 2))
+        self.C[6:8, :] = np.array([[1/20, 0],
+                                   [0, 1/20]])
+        self.K = compute_K(self.C, self.B)
+
+        self.fx = lambda x: self.A@x
+        self.gx = lambda x: self.B
+
+        self.U = HyperRectangle(np.array([-3, -3, -3, -0.5, -0.5, -0.5]),
+                                np.array([3, 3, 3, 0.5, 0.5, 0.5]))
+        self.D = HyperRectangle(np.array([-1, -1]),np.array([1, 1]))
+
+        # self.U_effective = minkowski_difference(self.U, self.K@self.D)
+        self.KD = HyperRectangle(
+            self.K[6:,2:]@self.D.lower_bounds,
+            self.K[6:,2:]@self.D.upper_bounds
         )
         self.U_effective = self.U.subtract(self.KD)
 
