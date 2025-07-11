@@ -19,9 +19,9 @@ def exists_K(B, C, tol=1e-8):
 
 def compute_K(B, C, tol=1e-8):
     if exists_K(B, C, tol):
-        return B @ np.linalg.pinv(C)
+        return np.linalg.pinv(B)@C
     else:
-        raise ValueError("No K exists such that B = K C")
+        raise ValueError("No K exists such that C = BK")
     
 
 class HyperRectangle():
@@ -179,6 +179,25 @@ def v_dot_q(v, q):
     rot_mat = q_to_rot_mat(q)
 
     return cs.mtimes(rot_mat, v)
+
+def euler_to_quat(roll, pitch, yaw):
+    """
+    Convert Euler angles (roll, pitch, yaw) to quaternion (qw, qx, qy, qz).
+    Angles are in radians.
+    """
+    cy = np.cos(yaw * 0.5)
+    sy = np.sin(yaw * 0.5)
+    cr = np.cos(roll * 0.5)
+    sr = np.sin(roll * 0.5)
+    cp = np.cos(pitch * 0.5)
+    sp = np.sin(pitch * 0.5)
+
+    qw = cy * cr * cp + sy * sr * sp
+    qx = cy * sr * cp - sy * cr * sp
+    qy = sy * cr * cp + cy * sr * sp
+    qz = sy * sr * cp - cy * cr * sp
+
+    return np.array([qx, qy, qz, qw])
 
 # def skew_symmetric(v):
 #     return np.vstack((np.hstack((0, -v[0], -v[1], -v[2])),

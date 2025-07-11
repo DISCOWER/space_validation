@@ -12,37 +12,37 @@ import os
 import sys
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
-from Utilities.Robots import LinearFreeFlyer2DoF, FreeFlyer, LinearBlueROV, BlueROV
-from Utilities.helpers import HyperRectangle, Polytope
+from Utilities.Robots import LinearFreeFlyer2DoF, FreeFlyer, LinearBlueROV, BlueROV, LinearFreeFlyer6DoF
+from Utilities.helpers import HyperRectangle, Polytope, euler_to_quat
 from Utilities.stl import Pred, Spec, quant_parse_operator, OptProbItems
 
 
 # hyperparameters
-N = 30     # number of time steps
-dt = 0.25    # time step size
+N = 20     # number of time steps
+dt = 0.5    # time step size
 t0 = 0      # initial time
 tf = N*dt   # final time
 
 bigM = 1e4
 
 # Robot
-sp_robot = LinearFreeFlyer2DoF()
+sp_robot = LinearFreeFlyer6DoF()
 
 # Specification
-X0 = HyperRectangle(np.array([0, 0]), np.array([0.1, 0.1]))
-Xf = HyperRectangle(np.array([0.90, 0.90]), np.array([1, 1]))
-XA = HyperRectangle(np.array([0.2, 0.8]), np.array([0.4, 1.0]))
+X0 = HyperRectangle(np.array([0, 0, 0]), np.array([0.1, 0.1, 0.1]))
+Xf = HyperRectangle(np.array([0.90, 0.90, 0]), np.array([1, 1, 0.1]))
+XA = HyperRectangle(np.array([0.2, 0.8, 0,  -np.pi/2-np.pi/8]), np.array([0.4, 1.0, 0.1,  -np.pi/2+np.pi/8]))
 Obs = [HyperRectangle(np.array([0.4, -0.1]), np.array([0.6, 0.6])),
        HyperRectangle(np.array([0.75, 0.8]), np.array([0.9, 1.1]))]
 World = HyperRectangle(np.array([0, 0, -10, -10]), np.array([1, 1, 10, 10]))
 
 phi = Pred("AND", preds=[
-    Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)], dims=[0,1])]),
-    Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1])]),
-    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1])]),
-    Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)], dims=[0,1,2,3])]),
-    Pred("G", [t0,tf], preds=[Pred("NEG", preds=[Pred("MU", preds=[Polytope(Obs[0])], dims=[0,1])])]),
-    Pred("G", [t0,tf], preds=[Pred("NEG", preds=[Pred("MU", preds=[Polytope(Obs[1])], dims=[0,1])])])
+    Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)], dims=[0,1,2])]),
+    Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1,2])]),
+    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2, 5])]),
+    Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)], dims=[0,1,6,7])]),
+    # Pred("G", [t0,tf], preds=[Pred("NEG", preds=[Pred("MU", preds=[Polytope(Obs[0])], dims=[0,1])])]),
+    # Pred("G", [t0,tf], preds=[Pred("NEG", preds=[Pred("MU", preds=[Polytope(Obs[1])], dims=[0,1])])])
 ])
 spec = Spec(phi, t0, tf)
 
@@ -53,9 +53,10 @@ if True:
     x_vars = opt.addMVar((N, sp_robot.n_x), lb=-np.inf, ub=np.inf, name="X")
     u_vars = opt.addMVar((N, sp_robot.n_u), lb=-np.inf, ub=np.inf, name="U")
     times = np.linspace(0, tf, N)
-
     alpha_vars = opt.addVar(lb=0, ub=1, name="alpha")
     opt.update()
+
+    items = OptProbItems(x_vars, u_vars, times)
 
     for i in range(N):
         opt.addConstrs((u_vars[i, j] >= alpha_vars*sp_robot.U_effective.lower_bounds[j] for j in range(2)))
@@ -63,14 +64,21 @@ if True:
 
     # constraints
     opt.addConstrs((x_vars[i+1,:] == sp_robot.step(x_vars[i, :], u_vars[i, :], dt) for i in range(N-1)))
+    sp_robot.add_state_constraints(opt, items)
+
+    # initial orientation and velocity constraints
+    opt.addConstr(x_vars[0, 3::] == np.zeros(sp_robot.n_x - 3))
+    opt.addConstr(x_vars[-1, 3::] >= np.zeros(sp_robot.n_x - 3))
 
     X = [var for var in opt.getVars() if "X" in var.VarName]
-
-    items = OptProbItems(x_vars, u_vars, times)
     quant_parse_operator(opt, spec.phi, items)
 
     cost_var = opt.addVar(lb=-np.inf, ub=np.inf, name="cost")
-    opt.addConstr(cost_var == 1*alpha_vars - 100*spec.phi.rho) # quad_cost
+    act_abs_var = opt.addMVar((N, sp_robot.n_u))
+    act_int_var = opt.addVar()
+    opt.addConstrs((act_abs_var[i,j] == gp.abs_(u_vars[i,j]) for i in range(N) for j in range(sp_robot.n_u)), name="act_int")
+    opt.addConstr(act_int_var == gp.quicksum([act_abs_var[i,j] for i in range(N) for j in range(sp_robot.n_u)]), name="act_int_sum")
+    opt.addConstr(cost_var == 1*alpha_vars - 10000*spec.phi.rho + 0.0001*act_int_var) # quad_cost
     opt.setObjective(cost_var, gp.GRB.MINIMIZE)
     opt.setParam('OutputFlag', 0)  # Suppress Gurobi output
     opt.optimize()
@@ -80,6 +88,8 @@ if True:
         denom = sp_robot.U_effective.scalar_multiply(alpha_vars.X)
         denom = denom.sum(sp_robot.KD)
         print(f"Beta from solving Prob 1: {denom.divide(sp_robot.U)}")
+        print(f"Spatial robustness: rho = {spec.phi.rho.X}")
+        print(f"Control integral summed: {act_int_var.X}")
         # print(f"Spatial robustness: {spec.phi.rho.X}")
         # for pred in spec.phi.preds:
         #     print(f"rhos: {pred.preds[-1].rhos.X }")
@@ -93,14 +103,17 @@ if True:
     x_ff = x_vars.X
     u_ff = u_vars.X
     alpha = alpha_vars.X
+    # save x_ff and u_ff to a csv file
+    np.savez('Planning/solutions/sp_solution.npz', x_ff=x_ff, u_ff=u_ff, dt=dt, alpha=alpha, times=times)
+
 else:
-    # load the solution
-    data = np.load("solutions/ff_solution.npz")
+    # or load instead
+    data = np.load('Planning/solutions/sp_solution.npz')
     x_ff = data['x_ff']
     u_ff = data['u_ff']
     alpha = data['alpha']
-
-t_sp = np.linspace(0, N*dt, N)
+    dt = data['dt']
+    # t_sp = data['times']
 
 # plot the trajectory
 fig, axs = plt.subplots(1,2, figsize=(10, 5))
@@ -124,18 +137,17 @@ axs[1].set_xlabel('Time step')
 axs[1].set_ylabel('Control input')
 plt.savefig("figures/sp_trajectory.png")
 
-# save x_ff and u_ff to a csv file
-np.savez('Planning/solutions/sp_solution.npz', x_ff=x_ff, u_ff=u_ff, dt=dt, alpha=alpha)
 
 
+# Now we have pitch-roll-yaw angles which we want to convert to unit quaternion
+x_ff_quat = np.zeros((x_ff.shape[0], x_ff.shape[1] + 1))
+for i in range(x_ff.shape[0]):
+    x_ff_quat[i, 0:3] = x_ff[i, 0:3]
+    x_ff_quat[i, 3:7] = euler_to_quat(x_ff[i, 3], x_ff[i, 4], x_ff[i, 5])
+    x_ff_quat[i, 7::] = x_ff[i, 6::]
 
-
-
-
-
-
-
-
+print(x_ff_quat[:, 3:7])
+print(np.linalg.norm(x_ff_quat[:, 3:7],axis=1))  # should be close to 1
 
 # feedback linearization controller for the underwater robot to behave like a free flyer
 uw_robot = BlueROV()

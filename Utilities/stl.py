@@ -24,7 +24,7 @@ class Pred():
 
         # check that if preds[0] is a Polytope, dims is of same lenght as preds[0].H.shape[1]
         if len(preds) > 0 and isinstance(preds[0], Polytope):
-            if len(dims) != preds[0].H.shape[1]:
+            if len(dims) > preds[0].H.shape[1]:
                 raise ValueError("dims must be of same length as preds[0].H.shape[1]")
         self.dims = dims    # Dimensions that need to be considered for the polytope inequalities
 

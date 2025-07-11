@@ -1,8 +1,10 @@
 import numpy as np
 import casadi as cs
+import gurobipy as gp
 from Utilities.helpers import HyperRectangle, Zonotope
 from Utilities.helpers import skew_symmetric, q_to_rot_mat
 from Utilities.helpers import compute_K
+from Utilities.stl import OptProbItems
 
 
 class Robot:
@@ -41,6 +43,12 @@ class Robot:
         self.x += dx * dt
         return self.x
 
+    def add_state_constraints(self, prog:gp.Model, items:OptProbItems):
+        # Add constraitns on the state that are fundamental:
+        # - rotations in [0,2pi]
+        # - with additional wrapping? (TODO)
+        pass
+
 
 class LinearFreeFlyer2DoF(Robot):
     def __init__(self):
@@ -60,7 +68,7 @@ class LinearFreeFlyer2DoF(Robot):
                            [0, 0],
                            [1/20, 0],
                            [0, 1/20]])
-        self.K = compute_K(self.C, self.B)
+        self.K = compute_K(self.B, self.C)
 
         self.fx = lambda x: self.A@x
         self.gx = lambda x: self.B
@@ -93,24 +101,48 @@ class LinearFreeFlyer6DoF(Robot):
                                     [0, 0, 0, 0, 1/self.inertia, 0],
                                     [0, 0, 0, 0, 0, 1/self.inertia]])
         
-        self.C = np.zeros((12, 2))
-        self.C[6:8, :] = np.array([[1/20, 0],
-                                   [0, 1/20]])
-        self.K = compute_K(self.C, self.B)
+        self.C = np.zeros((12, 3))
+        # TODO: deal with positive and negative values here
+        self.C[6:9, :] = np.array([[1/20, 0, 0],
+                                   [0, 1/20, 0],
+                                   [0, 0, 1/20]])
+        self.K = np.linalg.pinv(self.B)@self.C #compute_K(self.B, self.C)
 
         self.fx = lambda x: self.A@x
         self.gx = lambda x: self.B
 
         self.U = HyperRectangle(np.array([-3, -3, -3, -0.5, -0.5, -0.5]),
                                 np.array([3, 3, 3, 0.5, 0.5, 0.5]))
-        self.D = HyperRectangle(np.array([-1, -1]),np.array([1, 1]))
+        self.D = HyperRectangle(np.array([-1, -1, -1]),np.array([1, 1, 1]))
 
         # self.U_effective = minkowski_difference(self.U, self.K@self.D)
+        # TODO: deal with the fact that K and D are not of same dimension
         self.KD = HyperRectangle(
-            self.K[6:,2:]@self.D.lower_bounds,
-            self.K[6:,2:]@self.D.upper_bounds
+            self.K@self.D.lower_bounds,
+            self.K@self.D.upper_bounds
         )
+
         self.U_effective = self.U.subtract(self.KD)
+
+    def add_state_constraints(self, prog:gp.Model, items:OptProbItems):
+        for i in range(items.x_vars.shape[0]):
+            # Add constraints for roll and yaw to be between [-pi, pi]
+            prog.addConstr(items.x_vars[i, 4] >= -np.pi, f"roll_lower_{i}")
+            prog.addConstr(items.x_vars[i, 4] <= np.pi, f"roll_upper_{i}")
+            prog.addConstr(items.x_vars[i, 5] >= -np.pi, f"yaw_lower_{i}")
+            prog.addConstr(items.x_vars[i, 5] <= np.pi, f"yaw_upper_{i}")
+
+            # Add constrains for pitch to be between [-pi/2, pi/2] (prevent gymbal lock)
+            prog.addConstr(items.x_vars[i, 3] >= -np.pi/2, f"pitch_lower_{i}")
+            prog.addConstr(items.x_vars[i, 3] <= np.pi/2, f"pitch_upper_{i}")
+
+            # Add constraints for the angular velocities to be between [-pi/8, pi/8]
+            prog.addConstr(items.x_vars[i, 9] >= -np.pi/8, f"p_lower_{i}")
+            prog.addConstr(items.x_vars[i, 9] <= np.pi/8, f"p_upper_{i}")
+            prog.addConstr(items.x_vars[i, 10] >= -np.pi/8, f"q_lower_{i}") 
+            prog.addConstr(items.x_vars[i, 10] <= np.pi/8, f"q_upper_{i}")
+            prog.addConstr(items.x_vars[i, 11] >= -np.pi/8, f"r_lower_{i}")
+            prog.addConstr(items.x_vars[i, 11] <= np.pi/8, f"r_upper_{i}")
 
 class FreeFlyer(Robot):
     def __init__(self):
