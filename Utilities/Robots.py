@@ -2,7 +2,9 @@ import numpy as np
 import casadi as cs
 import gurobipy as gp
 from Utilities.helpers import HyperRectangle, Zonotope
-from Utilities.helpers import skew_symmetric, q_to_rot_mat
+from Utilities.rotations import skew_symmetric, q_to_rot_mat
+from Utilities.rotations import euler_to_quat_cs, euler_to_quat_np, quat_to_euler_cs, quat_to_euler_np
+from Utilities.rotations import quat_x_to_euler_x_cs, euler_x_to_quat_x_cs
 from Utilities.helpers import compute_K
 from Utilities.stl import OptProbItems
 
@@ -18,15 +20,15 @@ class Robot:
         self.gx = None
 
     def set_state(self, x:np.ndarray):
-        assert x.shape==(self.n_x,) or x.shape==(self.n_x,1), f"State vector must be of shape ({self.n_x},) but got {x.shape}"
+        # assert x.shape==(self.n_x,) or x.shape==(self.n_x,1), f"State vector must be of shape ({self.n_x},) but got {x.shape}"
         self.x = x
 
     def set_control(self, u:np.ndarray):
-        assert u.shape==(self.n_u,) or u.shape==(self.n_u,1), f"Control vector must be of shape ({self.n_u},) but got {u.shape}"
+        # assert u.shape==(self.n_u,) or u.shape==(self.n_u,1), f"Control vector must be of shape ({self.n_u},) but got {u.shape}"
         self.u = u
 
     def dynamics(self, u:np.ndarray)-> np.ndarray:
-        assert u.shape==(self.n_u,) or u.shape==(self.n_u,1), f"Control vector must be of shape ({self.n_u},)"
+        # assert u.shape==(self.n_u,) or u.shape==(self.n_u,1), f"Control vector must be of shape ({self.n_u},)"
         self.u = u
         # Calculate the dynamics
         dx = self.fx(self.x) + self.gx(self.x)@self.u
@@ -165,42 +167,27 @@ class FreeFlyer(Robot):
         )
 
     def _fx(self, x):
-        p, v, q, w = x[0:3], x[3:6], x[6:10], x[10:13]
+        p, q, v, w = x[0:3], x[3:7], x[7:10], x[10:13]
         fx = cs.blockcat([
             [v],
-            [cs.MX.zeros(3,)],
             [0.5 * cs.mtimes(skew_symmetric(w), q)],
+            [cs.DM.zeros(3,)],
             [cs.DM(np.linalg.inv(self.inertia)) @ (-cs.cross(w, self.inertia @ w))]
         ])
         return fx
     
     def _gx(self, x):
-        p, v, q, w = x[0:3], x[3:6], x[6:10], x[10:13]
-        gx = cs.blockcat([
-            [cs.MX.zeros((3, 6))],
-            [q_to_rot_mat(q)/self.mass],
-            [cs.MX.zeros((4, 6))],
-            [cs.DM(np.linalg.inv(self.inertia))]
-        ])
+        p, q, v, w = x[0:3], x[3:7], x[7:10], x[10:13]
+        gx = cs.vertcat(
+            cs.DM.zeros((3, 6)),
+            cs.DM.zeros((4, 6)),
+            cs.horzcat(q_to_rot_mat(q)/self.mass, cs.DM.zeros((3,3))),
+            cs.horzcat(cs.DM.zeros((3, 3)), cs.DM(np.linalg.inv(self.inertia)))
+        )
         return gx
 
-
-
-        
-class LinearBlueROV(Robot):
-    def __init__(self):
-        super().__init__(n_x=4, n_u=2)
-        # dynamics in the form: dx = f(x) + g(x)u
-        self.fx = lambda x: np.array([[0,0,1,0],
-                                      [0,0,0,1],
-                                      [0,0,-0.1,0],
-                                      [0,0,0,-0.1]])@x
-        self.gx = lambda x: np.array([[0, 0], [0, 0], [1, 0], [0, 1]])
-
-        self.U = HyperRectangle(np.array([-2, -2]), np.array([2, 2]))
-
 class BlueROV(Robot):
-    def __init__(self):
+    def __init__(self, quaternion=False):
         # from https://www.mdpi.com/2077-1312/10/12/1898
         super().__init__(n_x=12, n_u=6)
         # dynamics in the form: dx = f(x) + g(x)u
@@ -235,8 +222,19 @@ class BlueROV(Robot):
         self.M_dq = 0.135   # kg*m^2
         self.N_dr = 0.222   # kg*m^2
 
-        self.fx = lambda x: self._fx(x)
-        self.gx = lambda x: self._gx(x)
+        if quaternion:
+            self.fx = lambda x: (
+                lambda fx:
+                 cs.blockcat([[fx[0:3]], [x[3:7]], [fx[6::]]])
+            )(self._fx(quat_x_to_euler_x_cs(x)))
+            self.gx = lambda x: (
+                #TODO: FIX THIS, GX SHOULD BE A MATRIX
+                lambda gx:
+                cs.blockcat([[gx[0:3,:]], [cs.GenDM_zeros((1,6))], [gx[3::,:]]])
+            )(self._gx(quat_x_to_euler_x_cs(x)))
+        else:
+            self.fx = lambda x: self._fx(x)
+            self.gx = lambda x: self._gx(x)
 
         self.U = HyperRectangle(np.array([-85, -85, -120, -26, -14, -22]),
                                 np.array([85, 85, 120, 26, 14, 22]))
