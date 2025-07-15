@@ -19,9 +19,9 @@ def generate_launch_description():
     # run the px4_1.launch.py script twice
     lf_1 = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            [get_package_share_directory('impact_stl'), '/px4.launch.py']),
+            [get_package_share_directory('discower_launch'), '/px4.launch.py']),
 
-        launch_arguments={'id':'0', 'pose':'-5,9,0', 'name':'snap', 'delay':'0', 'headless':'0'}.items()
+        launch_arguments={'id':'0', 'pose':'1,0,0', 'name':'snap', 'delay':'0'}.items()
     )
 
     ld.add_action(lf_1)
@@ -40,7 +40,7 @@ def generate_launch_description():
             package='rviz2',
             executable='rviz2',
             name='rviz2',
-            arguments=['-d', [os.path.join(get_package_share_directory('impact_stl'), 'config.rviz')]]
+            arguments=['-d', [os.path.join(get_package_share_directory('stl_mapping'), 'config.rviz')]]
     ))
     # Plotjuggler from the juggler_2.xml file (2 spacecrafts)
     ld.add_action(Node(
@@ -48,32 +48,7 @@ def generate_launch_description():
             namespace='snap',
             executable='plotjuggler',
             name='plotjuggler',
-            arguments=['-l', os.path.join(get_package_share_directory('impact_stl'), 'juggler_sitl_3.xml')]
-    ))
-
-    # Launch a Gazebo to ROS bridge such that we can use the ground truth
-    # position and velocity estimates in the controller
-    # We do this because of the impacts screwing with the EKF2
-    # Since we have mo-cap on the platforms, this is a sensible decision
-    ld.add_action(Node(
-            package='ros_gz_bridge',
-            executable='parameter_bridge', # spacecraft_mpc, spacecraft_impact_mpc
-            name='bridge_1',
-            output='screen',
-            arguments=['/model/spacecraft_2d_0/odometry@nav_msgs/msg/Odometry[gz.msgs.Odometry']
-    ))
-
-    # Launch the gz to px4 converters that take the Odometry message
-    # and fill the correct PX4 messages such that we only need to change
-    # .../fmu/out/vehicle_local_position to .../fmu/out/vehicle_local_position_gz
-    # or vice-versa. Keep care of the namespace and topic_name parameters!!!
-    # snap
-    ld.add_action(Node(
-            package='impact_stl',
-            executable='odom_to_vehicle_local_position',
-            namespace='snap',
-            output='screen',
-            parameters=[{'topic_name': '/model/spacecraft_2d_0/odometry'}]
+            arguments=['-l', os.path.join(get_package_share_directory('stl_mapping'), 'juggler_sitl_3.xml')]
     ))
 
     return ld

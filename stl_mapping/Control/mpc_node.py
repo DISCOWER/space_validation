@@ -158,6 +158,7 @@ class MPCNode(Node):
         self.publisher_torque_setpoint.publish(torque_output_msg)
 
     def publish_offboard_mode(self):
+        # self.get_logger().info("Publishing offboard mode")
         offboard_msg = OffboardControlMode()
         offboard_msg.timestamp = int(Clock().now().nanoseconds / 1000)
         offboard_msg.position = False
@@ -226,6 +227,7 @@ class MPCNode(Node):
         pub.publish(msg)
 
     def cmdloop_callback(self):
+        # self.get_logger().info("Command loop callback")
         t = time.time()
 
         x0 = np.array([self.vehicle_local_position[0],
@@ -244,9 +246,11 @@ class MPCNode(Node):
 
         if not self.started:
             self.get_logger().info("MPC not started yet, skipping control computation.")
-            x_ref = np.array([1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0])
+            x_ref = np.array([0.5, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0])
         else:
+            self.get_logger().info("MPC started, computing control input.")
             t_mpc = t - self.t0
+            self.get_logger().info(f"Time since start: {t_mpc:.2f} seconds")
             times = np.arange(t_mpc, t_mpc+self.mpc.Nx*self.mpc.dt, self.mpc.dt)
             x_ref = np.zeros((13, self.mpc.Nx + 1))
             for idx, ti in enumerate(times):

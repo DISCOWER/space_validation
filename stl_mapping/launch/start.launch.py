@@ -37,7 +37,7 @@ def generate_launch_description():
     # Send a "Start" signal to anyone that cares
     ld.add_action(ExecuteProcess(
         cmd=[
-            'ros2 topic pub --once --qos_reliability reliable /stl_mapping/start \
+            'ros2 topic pub --once /stl_mapping/start \
                 std_msgs/msg/Bool \
                 "{data: true}"'
         ], shell=True)
