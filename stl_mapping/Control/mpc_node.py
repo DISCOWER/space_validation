@@ -2,6 +2,7 @@ import numpy as np
 import time
 import rclpy
 from rclpy.node import Node
+from rclpy.clock import Clock
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
 import casadi as cs
 import os
@@ -10,12 +11,13 @@ from Utilities.get_reference_trajectory import get_reference_trajectory, Referen
         
 from std_msgs.msg import Bool
 from px4_msgs.msg import VehicleStatus, VehicleAttitude, VehicleAngularVelocity, VehicleLocalPosition
+from px4_msgs.msg import VehicleThrustSetpoint, VehicleTorqueSetpoint, OffboardControlMode
 
 class MPCNode(Node):
     def __init__(self):
         super().__init__('mpc_node')
 
-        # Subscribers and publishers
+        # Subscribers
         self.status_sub = self.create_subscription(
             VehicleStatus,
             'fmu/out/vehicle_status',
@@ -38,6 +40,16 @@ class MPCNode(Node):
             NORMAL_QOS)
         self.start_sub = self.create_subscription(
             Bool, '/stl_mapping/start', self.start_callback, RELIABLE_QOS)
+
+        # Publishers
+        self.publisher_offboard_mode = self.create_publisher(OffboardControlMode, 'fmu/in/offboard_control_mode', NORMAL_QOS)
+        self.publisher_torque_setpoint = self.create_publisher(VehicleTorqueSetpoint, 'fmu/in/vehicle_torque_setpoint', NORMAL_QOS)
+        self.publisher_thrust_setpoint = self.create_publisher(VehicleThrustSetpoint, 'fmu/in/vehicle_thrust_setpoint', NORMAL_QOS)
+        
+
+        # Create the MPC solver and create timer callback to solve
+        timer_period = 0.05
+        self.timer = self.create_timer(timer_period, self.cmdloop_callback)
 
         # Load the plan from a file (declared as launch argument)
         self.plan_path = self.declare_parameter('plan_path', 'sp_solution_quat.npz').value
@@ -95,6 +107,24 @@ class MPCNode(Node):
             self.t0 = time.time()
         else:
             self.get_logger().info("Received stop signal, stopping MPC computation.")
+
+    def publish_offboard_mode(self):
+        offboard_msg = OffboardControlMode()
+        offboard_msg.timestamp = int(Clock().now().nanoseconds / 1000)
+        offboard_msg.position = False
+        offboard_msg.velocity = False
+        offboard_msg.acceleration = False
+        offboard_msg.attitude = False
+        offboard_msg.body_rate = False
+        offboard_msg.direct_actuator = False
+        offboard_msg.body_rate = True   # rate control
+        self.publisher_offboard_mode.publish(offboard_msg)
+
+    def cmdloop_callback(self):
+        t = time.time()
+
+        self.publish_offboard_mode()
+
 
 def main(args=None):
     rclpy.init(args=args)
