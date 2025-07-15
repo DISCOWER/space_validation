@@ -6,7 +6,7 @@ import sys
 sys.path.append(".")
 from Utilities.beziers import eval_bezier
 
-data = np.load('Planning/solutions/sp_solution.npz')
+data = np.load('Planning/solutions/sp_solution_quat.npz')
 
 x_ff = data['x_ff']
 u_ff = data['u_ff']
@@ -14,7 +14,7 @@ alpha = data['alpha']
 dt = data['dt']
 
 N = x_ff.shape[0]
-n = 2
+n = 3
 times = np.arange(N) * dt
 
 # create d-th order Bezier curve from variables
@@ -34,17 +34,13 @@ for i in range(N-1):
 
 # end-point position constraints
 for i in range(N-1):
-    constraints += [r_vars[i][:,0] == x_ff[i,:2]]
-    constraints += [r_vars[i][:,-1] == x_ff[i+1,:2]]
+    constraints += [r_vars[i][:,0] == x_ff[i,0:3]]
+    constraints += [r_vars[i][:,-1] == x_ff[i+1,0:3]]
 
 # end-point velocity constraints
 for i in range(N-1):
-    constraints += [dr_vars[i][:,0] == x_ff[i,2:]]
-    constraints += [dr_vars[i][:,-1] == x_ff[i+1,2:]]
-
-# # end-point acceleration constraints
-# for i in range(N-2):
-#     constraints += [ddr_vars[i][:,-1] == ddr_vars[i+1][:,0]]
+    constraints += [dr_vars[i][:,0] == x_ff[i,7:10]]
+    constraints += [dr_vars[i][:,-1] == x_ff[i+1,7:10]]
 
 # cost
 for i in range(N-1):
@@ -52,6 +48,19 @@ for i in range(N-1):
 
 prob = cp.Problem(cp.Minimize(cost), constraints)
 prob.solve(solver=cp.SCS)
+
+# Gather the results and save
+r_sols = [r_vars[i].value for i in range(N-1)]
+dr_sols = [dr_vars[i].value for i in range(N-1)]
+ddr_sols = [ddr_vars[i].value for i in range(N-1)]
+r_sols, dr_sols, ddr_sols = np.array(r_sols), np.array(dr_sols), np.array(ddr_sols)
+
+q_sols = [np.array([x_ff[i, 3:7], x_ff[i+1, 3:7]]) for i in range(N-1)]
+q_sols = np.array(q_sols)
+
+np.savez('Planning/solutions/sp_solution_bezier.npz',
+         r=r_sols, dr=dr_sols, ddr=ddr_sols, q=q_sols, dt=dt, alpha=alpha, times=times)
+
 
 r_vals = [eval_bezier(r_vars[i].value) for i in range(N-1)]
 dr_vals = [eval_bezier(dr_vars[i].value) for i in range(N-1)]
@@ -71,8 +80,8 @@ axs[0].set_title('Trajectory and Bezier Curve')
 axs[0].set_xlabel('x')
 axs[0].set_ylabel('y')
 
-axs[1].plot(times, x_ff[:,2], 'bo', label='Velocity')
-axs[1].plot(times, x_ff[:,3], 'ro')
+axs[1].plot(times, x_ff[:,7], 'bo', label='Velocity')
+axs[1].plot(times, x_ff[:,8], 'ro')
 for i in range(N-1):
     i_time = np.linspace(i*dt, (i+1)*dt, r_vals[i].shape[1])
     axs[1].plot(i_time, dr_vals[i][0, :], 'b', label=f'Bezier {i}')

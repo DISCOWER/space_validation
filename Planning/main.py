@@ -23,7 +23,7 @@ from Utilities.stl import Pred, Spec, quant_parse_operator, OptProbItems
 N = 20     # number of time steps
 dt = 0.5    # time step size
 t0 = 0      # initial time
-tf = N*dt   # final time
+tf = (N-1)*dt   # final time
 
 bigM = 1e4
 
@@ -56,15 +56,15 @@ if True:
     opt = gp.Model("prob1")
     x_vars = opt.addMVar((N, sp_robot.n_x), lb=-np.inf, ub=np.inf, name="X")
     u_vars = opt.addMVar((N, sp_robot.n_u), lb=-np.inf, ub=np.inf, name="U")
-    t_sp = np.linspace(0, tf, N)
+    t_sp = np.linspace(0,(N-1)*dt, N)
     alpha_vars = opt.addVar(lb=0, ub=1, name="alpha")
     opt.update()
 
     items = OptProbItems(x_vars, u_vars, t_sp)
 
     for i in range(N):
-        opt.addConstrs((u_vars[i, j] >= alpha_vars*sp_robot.U_effective.lower_bounds[j] for j in range(2)))
-        opt.addConstrs((u_vars[i, j] <= alpha_vars*sp_robot.U_effective.upper_bounds[j] for j in range(2)))
+        opt.addConstrs((u_vars[i, j] >= alpha_vars*sp_robot.U_effective.lower_bounds[j] for j in range(sp_robot.n_u)))
+        opt.addConstrs((u_vars[i, j] <= alpha_vars*sp_robot.U_effective.upper_bounds[j] for j in range(sp_robot.n_u)))
 
     # constraints
     opt.addConstrs((x_vars[i+1,:] == sp_robot.step(x_vars[i, :], u_vars[i, :], dt) for i in range(N-1)))
@@ -108,11 +108,11 @@ if True:
     u_ff = u_vars.X
     alpha = alpha_vars.X
     # save x_ff and u_ff to a csv file
-    np.savez('Planning/solutions/sp_solution.npz', x_ff=x_ff, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
+    np.savez('Planning/solutions/sp_solution_euler.npz', x_ff=x_ff, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
 
 else:
     # or load instead
-    data = np.load('Planning/solutions/sp_solution.npz')
+    data = np.load('Planning/solutions/sp_solution_euler.npz')
     x_ff = data['x_ff']
     u_ff = data['u_ff']
     alpha = data['alpha']
@@ -138,6 +138,7 @@ axs[1].grid()
 
 axs[2].plot(u_ff[:,0])
 axs[2].plot(u_ff[:,1])
+axs[2].plot(u_ff[:,2])
 axs[2].axhline(sp_robot.U.lower_bounds[0], color='g', linestyle='-.', label="U_lb")
 axs[2].axhline(sp_robot.U.upper_bounds[0], color='g', linestyle='-.')
 axs[2].axhline(alpha*sp_robot.U_effective.lower_bounds[0], color='b', linestyle='--', label="alpha*U_effective_lb")
@@ -156,6 +157,7 @@ for i in range(x_ff.shape[0]):
     x_ff_quat[i,:] = euler_x_to_quat_x_np(x_ff[i, :])
 print(x_ff_quat[:, 3:7])
 print(np.linalg.norm(x_ff_quat[:, 3:7],axis=1))  # should be close to 1
+np.savez('Planning/solutions/sp_solution_quat.npz', x_ff=x_ff_quat, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
 
 # feedback linearization controller for the underwater robot to behave like a free flyer
 uw_robot = BlueROV(quaternion=True)
@@ -185,9 +187,11 @@ for i in range(N-1):
     x_uw_fbl_sp[i+1, :] = x
     u_uw_fbl_sp[i, :] = u
 
+
 # print(f"u_uw_fbl_sp: {u_uw_fbl_sp[:,0]}")
 # print(f"u_uw_fbl_sp: {u_uw_fbl_sp[:,1]}")
 print(f"u_uw_fbl_sp: {u_uw_fbl_sp[:,2]}")
+print(f"x_uw_fbl_sp: {x_uw_fbl_sp[:,2]}")
 
 fig, axs = plt.subplots(1,3, figsize=(15, 5))
 axs[0].plot(x_uw_fbl_sp[:, 0], x_uw_fbl_sp[:, 1], 'g-')
@@ -216,7 +220,7 @@ plt.savefig("figures/sp_trajectory_uw.png")
 
 
 u_max = np.max(np.abs(u_uw_fbl_sp), axis=0)
-print(f"\nAlpha if u_sp applied to BlueROV directly: {np.max(u_max/uw_robot.U.upper_bounds[0:2])}")
+print(f"\nAlpha if u_sp applied to BlueROV directly: {np.max(u_max/uw_robot.U.upper_bounds)}")
 print(f"This is lower because BlueROV is faster than free flyer")
 
 u_uw = np.array([u_fbl(x_uw_fbl_sp[i,:],u_uw_fbl_sp[i,:])[0:2].squeeze() for i in range(N)])
