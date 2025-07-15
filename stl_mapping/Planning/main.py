@@ -13,14 +13,14 @@ import sys
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
 from Utilities.Robots import FreeFlyer, BlueROV, LinearFreeFlyer6DoF
-from stl_mapping.Utilities.sets import HyperRectangle, Polytope
+from Utilities.sets import HyperRectangle, Polytope
 from Utilities.rotations import quat_to_euler_np, quat_to_euler_cs, euler_to_quat_np, euler_to_quat_cs
 from Utilities.rotations import quat_x_to_euler_x_cs, euler_x_to_quat_x_cs, quat_x_to_euler_x_np, euler_x_to_quat_x_np
 from Utilities.stl import Pred, Spec, quant_parse_operator, OptProbItems
 
 
 # hyperparameters
-N = 20     # number of time steps
+N = 30     # number of time steps
 dt = 0.5    # time step size
 t0 = 0      # initial time
 tf = (N-1)*dt   # final time
@@ -30,23 +30,35 @@ bigM = 1e4
 # Robot
 sp_robot = LinearFreeFlyer6DoF()
 
-# Specification
-X0 = HyperRectangle(np.array([0, 0, 0]), np.array([0.1, 0.1, 0.1]))
-Xf = HyperRectangle(np.array([0.90, 0.90, 0]), np.array([1, 1, 0.1]))
-XA = HyperRectangle(np.array([0.2, 0.8, 0,  -np.pi/2-np.pi/8]), np.array([0.4, 1.0, 0.1,  -np.pi/2+np.pi/8]))
-# XA = HyperRectangle(np.array([0.2, 0.8, 0]), np.array([0.4, 1.0, 0.1]))
-Obs = [HyperRectangle(np.array([0.4, -0.1]), np.array([0.6, 0.6])),
-       HyperRectangle(np.array([0.75, 0.8]), np.array([0.9, 1.1]))]
-World = HyperRectangle(np.array([0, 0, -10, -10]), np.array([1, 1, 10, 10]))
+# # Specification
+# X0 = HyperRectangle(np.array([0, 0, 0]), np.array([0.1, 0.1, 0.1]))
+# Xf = HyperRectangle(np.array([0.90, 0.90, 0]), np.array([1, 1, 0.1]))
+# XA = HyperRectangle(np.array([0.2, 0.8, 0,  -np.pi/2-np.pi/8]), np.array([0.4, 1.0, 0.1,  -np.pi/2+np.pi/8]))
+# # XA = HyperRectangle(np.array([0.2, 0.8, 0]), np.array([0.4, 1.0, 0.1]))
+# Obs = [HyperRectangle(np.array([0.4, -0.1]), np.array([0.6, 0.6])),
+#        HyperRectangle(np.array([0.75, 0.8]), np.array([0.9, 1.1]))]
+# World = HyperRectangle(np.array([0, 0, -10, -10]), np.array([1, 1, 10, 10]))
+# phi = Pred("AND", preds=[
+#     Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)], dims=[0,1,2])]),
+#     Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1,2])]),
+#     Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2, 5])]),
+#     # Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2])]),
+#     Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)], dims=[0,1,6,7])]),
+#     # Pred("G", [t0,tf], preds=[Pred("NEG", preds=[Pred("MU", preds=[Polytope(Obs[0])], dims=[0,1])])]),
+#     # Pred("G", [t0,tf], preds=[Pred("NEG", preds=[Pred("MU", preds=[Polytope(Obs[1])], dims=[0,1])])])
+# ])
+# spec = Spec(phi, t0, tf)
 
+X0 = HyperRectangle(np.array([0.5, 0, 0]), np.array([0.6, 0.1, 0.1]))
+Xf = HyperRectangle(np.array([2.5, 1.0, 0]), np.array([2.6, 1.1, 0.1]))
+XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8]))
+Obs = []
+World = HyperRectangle(np.array([0, -1.5, -10, -10]), np.array([4, 1.5, 10, 10]))
 phi = Pred("AND", preds=[
     Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)], dims=[0,1,2])]),
     Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1,2])]),
     Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2, 5])]),
-    # Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2])]),
     Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)], dims=[0,1,6,7])]),
-    # Pred("G", [t0,tf], preds=[Pred("NEG", preds=[Pred("MU", preds=[Polytope(Obs[0])], dims=[0,1])])]),
-    # Pred("G", [t0,tf], preds=[Pred("NEG", preds=[Pred("MU", preds=[Polytope(Obs[1])], dims=[0,1])])])
 ])
 spec = Spec(phi, t0, tf)
 
@@ -84,7 +96,7 @@ if True:
     opt.addConstr(act_int_var == gp.quicksum([act_abs_var[i,j] for i in range(N) for j in range(sp_robot.n_u)]), name="act_int_sum")
     opt.addConstr(cost_var == 1*alpha_vars - 10000*spec.phi.rho + 0.0001*act_int_var) # quad_cost
     opt.setObjective(cost_var, gp.GRB.MINIMIZE)
-    opt.setParam('OutputFlag', 0)  # Suppress Gurobi output
+    opt.setParam('OutputFlag', 1)  # Suppress Gurobi output
     opt.optimize()
     if opt.status == gp.GRB.OPTIMAL:
         print(f"Optimal solution found")

@@ -30,18 +30,14 @@ setup(
     entry_points={
         'console_scripts': [
                 # planning and missions
-                'main_planner = stl_mapping.planners.main_planner:main',
-                'replanner = stl_mapping.planners.replanner:main',
-                'scenario = stl_mapping.scenario:main',
-                'reset = stl_mapping.reset:main',
 
                 # controllers
                 'mpc_node = Control.mpc_node:main',
 
                 # helpers
-                'odom_to_vehicle_local_position = stl_mapping.helpers.odom_to_vehicle_local_position:main',
-                'odom_to_vehicle_angular_velocity = stl_mapping.helpers.odom_to_vehicle_angular_velocity:main',
-                'odom_to_vehicle_attitude = stl_mapping.helpers.odom_to_vehicle_attitude:main',
+                # 'odom_to_vehicle_local_position = stl_mapping.helpers.odom_to_vehicle_local_position:main',
+                # 'odom_to_vehicle_angular_velocity = stl_mapping.helpers.odom_to_vehicle_angular_velocity:main',
+                # 'odom_to_vehicle_attitude = stl_mapping.helpers.odom_to_vehicle_attitude:main',
 
         ],
     },
