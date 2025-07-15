@@ -44,7 +44,7 @@ from ..models_2d.atmos_wrench import atmos_model_wrench
 class MpcWrench():
     def __init__(self):
         # Define the controller parameters
-        self.dt = 0.5               # MPC time step [s]
+        self.dt = 0.1               # MPC time step [s]
         self.Nx = 30                # Prediction horizon, states             
         self.Nu = 30                # Prediction horizon, inputs
         self.Q = np.diag([          # State weighting matrix
@@ -177,6 +177,7 @@ class MpcWrench():
 
     def get_input(self, x0, x_ref):
         # Properly set x0, i.e. constrain it to x0
+        print("trying to set initial state")
         self.solver.set(0, "lbx", x0.flatten())
         self.solver.set(0, "ubx", x0.flatten())
 

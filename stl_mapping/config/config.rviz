@@ -45,7 +45,7 @@ Visualization Manager:
       Cell Size: 1
       Class: rviz_default_plugins/Grid
       Color: 160; 160; 164
-      Enabled: false
+      Enabled: true
       Line Style:
         Line Width: 0.029999999329447746
         Value: Lines
@@ -58,7 +58,7 @@ Visualization Manager:
       Plane: XY
       Plane Cell Count: 10
       Reference Frame: <Fixed Frame>
-      Value: false
+      Value: true
     - Alpha: 1
       Axes Length: 0.05000000074505806
       Axes Radius: 0.004999999888241291
@@ -146,7 +146,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /snap/impact_stl/predicted_path
+        Value: /snap/stl_mapping/predicted_path
       Value: true
     - Class: rviz_default_plugins/InteractiveMarkers
       Enable Transparency: true
@@ -183,7 +183,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /snap/impact_stl/reference_path
+        Value: /snap/stl_mapping/reference_path
       Value: true
     - Class: rviz_default_plugins/Marker
       Enabled: false
@@ -285,7 +285,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /crackle/impact_stl/predicted_path
+        Value: /crackle/stl_mapping/predicted_path
       Value: true
     - Class: rviz_default_plugins/InteractiveMarkers
       Enable Transparency: true
@@ -322,7 +322,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /crackle/impact_stl/reference_path
+        Value: /crackle/stl_mapping/reference_path
       Value: true
     - Class: rviz_default_plugins/Marker
       Enabled: false
@@ -424,7 +424,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /pop/impact_stl/predicted_path
+        Value: /pop/stl_mapping/predicted_path
       Value: true
     - Class: rviz_default_plugins/InteractiveMarkers
       Enable Transparency: true
@@ -461,7 +461,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /pop/impact_stl/reference_path
+        Value: /pop/stl_mapping/reference_path
       Value: true
     - Class: rviz_default_plugins/Marker
       Enabled: false
@@ -502,7 +502,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /snap/impact_stl/entire_path
+        Value: /snap/stl_mapping/entire_path
       Value: true
     - Alpha: 1
       Buffer Length: 1
@@ -530,7 +530,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /crackle/impact_stl/entire_path
+        Value: /crackle/stl_mapping/entire_path
       Value: true
     - Alpha: 1
       Buffer Length: 1
@@ -558,7 +558,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /pop/impact_stl/entire_path
+        Value: /pop/stl_mapping/entire_path
       Value: true
     - Class: rviz_default_plugins/Marker
       Enabled: false
@@ -782,7 +782,7 @@ Visualization Manager:
   Enabled: true
   Global Options:
     Background Color: 0; 0; 0
-    Fixed Frame: world
+    Fixed Frame: map
     Frame Rate: 30
   Name: root
   Tools:
@@ -825,7 +825,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 11.993707656860352
+      Distance: 0.14776286482810974
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1

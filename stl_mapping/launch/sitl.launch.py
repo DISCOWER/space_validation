@@ -42,13 +42,13 @@ def generate_launch_description():
             name='rviz2',
             arguments=['-d', [os.path.join(get_package_share_directory('stl_mapping'), 'config.rviz')]]
     ))
-    # Plotjuggler from the juggler_2.xml file (2 spacecrafts)
-    ld.add_action(Node(
-            package='plotjuggler',
-            namespace='snap',
-            executable='plotjuggler',
-            name='plotjuggler',
-            arguments=['-l', os.path.join(get_package_share_directory('stl_mapping'), 'juggler_sitl_3.xml')]
-    ))
+#     # Plotjuggler 
+#     ld.add_action(Node(
+#             package='plotjuggler',
+#             namespace='snap',
+#             executable='plotjuggler',
+#             name='plotjuggler',
+#             arguments=['-l', os.path.join(get_package_share_directory('stl_mapping'), 'juggler_sitl_3.xml')]
+#     ))
 
     return ld

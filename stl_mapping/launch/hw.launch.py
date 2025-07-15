@@ -23,20 +23,20 @@ def generate_launch_description():
             name='visualizer_0'
     )),
 
-    # camera 
-    ld.add_action(Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='static_tf_world_to_inertial',
-            arguments=['0', '0', '0', '0', '0', '0', 'world', 'inertial']
-        )),
-    ld.add_action(Node(
-                package='tf2_ros',
-                executable='static_transform_publisher',
-                name='static_tf_world_to_camera',
-                # arguments=['0', '0', '2.5', '0', '0.4349655', '0', '0.9', 'world', 'camera_link'] # camera 1
-                arguments=['2', '1.9', '2.3', '0.3010647', '0.3013046', '-0.6395013', '0.6400107', 'world', 'camera_link'] # camera 2
-        )),
+#     # camera 
+#     ld.add_action(Node(
+#             package='tf2_ros',
+#             executable='static_transform_publisher',
+#             name='static_tf_world_to_inertial',
+#             arguments=['0', '0', '0', '0', '0', '0', 'world', 'inertial']
+#         )),
+#     ld.add_action(Node(
+#                 package='tf2_ros',
+#                 executable='static_transform_publisher',
+#                 name='static_tf_world_to_camera',
+#                 # arguments=['0', '0', '2.5', '0', '0.4349655', '0', '0.9', 'world', 'camera_link'] # camera 1
+#                 arguments=['2', '1.9', '2.3', '0.3010647', '0.3013046', '-0.6395013', '0.6400107', 'world', 'camera_link'] # camera 2
+#         )),
 
 
     # Rviz while loading a config file (valid for all three spacecrafts)
@@ -46,27 +46,14 @@ def generate_launch_description():
             name='rviz2',
             arguments=['-d', [os.path.join(get_package_share_directory('impact_stl'), 'config.rviz')]]
     ))
-    # Plotjuggler from the juggler_2.xml file (2 spacecrafts)
-    ld.add_action(Node(
-            package='plotjuggler',
-            namespace='snap',
-            executable='plotjuggler',
-            name='plotjuggler',
-            arguments=['-l', os.path.join(get_package_share_directory('impact_stl'), 'juggler_sitl_3.xml')]
-    ))
-
-    # Launch the gz to px4 converters that take the Odometry message
-    # and fill the correct PX4 messages such that we only need to change
-    # .../fmu/out/vehicle_local_position to .../fmu/out/vehicle_local_position_gz
-    # or vice-versa. Keep care of the namespace and robot_prefix parameters!!!
-    # snap
-    ld.add_action(Node(
-            package='impact_stl',
-            executable='odom_to_vehicle_local_position',
-            namespace='snap',
-            output='screen',
-            parameters=[{'topic_name': '/snap/odom'}]
-    ))
+#     # Plotjuggler from the juggler_2.xml file (2 spacecrafts)
+#     ld.add_action(Node(
+#             package='plotjuggler',
+#             namespace='snap',
+#             executable='plotjuggler',
+#             name='plotjuggler',
+#             arguments=['-l', os.path.join(get_package_share_directory('impact_stl'), 'juggler_sitl_3.xml')]
+#     ))
 
     return ld
 

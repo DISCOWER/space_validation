@@ -21,9 +21,11 @@ from Control.controllers.mpc_wrench import MpcWrench
 class MPCNode(Node):
     def __init__(self):
         super().__init__('mpc_node')
+        self.get_logger().info("Initializing MPC Node")
 
         self.mpc = MpcWrench()
         self.control = np.zeros((self.mpc.nu, 1))
+        self.get_logger().info("MPC solver initialized successfully")
 
         # Subscribers
         self.status_sub = self.create_subscription(
@@ -47,37 +49,54 @@ class MPCNode(Node):
             self.vehicle_local_position_callback,
             NORMAL_QOS)
         self.start_sub = self.create_subscription(
-            Bool, '/stl_mapping/start', self.start_callback, RELIABLE_QOS)
+            Bool, 
+            '/stl_mapping/start', 
+            self.start_callback, 
+            RELIABLE_QOS)
+        
+        self.get_logger().info("MPC subscribers initialized successfully")
 
         # Publishers
-        self.publisher_offboard_mode = self.create_publisher(OffboardControlMode, 'fmu/in/offboard_control_mode', NORMAL_QOS)
-        self.publisher_torque_setpoint = self.create_publisher(VehicleTorqueSetpoint, 'fmu/in/vehicle_torque_setpoint', NORMAL_QOS)
-        self.publisher_thrust_setpoint = self.create_publisher(VehicleThrustSetpoint, 'fmu/in/vehicle_thrust_setpoint', NORMAL_QOS)
+        self.publisher_offboard_mode = self.create_publisher(
+            OffboardControlMode, 
+            'fmu/in/offboard_control_mode', 
+            NORMAL_QOS)
+        self.publisher_torque_setpoint = self.create_publisher(
+            VehicleTorqueSetpoint, 
+            'fmu/in/vehicle_torque_setpoint', 
+            NORMAL_QOS)
+        self.publisher_thrust_setpoint = self.create_publisher(
+            VehicleThrustSetpoint, 
+            'fmu/in/vehicle_thrust_setpoint', 
+            NORMAL_QOS)
         self.publisher_thrust_setpoint = self.create_publisher(
             VehicleThrustSetpoint,
             'fmu/in/vehicle_thrust_setpoint',
             NORMAL_QOS)
-        
         self.publisher_torque_setpoint = self.create_publisher(
             VehicleTorqueSetpoint,
             'fmu/in/vehicle_torque_setpoint',
             NORMAL_QOS)
-        
         self.predicted_path_pub = self.create_publisher(
             Path,
             'stl_mapping/predicted_path',
             10)
-        
-        self.reference_pub = self.create_publisher(
-            Marker,
-            "stl_mapping/reference",
+        self.reference_path_pub = self.create_publisher(
+            Path,
+            "stl_mapping/reference_path",
             10)
+        self.entire_path_pub = self.create_publisher(
+            Path,
+            'stl_mapping/entire_path',
+            10)
+        
+        self.get_logger().info("MPC publishers initialized successfully")
 
         # Create the MPC solver and create timer callback to solve
-        timer_period = 0.05
+        timer_period = 0.05 # seconds
         self.timer = self.create_timer(timer_period, self.cmdloop_callback)
 
-        timer_period_offboard = 0.3  # seconds
+        timer_period_offboard = 0.3 # seconds
         self.timer_offboard = self.create_timer(timer_period_offboard, self.publish_offboard_mode)
 
         # Load the plan from a file (declared as launch argument)
@@ -106,6 +125,7 @@ class MPCNode(Node):
         self.started = False
         
         self.t0 = np.inf
+        self.get_logger().info("MPC Node initialized successfully")
 
     def vehicle_attitude_callback(self, msg):
             # NED-> ENU transformation
@@ -245,30 +265,51 @@ class MPCNode(Node):
                            self.vehicle_angular_velocity[2]]).reshape(13, 1)
 
         if not self.started:
-            self.get_logger().info("MPC not started yet, skipping control computation.")
-            x_ref = np.array([0.5, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0])
+            self.get_logger().info("Mission not started, using constant reference (t=0)")
+            times = np.zeros(self.mpc.Nx + 1)  # No time since start, constant reference
         else:
-            self.get_logger().info("MPC started, computing control input.")
+            self.get_logger().info("Mission started, calculating reference trajectory")
             t_mpc = t - self.t0
-            self.get_logger().info(f"Time since start: {t_mpc:.2f} seconds")
-            times = np.arange(t_mpc, t_mpc+self.mpc.Nx*self.mpc.dt, self.mpc.dt)
-            x_ref = np.zeros((13, self.mpc.Nx + 1))
-            for idx, ti in enumerate(times):
-                x_ref[:, idx] = get_reference_trajectory(ti, self.reference)
-            # x_ref contains reference in order p q dp dq, convert to order p, dp, q, dq
-            x_ref = np.concatenate((
-                x_ref[0:3, :],  # Position
-                x_ref[7:10, :],  # Linear velocity
-                x_ref[3:7, :],  # Quaternion
-                x_ref[10:13, :]  # Angular velocity
-            ))
+            times = np.linspace(t_mpc, t_mpc + self.mpc.Nx * self.mpc.dt, self.mpc.Nx + 1)
+            # times = np.arange(t_mpc, t_mpc + self.mpc.Nx * self.mpc.dt, self.mpc.dt)
+            self.get_logger().info(f"t_mpc: {t_mpc}, times: {times}")
+        
+        x_ref = np.zeros((13, self.mpc.Nx + 1))  # Initialize reference trajectory
+        for idx, ti in enumerate(times):
+            x_ref[:, idx] = get_reference_trajectory(ti, self.reference)
+                
+        # x_ref contains reference in order p q dp dq, convert to order p, dp, q, dq
+        x_ref = np.concatenate((
+            x_ref[0:3, :],  # Position
+            x_ref[7:10, :],  # Linear velocity
+            x_ref[3:7, :],  # Quaternion
+            x_ref[10:13, :]  # Angular velocity
+        ))
+        self.get_logger().info(f"x_ref: {x_ref}")
+        self.get_logger().info(f"x0: {x0.flatten()}")
 
         # Get control input
         self.control, x_pred = self.mpc.get_input(x0, x_ref)
         print(f"Control: {self.control.flatten()}")
 
-        # self.publish_predicted_path(x_pred, self.vehicle_attitude)
-        # self.publish_reference(self.reference_pub, self.setpoint_position)
+        # Publish the reference and predicted path for rviz
+        setpoint_path_msg = Path()
+        self.get_logger().info(f'shape: {x_ref.shape}')
+        for idx in range(x_ref.shape[1]):
+            setpoint = x_ref[:, idx]
+            setpoint_pose_msg = self.vector2PoseMsg('map', setpoint[0:3], setpoint[6:10])
+            setpoint_path_msg.header = setpoint_pose_msg.header
+            setpoint_path_msg.poses.append(setpoint_pose_msg)
+        self.reference_path_pub.publish(setpoint_path_msg)
+
+        x_pred = x_pred.T
+        predicted_path_msg = Path()
+        for idx in range(x_pred.shape[1]):
+            predicted_state = x_pred[:, idx]
+            predicted_pose_msg = self.vector2PoseMsg('map', predicted_state[0:3], predicted_state[6:10])
+            predicted_path_msg.header = predicted_pose_msg.header
+            predicted_path_msg.poses.append(predicted_pose_msg)
+        self.predicted_path_pub.publish(predicted_path_msg)
 
         if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             self.publish_wrench_setpoint(self.control)
