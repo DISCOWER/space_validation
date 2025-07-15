@@ -19,7 +19,7 @@ class ReferenceTrajectory:
 def get_reference_trajectory(t:float, trajectory:ReferenceTrajectory):
     idx = min(int(t / trajectory.dt), trajectory.N-1)
     s = min(1,(t - idx * trajectory.dt) / trajectory.dt)
-    print(f"idx: {idx}, s: {s}")
+    # print(f"idx: {idx}, s: {s}")
 
     p = value_bezier(trajectory.r[idx], s)
     v = value_bezier(trajectory.dr[idx], s)
@@ -32,8 +32,8 @@ def get_reference_trajectory(t:float, trajectory:ReferenceTrajectory):
     dq_val = slerp([s, min(1,s+ds)]).as_euler('xyz')
     dq_val = (dq_val[1] - dq_val[0]) / ds
 
-    print(f"q_val: {q_val}")
-    print(f"dq_val: {dq_val}")
+    # print(f"q_val: {q_val}")
+    # print(f"dq_val: {dq_val}")
     return np.concatenate((p, q_val, v, dq_val))
 
 

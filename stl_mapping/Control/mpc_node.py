@@ -9,13 +9,21 @@ import os
 from Utilities.qos_profiles import NORMAL_QOS, RELIABLE_QOS
 from Utilities.get_reference_trajectory import get_reference_trajectory, ReferenceTrajectory
         
+from nav_msgs.msg import Path, Odometry
+from visualization_msgs.msg import Marker
+from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Bool
 from px4_msgs.msg import VehicleStatus, VehicleAttitude, VehicleAngularVelocity, VehicleLocalPosition
 from px4_msgs.msg import VehicleThrustSetpoint, VehicleTorqueSetpoint, OffboardControlMode
 
+from Control.controllers.mpc_wrench import MpcWrench
+
 class MPCNode(Node):
     def __init__(self):
         super().__init__('mpc_node')
+
+        self.mpc = MpcWrench()
+        self.control = np.zeros((self.mpc.nu, 1))
 
         # Subscribers
         self.status_sub = self.create_subscription(
@@ -45,14 +53,42 @@ class MPCNode(Node):
         self.publisher_offboard_mode = self.create_publisher(OffboardControlMode, 'fmu/in/offboard_control_mode', NORMAL_QOS)
         self.publisher_torque_setpoint = self.create_publisher(VehicleTorqueSetpoint, 'fmu/in/vehicle_torque_setpoint', NORMAL_QOS)
         self.publisher_thrust_setpoint = self.create_publisher(VehicleThrustSetpoint, 'fmu/in/vehicle_thrust_setpoint', NORMAL_QOS)
+        self.publisher_thrust_setpoint = self.create_publisher(
+            VehicleThrustSetpoint,
+            'fmu/in/vehicle_thrust_setpoint',
+            NORMAL_QOS)
         
+        self.publisher_torque_setpoint = self.create_publisher(
+            VehicleTorqueSetpoint,
+            'fmu/in/vehicle_torque_setpoint',
+            NORMAL_QOS)
+        
+        self.predicted_path_pub = self.create_publisher(
+            Path,
+            'stl_mapping/predicted_path',
+            10)
+        
+        self.reference_pub = self.create_publisher(
+            Marker,
+            "stl_mapping/reference",
+            10)
 
         # Create the MPC solver and create timer callback to solve
         timer_period = 0.05
         self.timer = self.create_timer(timer_period, self.cmdloop_callback)
 
+        timer_period_offboard = 0.3  # seconds
+        self.timer_offboard = self.create_timer(timer_period_offboard, self.publish_offboard_mode)
+
         # Load the plan from a file (declared as launch argument)
-        self.plan_path = self.declare_parameter('plan_path', 'sp_solution_quat.npz').value
+        self.plan_path = self.declare_parameter('plan_path', 'sp_solution_bezier.npz').value
+
+        this_file_dir = os.path.dirname(os.path.abspath(__file__))
+        path = os.path.abspath(os.path.join(this_file_dir, '../../../../share/stl_mapping/'))
+        self.plan_path = os.path.join(path, self.plan_path)
+        self.get_logger().info(f"Loaded plan from {self.plan_path}")
+
+        print(f"Loading plan from {self.plan_path}")
         plan_solution = np.load(self.plan_path)
         self.reference = ReferenceTrajectory(
             r=plan_solution['r'],
@@ -60,7 +96,6 @@ class MPCNode(Node):
             q=plan_solution['q'],
             dt=plan_solution['dt']
         )
-        self.get_logger().info(f"Loaded plan from {self.plan_path}")
 
         # Initialize variables
         self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
@@ -108,6 +143,20 @@ class MPCNode(Node):
         else:
             self.get_logger().info("Received stop signal, stopping MPC computation.")
 
+    def publish_wrench_setpoint(self, u):
+        force_output_msg = VehicleThrustSetpoint()
+        force_output_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+
+        torque_output_msg = VehicleTorqueSetpoint()
+        torque_output_msg.timestamp = int(Clock().now().nanoseconds / 1000)
+
+        # ENU -> NED transformation
+        force_output_msg.xyz = [u[0], -u[1], -u[2]]
+        torque_output_msg.xyz = [u[3], -u[4], -u[5]]
+
+        self.publisher_thrust_setpoint.publish(force_output_msg)
+        self.publisher_torque_setpoint.publish(torque_output_msg)
+
     def publish_offboard_mode(self):
         offboard_msg = OffboardControlMode()
         offboard_msg.timestamp = int(Clock().now().nanoseconds / 1000)
@@ -117,13 +166,108 @@ class MPCNode(Node):
         offboard_msg.attitude = False
         offboard_msg.body_rate = False
         offboard_msg.direct_actuator = False
-        offboard_msg.body_rate = True   # rate control
+        offboard_msg.thrust_and_torque = True
         self.publisher_offboard_mode.publish(offboard_msg)
+    
+    def vector2PoseMsg(self, frame_id, position, attitude):
+        pose_msg = PoseStamped()
+        pose_msg.header.stamp = self.get_clock().now().to_msg()
+        pose_msg.header.frame_id = frame_id
+        pose_msg.pose.orientation.w = attitude[0]
+        pose_msg.pose.orientation.x = attitude[1]
+        pose_msg.pose.orientation.y = attitude[2]
+        pose_msg.pose.orientation.z = attitude[3]
+        pose_msg.pose.position.x = float(position[0])
+        pose_msg.pose.position.y = float(position[1])
+        pose_msg.pose.position.z = float(position[2])
+        return pose_msg
+
+    def publish_predicted_path(self, x_pred, current_attitude):
+        now = self.get_clock().now()
+        predicted_path_msg = Path()
+        predicted_path_msg.header.stamp = now.to_msg()
+        predicted_path_msg.header.frame_id = 'map'
+
+        for i, predicted_state in enumerate(x_pred):
+            # Calculate future time offset
+            future_time = now + rclpy.duration.Duration(seconds=i * self.mpc.dt)
+
+            # Create PoseStamped
+            pose_stamped = self.vector2PoseMsg('map', predicted_state[0:3], current_attitude)
+            pose_stamped.header.stamp = future_time.to_msg()
+            pose_stamped.header.frame_id = 'map'
+
+            predicted_path_msg.poses.append(pose_stamped)
+
+        self.predicted_path_pub.publish(predicted_path_msg)
+    
+    def publish_reference(self, pub, reference):
+        msg = Marker()
+        msg.action = Marker.ADD
+        msg.header.frame_id = "map"
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.ns = "arrow"
+        msg.id = 1
+        msg.type = Marker.SPHERE
+        msg.scale.x = 0.5
+        msg.scale.y = 0.5
+        msg.scale.z = 0.5
+        msg.color.r = 1.0
+        msg.color.g = 0.0
+        msg.color.b = 0.0
+        msg.color.a = 1.0
+        msg.pose.position.x = reference[0]
+        msg.pose.position.y = reference[1]
+        msg.pose.position.z = reference[2]
+        msg.pose.orientation.w = 1.0
+        msg.pose.orientation.x = 0.0
+        msg.pose.orientation.y = 0.0
+        msg.pose.orientation.z = 0.0
+        pub.publish(msg)
 
     def cmdloop_callback(self):
         t = time.time()
 
-        self.publish_offboard_mode()
+        x0 = np.array([self.vehicle_local_position[0],
+                           self.vehicle_local_position[1],
+                           self.vehicle_local_position[2],
+                           self.vehicle_local_velocity[0],
+                           self.vehicle_local_velocity[1],
+                           self.vehicle_local_velocity[2],
+                           self.vehicle_attitude[0],
+                           self.vehicle_attitude[1],
+                           self.vehicle_attitude[2],
+                           self.vehicle_attitude[3],
+                           self.vehicle_angular_velocity[0],
+                           self.vehicle_angular_velocity[1],
+                           self.vehicle_angular_velocity[2]]).reshape(13, 1)
+
+        if not self.started:
+            self.get_logger().info("MPC not started yet, skipping control computation.")
+            x_ref = np.array([1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0])
+        else:
+            t_mpc = t - self.t0
+            times = np.arange(t_mpc, t_mpc+self.mpc.Nx*self.mpc.dt, self.mpc.dt)
+            x_ref = np.zeros((13, self.mpc.Nx + 1))
+            for idx, ti in enumerate(times):
+                x_ref[:, idx] = get_reference_trajectory(ti, self.reference)
+            # x_ref contains reference in order p q dp dq, convert to order p, dp, q, dq
+            x_ref = np.concatenate((
+                x_ref[0:3, :],  # Position
+                x_ref[7:10, :],  # Linear velocity
+                x_ref[3:7, :],  # Quaternion
+                x_ref[10:13, :]  # Angular velocity
+            ))
+
+        # Get control input
+        self.control, x_pred = self.mpc.get_input(x0, x_ref)
+        print(f"Control: {self.control.flatten()}")
+
+        # self.publish_predicted_path(x_pred, self.vehicle_attitude)
+        # self.publish_reference(self.reference_pub, self.setpoint_position)
+
+        if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+            self.publish_wrench_setpoint(self.control)
 
 
 def main(args=None):
