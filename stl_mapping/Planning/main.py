@@ -108,11 +108,11 @@ if True:
     u_ff = u_vars.X
     alpha = alpha_vars.X
     # save x_ff and u_ff to a csv file
-    np.savez('Planning/solutions/sp_solution_euler.npz', x_ff=x_ff, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
+    np.savez('stl_mapping/Planning/solutions/sp_solution_euler.npz', x_ff=x_ff, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
 
 else:
     # or load instead
-    data = np.load('Planning/solutions/sp_solution_euler.npz')
+    data = np.load('stl_mapping/Planning/solutions/sp_solution_euler.npz')
     x_ff = data['x_ff']
     u_ff = data['u_ff']
     alpha = data['alpha']
@@ -147,7 +147,7 @@ axs[2].axhline(sp_robot.U_effective.lower_bounds[0], color='r', linestyle=':', l
 axs[2].axhline(sp_robot.U_effective.upper_bounds[0], color='r', linestyle=':')
 axs[2].set_xlabel('Time step')
 axs[2].set_ylabel('Control input')
-plt.savefig("figures/sp_trajectory.png")
+plt.savefig("stl_mapping/Planning/figures/sp_trajectory.png")
 
 
 
@@ -157,7 +157,7 @@ for i in range(x_ff.shape[0]):
     x_ff_quat[i,:] = euler_x_to_quat_x_np(x_ff[i, :])
 print(x_ff_quat[:, 3:7])
 print(np.linalg.norm(x_ff_quat[:, 3:7],axis=1))  # should be close to 1
-np.savez('Planning/solutions/sp_solution_quat.npz', x_ff=x_ff_quat, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
+np.savez('stl_mapping/Planning/solutions/sp_solution_quat.npz', x_ff=x_ff_quat, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
 
 # feedback linearization controller for the underwater robot to behave like a free flyer
 uw_robot = BlueROV(quaternion=True)
@@ -216,7 +216,7 @@ axs[2].set_ylabel('Control input')
 axs[2].set_ylim(-uw_robot.U.upper_bounds[0]*1.1, uw_robot.U.upper_bounds[0]*1.1)
 axs[2].legend()
 axs[2].grid()
-plt.savefig("figures/sp_trajectory_uw.png")
+plt.savefig("stl_mapping/Planning/figures/sp_trajectory_uw.png")
 
 
 u_max = np.max(np.abs(u_uw_fbl_sp), axis=0)
@@ -335,4 +335,4 @@ axs[1,1].grid()
 axs[1,1].legend()
 
 plt.tight_layout()
-plt.savefig("figures/sp_uw_trajectory.png")
+plt.savefig("stl_mapping/Planning/figures/sp_uw_trajectory.png")
