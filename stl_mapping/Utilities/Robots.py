@@ -1,11 +1,11 @@
 import numpy as np
 import casadi as cs
 import gurobipy as gp
-from Utilities.helpers import HyperRectangle, Zonotope
+from stl_mapping.Utilities.sets import HyperRectangle, Zonotope
 from Utilities.rotations import skew_symmetric, q_to_rot_mat
 from Utilities.rotations import euler_to_quat_cs, euler_to_quat_np, quat_to_euler_cs, quat_to_euler_np
 from Utilities.rotations import quat_x_to_euler_x_cs, euler_x_to_quat_x_cs
-from Utilities.helpers import compute_K
+from stl_mapping.Utilities.sets import compute_K
 from Utilities.stl import OptProbItems
 
 

@@ -13,7 +13,7 @@ import sys
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
 from Utilities.Robots import FreeFlyer, BlueROV, LinearFreeFlyer6DoF
-from Utilities.helpers import HyperRectangle, Polytope
+from stl_mapping.Utilities.sets import HyperRectangle, Polytope
 from Utilities.rotations import quat_to_euler_np, quat_to_euler_cs, euler_to_quat_np, euler_to_quat_cs
 from Utilities.rotations import quat_x_to_euler_x_cs, euler_x_to_quat_x_cs, quat_x_to_euler_x_np, euler_x_to_quat_x_np
 from Utilities.stl import Pred, Spec, quant_parse_operator, OptProbItems

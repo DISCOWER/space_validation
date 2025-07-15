@@ -1,5 +1,5 @@
 import gurobipy as gp
-from Utilities.helpers import Polytope
+from stl_mapping.Utilities.sets import Polytope
 import numpy as np
 
 class OptProbItems:

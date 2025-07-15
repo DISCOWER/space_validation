@@ -2,7 +2,7 @@ import numpy as np
 
 import sys 
 sys.path.append("..")
-from Utilities.helpers import Zonotope, exists_K, compute_K
+from stl_mapping.Utilities.sets import Zonotope, exists_K, compute_K
 
 
 B = np.array([[1, 0], [0, 1]])

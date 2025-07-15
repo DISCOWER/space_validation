@@ -36,20 +36,13 @@ setup(
                 'reset = stl_mapping.reset:main',
 
                 # controllers
-                'ff_rate_mpc = stl_mapping.ff_rate_mpc:main',
-                'ff_rate_mpc_impact = stl_mapping.ff_rate_mpc_impact:main',
-                'ff_wrench_mpc_impact = stl_mapping.ff_wrench_mpc_impact:main',
-                'ff_rate_mpc_velocity_keeping = stl_mapping.ff_rate_mpc_velocity_keeping:main',
-                'ff_rate_qp_velocity_keeping = stl_mapping.ff_rate_qp_velocity_keeping:main',
+                'mpc_node = Control.mpc_node:main',
 
                 # helpers
-                'impact_detector = stl_mapping.helpers.impact_detector:main',
                 'odom_to_vehicle_local_position = stl_mapping.helpers.odom_to_vehicle_local_position:main',
                 'odom_to_vehicle_angular_velocity = stl_mapping.helpers.odom_to_vehicle_angular_velocity:main',
                 'odom_to_vehicle_attitude = stl_mapping.helpers.odom_to_vehicle_attitude:main',
 
-                # test
-                'test_replanner = stl_mapping.tests.test_replanner:main',
         ],
     },
 )
