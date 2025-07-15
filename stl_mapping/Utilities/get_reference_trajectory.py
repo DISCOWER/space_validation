@@ -18,7 +18,7 @@ class ReferenceTrajectory:
 
 def get_reference_trajectory(t:float, trajectory:ReferenceTrajectory):
     idx = min(int(t / trajectory.dt), trajectory.N-1)
-    s = (t - idx * trajectory.dt) / trajectory.dt
+    s = min(1,(t - idx * trajectory.dt) / trajectory.dt)
     print(f"idx: {idx}, s: {s}")
 
     p = value_bezier(trajectory.r[idx], s)
@@ -51,6 +51,6 @@ if __name__ == "__main__":
     q = data['q']
     trajectory = ReferenceTrajectory(r, dr, q, dt)
 
-    for t in np.arange(0, dt*(x_ff.shape[0]-1), 0.1):
+    for t in np.arange(0, dt*(x_ff.shape[0]-1)+1.0, 0.1):
         x_ref = get_reference_trajectory(t, trajectory)
         print(f"t: {t}, x_ref: {x_ref}")
