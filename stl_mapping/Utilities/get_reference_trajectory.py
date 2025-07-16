@@ -7,6 +7,7 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
 
 from Utilities.beziers import value_bezier
+from Utilities.rotations import quat_to_euler_cs
 
 class ReferenceTrajectory:
     def __init__(self, r, dr, q, dt):
@@ -32,7 +33,7 @@ def get_reference_trajectory(t:float, trajectory:ReferenceTrajectory):
     dq_val = slerp([s, min(1,s+ds)]).as_euler('xyz')
     dq_val = (dq_val[1] - dq_val[0]) / ds
 
-    # print(f"q_val: {q_val}")
+    print(f"q_val: {quat_to_euler_cs(q_val)}")
     # print(f"dq_val: {dq_val}")
     return np.concatenate((p, q_val, v, dq_val))
 

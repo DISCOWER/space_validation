@@ -21,7 +21,7 @@ from Utilities.stl import Pred, Spec, quant_parse_operator, OptProbItems
 
 # hyperparameters
 N = 30     # number of time steps
-dt = 0.5    # time step size
+dt = 1.0    # time step size
 t0 = 0      # initial time
 tf = (N-1)*dt   # final time
 
@@ -132,7 +132,7 @@ else:
     t_sp = data['times']
 
 # plot the trajectory
-fig, axs = plt.subplots(1,3, figsize=(15, 5))
+fig, axs = plt.subplots(1,4, figsize=(15, 5))
 axs[0].plot(x_ff[:, 0], x_ff[:, 1], 'g-')
 axs[0].plot(x_ff[:, 0], x_ff[:, 1], 'go')
 X0.plot(axs[0], color='green', alpha=0.5)
@@ -148,17 +148,25 @@ axs[1].set_ylabel('Velocity')
 axs[1].legend()
 axs[1].grid()
 
-axs[2].plot(u_ff[:,0])
-axs[2].plot(u_ff[:,1])
-axs[2].plot(u_ff[:,2])
-axs[2].axhline(sp_robot.U.lower_bounds[0], color='g', linestyle='-.', label="U_lb")
-axs[2].axhline(sp_robot.U.upper_bounds[0], color='g', linestyle='-.')
-axs[2].axhline(alpha*sp_robot.U_effective.lower_bounds[0], color='b', linestyle='--', label="alpha*U_effective_lb")
-axs[2].axhline(alpha*sp_robot.U_effective.upper_bounds[0], color='b', linestyle='--')
-axs[2].axhline(sp_robot.U_effective.lower_bounds[0], color='r', linestyle=':', label="U_effective_lb")
-axs[2].axhline(sp_robot.U_effective.upper_bounds[0], color='r', linestyle=':')
+axs[2].plot(t_sp, x_ff[:, 3], label='pitch')
+axs[2].plot(t_sp, x_ff[:, 4], label='roll')
+axs[2].plot(t_sp, x_ff[:, 5], label='yaw')
 axs[2].set_xlabel('Time step')
-axs[2].set_ylabel('Control input')
+axs[2].set_ylabel('Euler angles (rad)')
+axs[2].legend()
+axs[2].grid()
+
+axs[3].plot(u_ff[:,0])
+axs[3].plot(u_ff[:,1])
+axs[3].plot(u_ff[:,2])
+axs[3].axhline(sp_robot.U.lower_bounds[0], color='g', linestyle='-.', label="U_lb")
+axs[3].axhline(sp_robot.U.upper_bounds[0], color='g', linestyle='-.')
+axs[3].axhline(alpha*sp_robot.U_effective.lower_bounds[0], color='b', linestyle='--', label="alpha*U_effective_lb")
+axs[3].axhline(alpha*sp_robot.U_effective.upper_bounds[0], color='b', linestyle='--')
+axs[3].axhline(sp_robot.U_effective.lower_bounds[0], color='r', linestyle=':', label="U_effective_lb")
+axs[3].axhline(sp_robot.U_effective.upper_bounds[0], color='r', linestyle=':')
+axs[3].set_xlabel('Time step')
+axs[3].set_ylabel('Control input')
 plt.savefig("stl_mapping/Planning/figures/sp_trajectory.png")
 
 
@@ -167,8 +175,10 @@ plt.savefig("stl_mapping/Planning/figures/sp_trajectory.png")
 x_ff_quat = np.zeros((x_ff.shape[0], x_ff.shape[1] + 1))
 for i in range(x_ff.shape[0]):
     x_ff_quat[i,:] = euler_x_to_quat_x_np(x_ff[i, :])
-print(x_ff_quat[:, 3:7])
-print(np.linalg.norm(x_ff_quat[:, 3:7],axis=1))  # should be close to 1
+print(f"quat: {x_ff_quat[:, 3:7]}")
+print(f"euler: {np.array([quat_to_euler_np(x[3:7]) for x in x_ff_quat])}")
+# print(np.linalg.norm(x_ff_quat[:, 3:7],axis=1))  # should be close to 1
+
 np.savez('stl_mapping/Planning/solutions/sp_solution_quat.npz', x_ff=x_ff_quat, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
 
 # feedback linearization controller for the underwater robot to behave like a free flyer

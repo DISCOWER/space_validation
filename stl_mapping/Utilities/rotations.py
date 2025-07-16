@@ -29,7 +29,7 @@ def euler_to_quat_cs(pry):
     Convert Euler angles (roll, pitch, yaw) to quaternion (qw, qx, qy, qz).
     Angles are in radians.
     """
-    roll, pitch, yaw = pry[0], pry[1], pry[2]
+    pitch, roll, yaw = pry[0], pry[1], pry[2]
     cy = cs.cos(yaw * 0.5)
     sy = cs.sin(yaw * 0.5)
     cr = cs.cos(roll * 0.5)
@@ -49,7 +49,7 @@ def euler_to_quat_np(pry):
     Convert Euler angles (roll, pitch, yaw) to quaternion (qw, qx, qy, qz).
     Angles are in radians.
     """
-    roll, pitch, yaw = pry[0], pry[1], pry[2]
+    pitch, roll, yaw = pry[0], pry[1], pry[2]
     cy = np.cos(yaw * 0.5)
     sy = np.sin(yaw * 0.5)
     cr = np.cos(roll * 0.5)
@@ -69,7 +69,7 @@ def quat_to_euler_cs(q):
     Convert quaternion (qw, qx, qy, qz) to Euler angles (roll, pitch, yaw).
     Angles are in radians.
     """
-    qw, qx, qy, qz = q[3], q[0], q[1], q[2]
+    qw, qx, qy, qz = q[0], q[1], q[2], q[3]
 
     roll = cs.atan2(2 * (qw * qx + qy * qz), 1 - 2 * (qx ** 2 + qy ** 2))
     pitch = cs.asin(2 * (qw * qy - qz * qx))
@@ -82,7 +82,7 @@ def quat_to_euler_np(q):
     Convert quaternion (qw, qx, qy, qz) to Euler angles (roll, pitch, yaw).
     Angles are in radians.
     """
-    qw, qx, qy, qz = q[3], q[0], q[1], q[2]
+    qw, qx, qy, qz = q[0], q[1], q[2], q[3]
 
     roll = np.arctan2(2 * (qw * qx + qy * qz), 1 - 2 * (qx ** 2 + qy ** 2))
     pitch = np.arcsin(2 * (qw * qy - qz * qx))

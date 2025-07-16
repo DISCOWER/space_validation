@@ -113,8 +113,16 @@ class LinearFreeFlyer6DoF(Robot):
         self.fx = lambda x: self.A@x
         self.gx = lambda x: self.B
 
-        self.U = HyperRectangle(np.array([-3, -3, -3, -0.5, -0.5, -0.5]),
-                                np.array([3, 3, 3, 0.5, 0.5, 0.5]))
+        # Define the control input bounds
+        max_thrust = 2.125
+        max_torque = 0.255
+        scale_thrust = 2/3
+        scale_torque = 1/3
+        u_max = np.concatenate([
+            np.array([max_thrust]*3) * scale_thrust,
+            np.array([max_torque]*3) * scale_torque
+        ])
+        self.U = HyperRectangle(-u_max, u_max)
         self.D = HyperRectangle(np.array([-1, -1, -1]),np.array([1, 1, 1]))
 
         # self.U_effective = minkowski_difference(self.U, self.K@self.D)

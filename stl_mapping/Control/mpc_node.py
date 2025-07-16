@@ -265,14 +265,14 @@ class MPCNode(Node):
                            self.vehicle_angular_velocity[2]]).reshape(13, 1)
 
         if not self.started:
-            self.get_logger().info("Mission not started, using constant reference (t=0)")
+            # self.get_logger().info("Mission not started, using constant reference (t=0)")
             times = np.zeros(self.mpc.Nx + 1)  # No time since start, constant reference
         else:
-            self.get_logger().info("Mission started, calculating reference trajectory")
+            # self.get_logger().info("Mission started, calculating reference trajectory")
             t_mpc = t - self.t0
             times = np.linspace(t_mpc, t_mpc + self.mpc.Nx * self.mpc.dt, self.mpc.Nx + 1)
             # times = np.arange(t_mpc, t_mpc + self.mpc.Nx * self.mpc.dt, self.mpc.dt)
-            self.get_logger().info(f"t_mpc: {t_mpc}, times: {times}")
+            # self.get_logger().info(f"t_mpc: {t_mpc}, times: {times}")
         
         x_ref = np.zeros((13, self.mpc.Nx + 1))  # Initialize reference trajectory
         for idx, ti in enumerate(times):
@@ -285,16 +285,15 @@ class MPCNode(Node):
             x_ref[3:7, :],  # Quaternion
             x_ref[10:13, :]  # Angular velocity
         ))
-        self.get_logger().info(f"x_ref: {x_ref}")
-        self.get_logger().info(f"x0: {x0.flatten()}")
+        # self.get_logger().info(f"x_ref: {x_ref[:, 0].flatten()}")
+        # self.get_logger().info(f"x0: {x0.flatten()}")
 
         # Get control input
         self.control, x_pred = self.mpc.get_input(x0, x_ref)
-        print(f"Control: {self.control.flatten()}")
+        # print(f"Control: {self.control.flatten()}")
 
         # Publish the reference and predicted path for rviz
         setpoint_path_msg = Path()
-        self.get_logger().info(f'shape: {x_ref.shape}')
         for idx in range(x_ref.shape[1]):
             setpoint = x_ref[:, idx]
             setpoint_pose_msg = self.vector2PoseMsg('map', setpoint[0:3], setpoint[6:10])
