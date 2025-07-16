@@ -1,6 +1,7 @@
 
 import casadi as cs
 import numpy as np
+from scipy.spatial.transform import Rotation as R
 
 def skew_symmetric(v):
     return cs.vertcat(cs.horzcat(0, -v[0], -v[1], -v[2]),
@@ -23,7 +24,7 @@ def v_dot_q(v, q):
 
     return cs.mtimes(rot_mat, v)
 
-def euler_to_quat_cs(pry):
+def euler_to_quat_cs(pry,order='zyz'):
     #TODO: check this function and if order matters
     """
     Convert Euler angles (roll, pitch, yaw) to quaternion (qw, qx, qy, qz).
@@ -44,25 +45,14 @@ def euler_to_quat_cs(pry):
 
     return cs.vertcat(qw, qx, qy, qz)  # return as (qw, qx, qy, qz)
 
-def euler_to_quat_np(pry):
+def euler_to_quat_np(pry, order='zyz'):
     """
     Convert Euler angles (roll, pitch, yaw) to quaternion (qw, qx, qy, qz).
     Angles are in radians.
     """
-    pitch, roll, yaw = pry[0], pry[1], pry[2]
-    cy = np.cos(yaw * 0.5)
-    sy = np.sin(yaw * 0.5)
-    cr = np.cos(roll * 0.5)
-    sr = np.sin(roll * 0.5)
-    cp = np.cos(pitch * 0.5)
-    sp = np.sin(pitch * 0.5)
-
-    qw = cy * cr * cp + sy * sr * sp
-    qx = cy * sr * cp - sy * cr * sp
-    qy = sy * cr * cp + cy * sr * sp
-    qz = sy * sr * cp - cy * cr * sp
-
-    return np.array([qw, qx, qy, qz])  # return as (qw, qx, qy, qz)
+    r = R.from_euler(order, pry, degrees=False)
+    q = r.as_quat(scalar_first=True)  # returns (qx, qy, qz, qw)
+    return q
 
 def quat_to_euler_cs(q):
     """
@@ -77,18 +67,14 @@ def quat_to_euler_cs(q):
 
     return cs.vertcat(roll, pitch, yaw)
 
-def quat_to_euler_np(q):
+def quat_to_euler_np(q,order='zyz'):
     """
     Convert quaternion (qw, qx, qy, qz) to Euler angles (roll, pitch, yaw).
     Angles are in radians.
     """
-    qw, qx, qy, qz = q[0], q[1], q[2], q[3]
-
-    roll = np.arctan2(2 * (qw * qx + qy * qz), 1 - 2 * (qx ** 2 + qy ** 2))
-    pitch = np.arcsin(2 * (qw * qy - qz * qx))
-    yaw = np.arctan2(2 * (qw * qz + qx * qy), 1 - 2 * (qy ** 2 + qz ** 2))
-
-    return np.array([roll, pitch, yaw])
+    q = R.from_quat(q, scalar_first=True)  # convert to scipy Rotation object
+    euler = q.as_euler(order, degrees=False)  # returns (
+    return euler
 
 def quat_x_to_euler_x_cs(x):
     # assumes x = [p, q, dp, dq]
@@ -111,22 +97,22 @@ def euler_x_to_quat_x_cs(x):
     )
     return quat_x
 
-def quat_x_to_euler_x_np(x):
+def quat_x_to_euler_x_np(x, order='zyz'):
     # assumes x = [p, q, dp, dq]
     euler_x = np.concatenate((
         x[0:3],                   # position
-        quat_to_euler_np(x[3:7]),    # euler angles
+        quat_to_euler_np(x[3:7], order=order),    # euler angles
         x[7:10],                  # linear velocity
         x[10:13]                  # angular velocity
     ))
     return euler_x
 
-def euler_x_to_quat_x_np(x):
+def euler_x_to_quat_x_np(x,order='zyz'):
     # assumes x = [p, q, dp, dq]
     p, q, dp, dq = x[0:3], x[3:6], x[6:9], x[9:12]
     quat_x = np.concatenate((
         p,                   # position
-        euler_to_quat_np(q),    # quaternion
+        euler_to_quat_np(q, order=order),    # quaternion
         dp,                  # linear velocity
         dq                   # angular velocity
     ))

@@ -75,7 +75,7 @@ class HyperRectangle():
     
     def plot(self, ax:plt.Axes, color='blue', alpha=0.5):
         rect = plt.Rectangle(self.lower_bounds[:2], self.size[0], self.size[1], 
-                             alpha=alpha, color=color, lw=1, edgecolor='black')
+                             alpha=alpha, fc=color, lw=1, ec='black')
         ax.add_patch(rect)
 
 class Zonotope():

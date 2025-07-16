@@ -136,15 +136,19 @@ class LinearFreeFlyer6DoF(Robot):
 
     def add_state_constraints(self, prog:gp.Model, items:OptProbItems):
         for i in range(items.x_vars.shape[0]):
-            # Add constraints for roll and yaw to be between [-pi, pi]
+            # # Add constraints for roll and yaw to be between [-pi, pi]
+            # prog.addConstr(items.x_vars[i, 4] >= -np.pi, f"roll_lower_{i}")
+            # prog.addConstr(items.x_vars[i, 4] <= np.pi, f"roll_upper_{i}")
+            # prog.addConstr(items.x_vars[i, 5] >= -np.pi, f"yaw_lower_{i}")
+            # prog.addConstr(items.x_vars[i, 5] <= np.pi, f"yaw_upper_{i}")
+            # # Add constrains for pitch to be between [-pi/2, pi/2] (prevent gymbal lock)
+            # prog.addConstr(items.x_vars[i, 3] >= -np.pi/2, f"pitch_lower_{i}")
+            # prog.addConstr(items.x_vars[i, 3] <= np.pi/2, f"pitch_upper_{i}")
+            # Add constraints for roll to be 0
+            # TODO: make this a user-defined dimension (based on order of euler angles)
             prog.addConstr(items.x_vars[i, 4] >= -np.pi, f"roll_lower_{i}")
             prog.addConstr(items.x_vars[i, 4] <= np.pi, f"roll_upper_{i}")
-            prog.addConstr(items.x_vars[i, 5] >= -np.pi, f"yaw_lower_{i}")
-            prog.addConstr(items.x_vars[i, 5] <= np.pi, f"yaw_upper_{i}")
 
-            # Add constrains for pitch to be between [-pi/2, pi/2] (prevent gymbal lock)
-            prog.addConstr(items.x_vars[i, 3] >= -np.pi/2, f"pitch_lower_{i}")
-            prog.addConstr(items.x_vars[i, 3] <= np.pi/2, f"pitch_upper_{i}")
 
             # Add constraints for the angular velocities to be between [-pi/8, pi/8]
             prog.addConstr(items.x_vars[i, 9] >= -np.pi/8, f"p_lower_{i}")

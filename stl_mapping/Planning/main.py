@@ -49,6 +49,8 @@ sp_robot = LinearFreeFlyer6DoF()
 # ])
 # spec = Spec(phi, t0, tf)
 
+euler_order = 'zyx'
+
 X0 = HyperRectangle(np.array([0.5, 0, 0]), np.array([0.6, 0.1, 0.1]))
 Xf = HyperRectangle(np.array([2.5, 1.0, 0]), np.array([2.6, 1.1, 0.1]))
 XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8]))
@@ -57,7 +59,7 @@ World = HyperRectangle(np.array([0, -1.5, -10, -10]), np.array([4, 1.5, 10, 10])
 phi = Pred("AND", preds=[
     Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)], dims=[0,1,2])]),
     Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1,2])]),
-    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2, 5])]),
+    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2, 5])]), # 3: pitch, 4: roll, 5: yaw
     Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)], dims=[0,1,6,7])]),
 ])
 spec = Spec(phi, t0, tf)
@@ -148,9 +150,12 @@ axs[1].set_ylabel('Velocity')
 axs[1].legend()
 axs[1].grid()
 
-axs[2].plot(t_sp, x_ff[:, 3], label='pitch')
-axs[2].plot(t_sp, x_ff[:, 4], label='roll')
-axs[2].plot(t_sp, x_ff[:, 5], label='yaw')
+axs[2].plot(t_sp, x_ff[:, 3], 'r', label='pitch')
+axs[2].plot(t_sp, x_ff[:, 4], 'g', label='roll')
+axs[2].plot(t_sp, x_ff[:, 5], 'b', label='yaw')
+axs[2].plot(t_sp, x_ff[:, 9], 'r--', label='d_pitch')
+axs[2].plot(t_sp, x_ff[:, 10], 'g--', label='d_roll')
+axs[2].plot(t_sp, x_ff[:, 11], 'b--', label='d_yaw')
 axs[2].set_xlabel('Time step')
 axs[2].set_ylabel('Euler angles (rad)')
 axs[2].legend()
@@ -174,10 +179,11 @@ plt.savefig("stl_mapping/Planning/figures/sp_trajectory.png")
 # Now we have pitch-roll-yaw angles which we want to convert to unit quaternion
 x_ff_quat = np.zeros((x_ff.shape[0], x_ff.shape[1] + 1))
 for i in range(x_ff.shape[0]):
-    x_ff_quat[i,:] = euler_x_to_quat_x_np(x_ff[i, :])
-print(f"quat: {x_ff_quat[:, 3:7]}")
-print(f"euler: {np.array([quat_to_euler_np(x[3:7]) for x in x_ff_quat])}")
-# print(np.linalg.norm(x_ff_quat[:, 3:7],axis=1))  # should be close to 1
+    x_ff_quat[i,:] = euler_x_to_quat_x_np(x_ff[i, :],order=euler_order)
+print(f"euler: {x_ff[:, 3:6]}")
+print(f"quat:  {x_ff_quat[:, 3:7]}")
+print(f"euler: {np.array([quat_to_euler_np(x[3:7], order=euler_order) for x in x_ff_quat])}")
+# print(np.linalg.norm(x_ff_quat[:, 3:7],axis=1))  # should be 1
 
 np.savez('stl_mapping/Planning/solutions/sp_solution_quat.npz', x_ff=x_ff_quat, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
 
@@ -245,9 +251,9 @@ u_max = np.max(np.abs(u_uw_fbl_sp), axis=0)
 print(f"\nAlpha if u_sp applied to BlueROV directly: {np.max(u_max/uw_robot.U.upper_bounds)}")
 print(f"This is lower because BlueROV is faster than free flyer")
 
-u_uw = np.array([u_fbl(x_uw_fbl_sp[i,:],u_uw_fbl_sp[i,:])[0:2].squeeze() for i in range(N)])
+u_uw = np.array([u_fbl(x_uw_fbl_sp[i,:],u_uw_fbl_sp[i,:]) for i in range(N)]).squeeze()
 u_max = np.max(np.abs(u_uw), axis=0)
-print(f"\nAlpha if u_fbl(x_sp,u_sp) applied to BlueROV directly: {np.max(u_max/uw_robot.U.upper_bounds[0:2])}")
+print(f"\nAlpha if u_fbl(x_sp,u_sp) applied to BlueROV directly: {np.max(u_max/uw_robot.U.upper_bounds)}")
 print(f"U should become {np.max(u_max)/alpha} for same alpha (was {uw_robot.U.upper_bounds[0]}) which is {(np.max(u_max)/alpha)/uw_robot.U.upper_bounds[0]*100}%")
 
 # So now we have to find \phi (for now deltaT) such that
