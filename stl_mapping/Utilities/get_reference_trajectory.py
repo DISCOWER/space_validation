@@ -7,7 +7,7 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
 
 from Utilities.beziers import value_bezier
-from Utilities.rotations import quat_to_euler_cs
+from Utilities.rotations import quat_to_euler_np, euler_to_quat_np
 
 class ReferenceTrajectory:
     def __init__(self, r, dr, q, dt):
@@ -17,7 +17,7 @@ class ReferenceTrajectory:
         self.dt = dt
         self.N = r.shape[0]
 
-def get_reference_trajectory(t:float, trajectory:ReferenceTrajectory):
+def get_reference_trajectory(t:float, trajectory:ReferenceTrajectory, order:str='zyx'):
     idx = min(int(t / trajectory.dt), trajectory.N-1)
     s = min(1,(t - idx * trajectory.dt) / trajectory.dt)
     # print(f"idx: {idx}, s: {s}")
@@ -28,12 +28,11 @@ def get_reference_trajectory(t:float, trajectory:ReferenceTrajectory):
     slerp = Slerp([0, 1], Rotation.from_quat(trajectory.q[idx], scalar_first=True))
     q_val = slerp(s).as_quat(scalar_first=True)
 
-    # TODO: this seems to map [1,0,0,0] quat to [pi,0,0] euler angles (should be [0,0,0])
     ds = 1e-6
-    dq_val = slerp([s, min(1,s+ds)]).as_euler('xyz')
+    dq_val = slerp([s, min(1,s+ds)]).as_euler(order)
     dq_val = (dq_val[1] - dq_val[0]) / ds
 
-    print(f"q_val: {quat_to_euler_cs(q_val)}")
+    print(f"q_val: {quat_to_euler_np(q_val, order=order)}")
     # print(f"dq_val: {dq_val}")
     return np.concatenate((p, q_val, v, dq_val))
 
