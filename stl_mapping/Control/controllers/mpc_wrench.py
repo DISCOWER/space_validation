@@ -50,9 +50,9 @@ class MpcWrench():
         self.Q = np.diag([          # State weighting matrix
             1e0, 1e0, 1e0,
             2e0, 2e0, 1e0, 
-            1e3, 
+            1e2, 
             5e0, 5e0, 5e0])             
-        self.R = np.diag([          # State weighting matrix
+        self.R = 0.1*np.diag([          # State weighting matrix
             1e0, 1e0, 1e0,
             1e0, 1e0, 1e0]) 
         self.P = 20 * self.Q        # Terminal state weighting matrix
@@ -114,9 +114,9 @@ class MpcWrench():
         ocp.cost.W = block_diag(self.Q, self.R)
         ocp.cost.W_e = block_diag(self.P)
 
-        quat_error = ca.fabs(model.x[6:10].T @ x_ref[6:10])
-        # quat_error = (model.x[6:10].T @ x_ref[6:10])**2
-        quat_error = ca.fmax(0, ca.fmin(1, quat_error))
+        # quat_error = ca.fabs(model.x[6:10].T @ x_ref[6:10])
+        quat_error = (model.x[6:10].T @ x_ref[6:10])**2
+        # quat_error = ca.fmax(0, ca.fmin(1, quat_error))
         ocp.model.cost_y_expr = ca.vertcat(
             model.x[0:3] - x_ref[0:3],   # Position error
             model.x[3:6] - x_ref[3:6],   # Velocity error

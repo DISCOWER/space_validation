@@ -89,7 +89,7 @@ class LinearFreeFlyer6DoF(Robot):
     def __init__(self):
         super().__init__(n_x=12, n_u=6)
         # dynamics in the form: dx = f(x) + g(x)u
-        self.mass = 16.8
+        self.mass = 17.8
         self.inertia = 0.314
 
         self.A = np.zeros((12, 12))
@@ -115,7 +115,7 @@ class LinearFreeFlyer6DoF(Robot):
 
         # Define the control input bounds
         max_thrust = 2.125
-        max_torque = 0.255
+        max_torque = 0.714
         scale_thrust = 2/3
         scale_torque = 1/3
         u_max = np.concatenate([

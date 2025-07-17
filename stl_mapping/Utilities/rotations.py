@@ -51,7 +51,7 @@ def euler_to_quat_np(pry, order='zyz'):
     Angles are in radians.
     """
     r = R.from_euler(order, pry, degrees=False)
-    q = r.as_quat(scalar_first=True)  # returns (qx, qy, qz, qw)
+    q = r.as_quat(scalar_first=True)  # returns (qw, qx, qy, qz)
     return q
 
 def quat_to_euler_cs(q):
@@ -107,7 +107,7 @@ def quat_x_to_euler_x_np(x, order='zyz'):
     ))
     return euler_x
 
-def euler_x_to_quat_x_np(x,order='zyz'):
+def euler_x_to_quat_x_np(x,order='zyx'):
     # assumes x = [p, q, dp, dq]
     p, q, dp, dq = x[0:3], x[3:6], x[6:9], x[9:12]
     quat_x = np.concatenate((

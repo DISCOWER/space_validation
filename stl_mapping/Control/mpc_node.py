@@ -17,6 +17,7 @@ from px4_msgs.msg import VehicleStatus, VehicleAttitude, VehicleAngularVelocity,
 from px4_msgs.msg import VehicleThrustSetpoint, VehicleTorqueSetpoint, OffboardControlMode
 
 from Control.controllers.mpc_wrench import MpcWrench
+from Utilities.rotations import quat_to_euler_np
 
 class MPCNode(Node):
     def __init__(self):
@@ -93,10 +94,10 @@ class MPCNode(Node):
         self.get_logger().info("MPC publishers initialized successfully")
 
         # Create the MPC solver and create timer callback to solve
-        timer_period = 0.05 # seconds
+        timer_period = 0.5 # seconds
         self.timer = self.create_timer(timer_period, self.cmdloop_callback)
 
-        timer_period_offboard = 0.3 # seconds
+        timer_period_offboard = 0.1 # seconds
         self.timer_offboard = self.create_timer(timer_period_offboard, self.publish_offboard_mode)
 
         # Load the plan from a file (declared as launch argument)
@@ -104,6 +105,7 @@ class MPCNode(Node):
 
         this_file_dir = os.path.dirname(os.path.abspath(__file__))
         path = os.path.abspath(os.path.join(this_file_dir, '../../../../share/stl_mapping/'))
+        # path = '/home/none/space_ws/src/stl_mapping/stl_mapping/Planning/solutions/'
         self.plan_path = os.path.join(path, self.plan_path)
         self.get_logger().info(f"Loaded plan from {self.plan_path}")
 
@@ -115,6 +117,7 @@ class MPCNode(Node):
             q=plan_solution['q'],
             dt=plan_solution['dt']
         )
+        self.get_logger().info(f"q: {self.reference.q}")
 
         # Initialize variables
         self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
@@ -276,7 +279,7 @@ class MPCNode(Node):
         
         x_ref = np.zeros((13, self.mpc.Nx + 1))  # Initialize reference trajectory
         for idx, ti in enumerate(times):
-            x_ref[:, idx] = get_reference_trajectory(ti, self.reference)
+            x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
                 
         # x_ref contains reference in order p q dp dq, convert to order p, dp, q, dq
         x_ref = np.concatenate((
@@ -285,12 +288,18 @@ class MPCNode(Node):
             x_ref[3:7, :],  # Quaternion
             x_ref[10:13, :]  # Angular velocity
         ))
-        # self.get_logger().info(f"x_ref: {x_ref[:, 0].flatten()}")
+        self.get_logger().info(f"euler: {quat_to_euler_np(x_ref[6:10, 0], order='xyz')}")
+        self.get_logger().info(f"x_ref: {x_ref[:, 0].flatten()}")
         # self.get_logger().info(f"x0: {x0.flatten()}")
 
         # Get control input
         self.control, x_pred = self.mpc.get_input(x0, x_ref)
         # print(f"Control: {self.control.flatten()}")
+
+        quat_error = (x_pred[0, 6:10] @ x_ref[6:10, 0])**2
+        self.get_logger().warning(f"quat_error: {1-quat_error}")
+        pos_error = np.linalg.norm(x_pred[0, 0:2] - x_ref[0:2, 0])
+        self.get_logger().warning(f"pos_error: {pos_error}")
 
         # Publish the reference and predicted path for rviz
         setpoint_path_msg = Path()

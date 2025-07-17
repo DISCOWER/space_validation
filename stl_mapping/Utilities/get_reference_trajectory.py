@@ -28,9 +28,10 @@ def get_reference_trajectory(t:float, trajectory:ReferenceTrajectory, order:str=
     slerp = Slerp([0, 1], Rotation.from_quat(trajectory.q[idx], scalar_first=True))
     q_val = slerp(s).as_quat(scalar_first=True)
 
-    ds = 1e-6
+    ds = 1e-4
     dq_val = slerp([s, min(1,s+ds)]).as_euler(order)
-    dq_val = (dq_val[1] - dq_val[0]) / ds
+    dq_val = (dq_val[1] - dq_val[0]) / (ds*trajectory.dt)
+    # dq_val = np.zeros((3,))   # This for slow-moving tests
 
     print(f"q_val: {quat_to_euler_np(q_val, order=order)}")
     # print(f"dq_val: {dq_val}")

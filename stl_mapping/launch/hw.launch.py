@@ -44,7 +44,7 @@ def generate_launch_description():
             package='rviz2',
             executable='rviz2',
             name='rviz2',
-            arguments=['-d', [os.path.join(get_package_share_directory('impact_stl'), 'config.rviz')]]
+            arguments=['-d', [os.path.join(get_package_share_directory('stl_mapping'), 'config.rviz')]]
     ))
 #     # Plotjuggler from the juggler_2.xml file (2 spacecrafts)
 #     ld.add_action(Node(

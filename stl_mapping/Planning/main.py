@@ -21,7 +21,7 @@ from Utilities.stl import Pred, Spec, quant_parse_operator, OptProbItems
 
 # hyperparameters
 N = 30     # number of time steps
-dt = 1.0    # time step size
+dt = 1.5    # time step size
 t0 = 0      # initial time
 tf = (N-1)*dt   # final time
 
@@ -49,17 +49,18 @@ sp_robot = LinearFreeFlyer6DoF()
 # ])
 # spec = Spec(phi, t0, tf)
 
-euler_order = 'zyx'
+euler_order = 'xyz'
 
 X0 = HyperRectangle(np.array([0.5, 0, 0]), np.array([0.6, 0.1, 0.1]))
 Xf = HyperRectangle(np.array([2.5, 1.0, 0]), np.array([2.6, 1.1, 0.1]))
-XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8]))
+# XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8]))
+XA = HyperRectangle(np.array([2.5, -1.0, 0]), np.array([2.6, -0.9, 0.1]))
 Obs = []
 World = HyperRectangle(np.array([0, -1.5, -10, -10]), np.array([4, 1.5, 10, 10]))
 phi = Pred("AND", preds=[
     Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)], dims=[0,1,2])]),
     Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1,2])]),
-    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2, 5])]), # 3: pitch, 4: roll, 5: yaw
+    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2])]), # 3: pitch, 4: roll, 5: yaw
     Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)], dims=[0,1,6,7])]),
 ])
 spec = Spec(phi, t0, tf)
@@ -85,8 +86,8 @@ if True:
     sp_robot.add_state_constraints(opt, items)
 
     # initial orientation and velocity constraints
-    opt.addConstr(x_vars[0, 3::] == np.zeros(sp_robot.n_x - 3))
-    opt.addConstr(x_vars[-1, 3::] == np.zeros(sp_robot.n_x - 3))
+    opt.addConstr(x_vars[0, 3::] == np.array([0, 0, -np.pi/2, 0, 0, 0, 0, 0, 0]))#np.zeros(sp_robot.n_x - 3))
+    opt.addConstr(x_vars[-1, 3::] == np.array([0, 0, -np.pi/2, 0, 0, 0, 0, 0, 0]))#np.zeros(sp_robot.n_x - 3))
 
     X = [var for var in opt.getVars() if "X" in var.VarName]
     quant_parse_operator(opt, spec.phi, items)
