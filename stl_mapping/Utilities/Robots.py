@@ -2,7 +2,7 @@ import numpy as np
 import casadi as cs
 import gurobipy as gp
 from Utilities.sets import HyperRectangle, Zonotope
-from Utilities.rotations import skew_symmetric, q_to_rot_mat
+from Utilities.rotations import skew_symmetric_cs, skew_symmetric_np, q_to_rot_mat_cs, q_to_rot_mat_np
 from Utilities.rotations import euler_to_quat_cs, euler_to_quat_np, quat_to_euler_cs, quat_to_euler_np
 from Utilities.rotations import quat_x_to_euler_x_cs, euler_x_to_quat_x_cs
 from Utilities.sets import compute_K
@@ -90,7 +90,7 @@ class LinearFreeFlyer6DoF(Robot):
         super().__init__(n_x=12, n_u=6)
         # dynamics in the form: dx = f(x) + g(x)u
         self.mass = 17.8
-        self.inertia = 0.314
+        self.inertia = np.diag((0.1454, 0.1366, 0.1594))
 
         self.A = np.zeros((12, 12))
         self.A[0:6, 6:12] = np.eye(6)
@@ -99,9 +99,9 @@ class LinearFreeFlyer6DoF(Robot):
         self.B[6:12, :] = np.array([[1/self.mass, 0, 0, 0, 0, 0],
                                     [0, 1/self.mass, 0, 0, 0, 0],
                                     [0, 0, 1/self.mass, 0, 0, 0],
-                                    [0, 0, 0, 1/self.inertia, 0, 0],
-                                    [0, 0, 0, 0, 1/self.inertia, 0],
-                                    [0, 0, 0, 0, 0, 1/self.inertia]])
+                                    [0, 0, 0, 1/self.inertia[0,0], 0, 0],
+                                    [0, 0, 0, 0, 1/self.inertia[1,1], 0],
+                                    [0, 0, 0, 0, 0, 1/self.inertia[2,2]]])
         
         self.C = np.zeros((12, 3))
         # TODO: deal with positive and negative values here
@@ -159,13 +159,14 @@ class LinearFreeFlyer6DoF(Robot):
             prog.addConstr(items.x_vars[i, 11] <= np.pi/8, f"r_upper_{i}")
 
 class FreeFlyer(Robot):
-    def __init__(self):
+    def __init__(self, casadi=False):
         nx = 13
         nu = 6
         super().__init__(n_x=nx, n_u=nu)
+        self.casadi = casadi 
 
         # dynamics in the form: dx = f(x) + g(x)u
-        self.mass = 16.8
+        self.mass = 17.8
         self.inertia = np.diag((0.1454, 0.1366, 0.1594))
         self.max_thrust = 1.
         self.max_torque = 0.5
@@ -180,22 +181,35 @@ class FreeFlyer(Robot):
 
     def _fx(self, x):
         p, q, v, w = x[0:3], x[3:7], x[7:10], x[10:13]
-        fx = cs.blockcat([
-            [v],
-            [0.5 * cs.mtimes(skew_symmetric(w), q)],
-            [cs.DM.zeros(3,)],
-            [cs.DM(np.linalg.inv(self.inertia)) @ (-cs.cross(w, self.inertia @ w))]
-        ])
+        if self.casadi:
+            fx = cs.blockcat([
+                [v],
+                [0.5 * cs.mtimes(skew_symmetric_cs(w), q)],
+                [cs.DM.zeros(3,)],
+                [cs.DM(np.linalg.inv(self.inertia)) @ (-cs.cross(w, self.inertia @ w))]
+            ])
+        else:
+            fx = np.zeros((13,))
+            fx[0:3] = v
+            fx[3:7] = 0.5 * skew_symmetric_np(w) @ q
+            fx[7:10] = np.zeros(3)
+            fx[10:13] = np.linalg.inv(self.inertia) @ (-np.cross(w, self.inertia @ w))
         return fx
     
     def _gx(self, x):
         p, q, v, w = x[0:3], x[3:7], x[7:10], x[10:13]
-        gx = cs.vertcat(
-            cs.DM.zeros((3, 6)),
-            cs.DM.zeros((4, 6)),
-            cs.horzcat(q_to_rot_mat(q)/self.mass, cs.DM.zeros((3,3))),
-            cs.horzcat(cs.DM.zeros((3, 3)), cs.DM(np.linalg.inv(self.inertia)))
-        )
+        if self.casadi:
+            gx = cs.vertcat(
+                cs.DM.zeros((3, 6)),
+                cs.DM.zeros((4, 6)),
+                cs.horzcat(q_to_rot_mat_cs(q)/self.mass, cs.DM.zeros((3,3))),
+                cs.horzcat(cs.DM.zeros((3, 3)), cs.DM(np.linalg.inv(self.inertia)))
+            )
+        else:
+            gx = np.zeros((13, 6))
+            # TODO: check because BlueROV has this constant!
+            gx[7:10, 0:3] = q_to_rot_mat_np(q) / self.mass
+            gx[10:13, 3:6] = np.linalg.inv(self.inertia)
         return gx
 
 class BlueROV(Robot):

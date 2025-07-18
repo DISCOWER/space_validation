@@ -1,3 +1,3 @@
-[submodule "bluerov2_dynamics"]
-	path = Utilities/bluerov2_dynamics
-	url = git@github.com:ViktorNfa/bluerov2_dynamics.git
+[submodule "stl_mapping/Utilities/smarc_modelling"]
+	path = stl_mapping/Utilities/smarc_modelling
+	url = git@github.com:DoernerD/smarc_modelling.git

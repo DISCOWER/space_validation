@@ -12,12 +12,13 @@ import os
 import sys
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
-from Utilities.Robots import FreeFlyer, BlueROV, LinearFreeFlyer6DoF
+from Utilities.Robots import FreeFlyer, LinearFreeFlyer6DoF
 from Utilities.sets import HyperRectangle, Polytope
 from Utilities.rotations import quat_to_euler_np, quat_to_euler_cs, euler_to_quat_np, euler_to_quat_cs
 from Utilities.rotations import quat_x_to_euler_x_cs, euler_x_to_quat_x_cs, quat_x_to_euler_x_np, euler_x_to_quat_x_np
 from Utilities.stl import Pred, Spec, quant_parse_operator, OptProbItems
-
+from Utilities.plotting import plot_planning_results
+from Utilities.smarc_modelling.src.smarc_modelling.vehicles.BlueROV import BlueROV 
 
 # hyperparameters
 N = 30     # number of time steps
@@ -53,7 +54,7 @@ euler_order = 'xyz'
 
 X0 = HyperRectangle(np.array([0.5, 0, 0]), np.array([0.6, 0.1, 0.1]))
 Xf = HyperRectangle(np.array([2.5, 1.0, 0]), np.array([2.6, 1.1, 0.1]))
-# XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8]))
+XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8]))
 XA = HyperRectangle(np.array([2.5, -1.0, 0]), np.array([2.6, -0.9, 0.1]))
 Obs = []
 World = HyperRectangle(np.array([0, -1.5, -10, -10]), np.array([4, 1.5, 10, 10]))
@@ -67,7 +68,7 @@ spec = Spec(phi, t0, tf)
 
 
 # create planner
-if True:
+if False:
     opt = gp.Model("prob1")
     x_vars = opt.addMVar((N, sp_robot.n_x), lb=-np.inf, ub=np.inf, name="X")
     u_vars = opt.addMVar((N, sp_robot.n_u), lb=-np.inf, ub=np.inf, name="U")
@@ -86,8 +87,8 @@ if True:
     sp_robot.add_state_constraints(opt, items)
 
     # initial orientation and velocity constraints
-    opt.addConstr(x_vars[0, 3::] == np.array([0, 0, -np.pi/2, 0, 0, 0, 0, 0, 0]))#np.zeros(sp_robot.n_x - 3))
-    opt.addConstr(x_vars[-1, 3::] == np.array([0, 0, -np.pi/2, 0, 0, 0, 0, 0, 0]))#np.zeros(sp_robot.n_x - 3))
+    opt.addConstr(x_vars[0, 3::] == np.array([0, 0, 0, 0, 0, 0, 0, 0, 0]))#np.zeros(sp_robot.n_x - 3))
+    opt.addConstr(x_vars[-1, 3::] == np.array([0, 0, 0, 0, 0, 0, 0, 0, 0]))#np.zeros(sp_robot.n_x - 3))
 
     X = [var for var in opt.getVars() if "X" in var.VarName]
     quant_parse_operator(opt, spec.phi, items)
@@ -104,17 +105,12 @@ if True:
     if opt.status == gp.GRB.OPTIMAL:
         print(f"Optimal solution found")
         print(f"\nAlpha from solving Prob 1: {alpha_vars.X}")
+        print(f"This is how much control is necessary to satisfy the specification")
         denom = sp_robot.U_effective.scalar_multiply(alpha_vars.X)
         denom = denom.sum(sp_robot.KD)
         print(f"Beta from solving Prob 1: {denom.divide(sp_robot.U)}")
         print(f"Spatial robustness: rho = {spec.phi.rho.X}")
         print(f"Control integral summed: {act_int_var.X}")
-        # print(f"Spatial robustness: {spec.phi.rho.X}")
-        # for pred in spec.phi.preds:
-        #     print(f"rhos: {pred.preds[-1].rhos.X }")
-        # print(f"rhos: {[rf.X for rf in spec.phi.preds[-1].preds[0].preds[0].rho_faces]}")
-        
-        print(f"This is how much control is necessary to satisfy the specification")
     else:
         print(f"No optimal solution found")
         print(f"Status: {scs[opt.status]}")
@@ -135,46 +131,8 @@ else:
     t_sp = data['times']
 
 # plot the trajectory
-fig, axs = plt.subplots(1,4, figsize=(15, 5))
-axs[0].plot(x_ff[:, 0], x_ff[:, 1], 'g-')
-axs[0].plot(x_ff[:, 0], x_ff[:, 1], 'go')
-X0.plot(axs[0], color='green', alpha=0.5)
-Xf.plot(axs[0], color='green', alpha=0.5)
-XA.plot(axs[0], color='blue', alpha=0.5)
-[obs.plot(axs[0], color='red', alpha=0.5) for obs in Obs]
-axs[0].set_aspect('equal', adjustable='box')
-
-axs[1].plot(t_sp, x_ff[:, 6], label='dx')
-axs[1].plot(t_sp, x_ff[:, 7], label='dy')
-axs[1].set_xlabel('Time step')
-axs[1].set_ylabel('Velocity')
-axs[1].legend()
-axs[1].grid()
-
-axs[2].plot(t_sp, x_ff[:, 3], 'r', label='pitch')
-axs[2].plot(t_sp, x_ff[:, 4], 'g', label='roll')
-axs[2].plot(t_sp, x_ff[:, 5], 'b', label='yaw')
-axs[2].plot(t_sp, x_ff[:, 9], 'r--', label='d_pitch')
-axs[2].plot(t_sp, x_ff[:, 10], 'g--', label='d_roll')
-axs[2].plot(t_sp, x_ff[:, 11], 'b--', label='d_yaw')
-axs[2].set_xlabel('Time step')
-axs[2].set_ylabel('Euler angles (rad)')
-axs[2].legend()
-axs[2].grid()
-
-axs[3].plot(u_ff[:,0])
-axs[3].plot(u_ff[:,1])
-axs[3].plot(u_ff[:,2])
-axs[3].axhline(sp_robot.U.lower_bounds[0], color='g', linestyle='-.', label="U_lb")
-axs[3].axhline(sp_robot.U.upper_bounds[0], color='g', linestyle='-.')
-axs[3].axhline(alpha*sp_robot.U_effective.lower_bounds[0], color='b', linestyle='--', label="alpha*U_effective_lb")
-axs[3].axhline(alpha*sp_robot.U_effective.upper_bounds[0], color='b', linestyle='--')
-axs[3].axhline(sp_robot.U_effective.lower_bounds[0], color='r', linestyle=':', label="U_effective_lb")
-axs[3].axhline(sp_robot.U_effective.upper_bounds[0], color='r', linestyle=':')
-axs[3].set_xlabel('Time step')
-axs[3].set_ylabel('Control input')
-plt.savefig("stl_mapping/Planning/figures/sp_trajectory.png")
-
+plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
+                      path="stl_mapping/Planning/figures/sp_trajectory.png")
 
 
 # Now we have pitch-roll-yaw angles which we want to convert to unit quaternion
@@ -189,7 +147,7 @@ print(f"euler: {np.array([quat_to_euler_np(x[3:7], order=euler_order) for x in x
 np.savez('stl_mapping/Planning/solutions/sp_solution_quat.npz', x_ff=x_ff_quat, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
 
 # feedback linearization controller for the underwater robot to behave like a free flyer
-uw_robot = BlueROV(quaternion=True)
+uw_robot = BlueROV() # (quaternion=True)
 sp_robot_nl = FreeFlyer()
 
 def u_fbl(x, v):
@@ -216,38 +174,16 @@ for i in range(N-1):
     x_uw_fbl_sp[i+1, :] = x
     u_uw_fbl_sp[i, :] = u
 
+# convert to euler angles for intuitive plotting
+x_uw_fbl_sp_euler = np.zeros((x_uw_fbl_sp.shape[0], x_uw_fbl_sp.shape[1] - 1))
+for i in range(x_uw_fbl_sp.shape[0]):
+    x_uw_fbl_sp_euler[i, :] = quat_x_to_euler_x_np(x_uw_fbl_sp[i, :], order=euler_order)
 
-# print(f"u_uw_fbl_sp: {u_uw_fbl_sp[:,0]}")
-# print(f"u_uw_fbl_sp: {u_uw_fbl_sp[:,1]}")
-print(f"u_uw_fbl_sp: {u_uw_fbl_sp[:,2]}")
-print(f"x_uw_fbl_sp: {x_uw_fbl_sp[:,2]}")
+# plot the trajectory
+plot_planning_results(uw_robot, t_sp, x_uw_fbl_sp_euler, u_uw_fbl_sp, X0, Xf, [XA], Obs, alpha=alpha,
+                      path="stl_mapping/Planning/figures/sp_trajectory_uw.png")
 
-fig, axs = plt.subplots(1,3, figsize=(15, 5))
-axs[0].plot(x_uw_fbl_sp[:, 0], x_uw_fbl_sp[:, 1], 'g-')
-axs[0].plot(x_uw_fbl_sp[:, 0], x_uw_fbl_sp[:, 1], 'go')
-X0.plot(axs[0], color='green', alpha=0.5)
-Xf.plot(axs[0], color='green', alpha=0.5)
-XA.plot(axs[0], color='blue', alpha=0.5)
-[obs.plot(axs[0], color='red', alpha=0.5) for obs in Obs]
-axs[0].set_aspect('equal', adjustable='box')
-
-axs[1].plot(t_sp, x_uw_fbl_sp[:, 7], label='dx')
-axs[1].plot(t_sp, x_uw_fbl_sp[:, 8], label='dy')
-axs[1].set_xlabel('Time step')
-axs[1].set_ylabel('Velocity')
-axs[1].legend()
-axs[1].grid()
-
-axs[2].plot(u_uw_fbl_sp[:,0],label='u_x')
-axs[2].plot(u_uw_fbl_sp[:,1],label='u_y')
-axs[2].set_xlabel('Time step')
-axs[2].set_ylabel('Control input')
-axs[2].set_ylim(-uw_robot.U.upper_bounds[0]*1.1, uw_robot.U.upper_bounds[0]*1.1)
-axs[2].legend()
-axs[2].grid()
-plt.savefig("stl_mapping/Planning/figures/sp_trajectory_uw.png")
-
-
+# Analysis of alpha
 u_max = np.max(np.abs(u_uw_fbl_sp), axis=0)
 print(f"\nAlpha if u_sp applied to BlueROV directly: {np.max(u_max/uw_robot.U.upper_bounds)}")
 print(f"This is lower because BlueROV is faster than free flyer")
@@ -319,49 +255,51 @@ print(f"This should be the same as the solution to Prob 1")
 print(f"Replanned dt_uw: {dt_uw} (was {dt}) which is {(dt_uw)/dt*100}%")
 
 
-# plot the trajectory
-fig, axs = plt.subplots(2,2, figsize=(10, 10))
-axs[0,0].plot(x_ff[:, 0], x_ff[:, 1], 'g-', label='sp trajectory')
-axs[0,0].plot(x_uw[:, 0], x_uw[:, 1], 'c-', label='uw trajectory')
-X0.plot(axs[0,0], color='green', alpha=0.5)
-Xf.plot(axs[0,0], color='green', alpha=0.5)
-XA.plot(axs[0,0], color='blue', alpha=0.5)
-axs[0,0].legend()
-axs[0,0].grid()
-axs[0,0].set_aspect('equal', adjustable='box')
+# # plot the trajectory
+# # plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
+# #                       path="stl_mapping/Planning/figures/sp_trajectory_uw.png")
+# fig, axs = plt.subplots(2,2, figsize=(10, 10))
+# axs[0,0].plot(x_ff[:, 0], x_ff[:, 1], 'g-', label='sp trajectory')
+# axs[0,0].plot(x_uw[:, 0], x_uw[:, 1], 'c-', label='uw trajectory')
+# X0.plot(axs[0,0], color='green', alpha=0.5)
+# Xf.plot(axs[0,0], color='green', alpha=0.5)
+# XA.plot(axs[0,0], color='blue', alpha=0.5)
+# axs[0,0].legend()
+# axs[0,0].grid()
+# axs[0,0].set_aspect('equal', adjustable='box')
 
-axs[0,1].plot(t_sp, x_ff[:, 0], 'g-', label='sp trajectory')
-axs[0,1].plot(t_sp, x_ff[:, 1], 'g--')
-axs[0,1].plot(t_uw, x_uw[:, 0], 'c-', label='uw trajectory')
-axs[0,1].plot(t_uw, x_uw[:, 1], 'c--')
-axs[0,1].set_xlabel('Time step')
-axs[0,1].set_ylabel('Position')
-axs[0,1].grid()
-axs[0,1].legend()
+# axs[0,1].plot(t_sp, x_ff[:, 0], 'g-', label='sp trajectory')
+# axs[0,1].plot(t_sp, x_ff[:, 1], 'g--')
+# axs[0,1].plot(t_uw, x_uw[:, 0], 'c-', label='uw trajectory')
+# axs[0,1].plot(t_uw, x_uw[:, 1], 'c--')
+# axs[0,1].set_xlabel('Time step')
+# axs[0,1].set_ylabel('Position')
+# axs[0,1].grid()
+# axs[0,1].legend()
 
-axs[1,0].plot(t_sp, x_ff[:, 2], 'g-', label='sp trajectory')
-axs[1,0].plot(t_sp, x_ff[:, 3], 'g--')
-axs[1,0].plot(t_uw, x_uw[:, 2], 'c-', label='uw trajectory')
-axs[1,0].plot(t_uw, x_uw[:, 3], 'c--')
-axs[1,0].set_xlabel('Time step')
-axs[1,0].set_ylabel('Velocity')
-axs[1,0].grid()
-axs[1,0].legend()
+# axs[1,0].plot(t_sp, x_ff[:, 2], 'g-', label='sp trajectory')
+# axs[1,0].plot(t_sp, x_ff[:, 3], 'g--')
+# axs[1,0].plot(t_uw, x_uw[:, 2], 'c-', label='uw trajectory')
+# axs[1,0].plot(t_uw, x_uw[:, 3], 'c--')
+# axs[1,0].set_xlabel('Time step')
+# axs[1,0].set_ylabel('Velocity')
+# axs[1,0].grid()
+# axs[1,0].legend()
 
-# axs[1,1].plot(t_uw,u_uw[:,0],'r',label='effective sp input')
-# axs[1,1].plot(t_uw,u_uw[:,1],'r--')
-axs[1,1].plot(t_sp,u_ff[:,0],'g',label='effective sp input')
-axs[1,1].plot(t_sp,u_ff[:,1],'g--')
-axs[1,1].axhline(sp_robot.U.lower_bounds[0], color='g', linestyle='-.')
-axs[1,1].axhline(sp_robot.U.upper_bounds[0], color='g', linestyle='-.')
-axs[1,1].plot(t_uw,u_uw_fbl[:,0],'c',label='effective uw input')
-axs[1,1].plot(t_uw,u_uw_fbl[:,1],'c--')
-axs[1,1].axhline(uw_robot.U.lower_bounds[0], color='c', linestyle='-.')
-axs[1,1].axhline(uw_robot.U.upper_bounds[0], color='c', linestyle='-.')
-axs[1,1].set_xlabel('Time step')
-axs[1,1].set_ylabel('Control input')
-axs[1,1].grid()
-axs[1,1].legend()
+# # axs[1,1].plot(t_uw,u_uw[:,0],'r',label='effective sp input')
+# # axs[1,1].plot(t_uw,u_uw[:,1],'r--')
+# axs[1,1].plot(t_sp,u_ff[:,0],'g',label='effective sp input')
+# axs[1,1].plot(t_sp,u_ff[:,1],'g--')
+# axs[1,1].axhline(sp_robot.U.lower_bounds[0], color='g', linestyle='-.')
+# axs[1,1].axhline(sp_robot.U.upper_bounds[0], color='g', linestyle='-.')
+# axs[1,1].plot(t_uw,u_uw_fbl[:,0],'c',label='effective uw input')
+# axs[1,1].plot(t_uw,u_uw_fbl[:,1],'c--')
+# axs[1,1].axhline(uw_robot.U.lower_bounds[0], color='c', linestyle='-.')
+# axs[1,1].axhline(uw_robot.U.upper_bounds[0], color='c', linestyle='-.')
+# axs[1,1].set_xlabel('Time step')
+# axs[1,1].set_ylabel('Control input')
+# axs[1,1].grid()
+# axs[1,1].legend()
 
-plt.tight_layout()
-plt.savefig("stl_mapping/Planning/figures/sp_uw_trajectory.png")
+# plt.tight_layout()
+# plt.savefig("stl_mapping/Planning/figures/sp_uw_trajectory.png")
