@@ -120,7 +120,6 @@ if False:
     alpha = alpha_vars.X
     # save x_ff and u_ff to a csv file
     np.savez('stl_mapping/Planning/solutions/sp_solution_euler.npz', x_ff=x_ff, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
-
 else:
     # or load instead
     data = np.load('stl_mapping/Planning/solutions/sp_solution_euler.npz')
@@ -139,10 +138,9 @@ plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, [XA], Obs, alpha=alpha
 x_ff_quat = np.zeros((x_ff.shape[0], x_ff.shape[1] + 1))
 for i in range(x_ff.shape[0]):
     x_ff_quat[i,:] = euler_x_to_quat_x_np(x_ff[i, :],order=euler_order)
-print(f"euler: {x_ff[:, 3:6]}")
-print(f"quat:  {x_ff_quat[:, 3:7]}")
-print(f"euler: {np.array([quat_to_euler_np(x[3:7], order=euler_order) for x in x_ff_quat])}")
-# print(np.linalg.norm(x_ff_quat[:, 3:7],axis=1))  # should be 1
+# print(f"euler: {x_ff[:, 3:6]}")
+# print(f"quat:  {x_ff_quat[:, 3:7]}")
+# print(f"euler: {np.array([quat_to_euler_np(x[3:7], order=euler_order) for x in x_ff_quat])}")
 
 np.savez('stl_mapping/Planning/solutions/sp_solution_quat.npz', x_ff=x_ff_quat, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
 
@@ -156,10 +154,9 @@ def u_fbl(x, v):
     u_fbl = np.linalg.pinv(gx_uw)@(sp_robot_nl.fx(x) + sp_robot_nl.gx(x)@v - fx_uw)
     return u_fbl
 def u_fbl_cs(x, v):
-    fx_uw = uw_robot.fx(x.T)
-    gx_uw = uw_robot.gx(x.T)
-    gx_inv = cs.DM(np.linalg.pinv(np.array(gx_uw)))
-    u_fbl = cs.mtimes(gx_inv, sp_robot_nl.fx(x) + sp_robot_nl.gx(x)@v - fx_uw)
+    fx_uw = uw_robot.fx(x)
+    gx_uw = uw_robot.gx(x)
+    u_fbl = cs.mtimes(cs.pinv(gx_uw), sp_robot_nl.fx(x) + cs.mtimes(sp_robot_nl.gx(x),v) - fx_uw)
     return u_fbl
 
 x = copy.deepcopy(x_ff_quat[0, :])
@@ -197,48 +194,59 @@ print(f"U should become {np.max(u_max)/alpha} for same alpha (was {uw_robot.U.up
 # alpha for uw is equal to alpha for the free flyer
 # we have bilinear constraints so that is quite tricky but
 # we have good initial guesses regarding obstacle avoidance
+uw_robot = BlueROV(backend='cs')
+sp_robot_nl = FreeFlyer(backend='cs')
 if True:
     # gradient-based optimization with casadi
     ocp = cs.Opti()
-    x_vars = ocp.variable(4, N)
-    u_vars = ocp.variable(2, N)
+    x_vars = ocp.variable(13, N)
+    u_vars = ocp.variable(6, N)
     dt_vars = ocp.variable(1)
+    delta = ocp.variable(1)
 
     ocp.set_initial(x_vars, x_uw_fbl_sp.T)
     ocp.set_initial(u_vars, u_uw_fbl_sp.T)
-    ocp.set_initial(dt_vars, 0.01)
+    ocp.set_initial(dt_vars, 0.02)
 
     ocp.subject_to(dt_vars >= 0)
+    ocp.subject_to(delta >= 0)
 
-    for i in range(N):
-        ocp.subject_to(u_fbl_cs(x_vars[:,i],u_vars[:,i])[0:2] >= alpha*(uw_robot.U.lower_bounds[0:2]))
-        ocp.subject_to(u_fbl_cs(x_vars[:,i],u_vars[:,i])[0:2] <= alpha*(uw_robot.U.upper_bounds[0:2]))
+    # for i in range(N):
+    #     ocp.subject_to(u_fbl_cs(x_vars[:,i],u_vars[:,i])[0:2] >= alpha*(uw_robot.U.lower_bounds[0:2]))
+    #     ocp.subject_to(u_fbl_cs(x_vars[:,i],u_vars[:,i])[0:2] <= alpha*(uw_robot.U.upper_bounds[0:2]))
 
     # constraints
     for i in range(N-1):
-        ocp.subject_to(x_vars[:,i+1] == sp_robot.step(x_vars[:,i], u_vars[:,i], dt_vars))
+        ocp.subject_to(x_vars[:,i+1] == uw_robot.step(x_vars[:,i], u_vars[:,i], dt_vars))
     
+    # enforce position equality with the free flyer
+    n_equal = 6 # first n_equal states 
     for i in range(N):
-        ocp.subject_to(x_vars[0:2,i] == x_uw_fbl_sp[i,0:2])
+        ocp.subject_to(x_vars[0:n_equal,i] <= x_uw_fbl_sp[i,0:n_equal] + delta* np.ones(n_equal))
+        ocp.subject_to(x_vars[0:n_equal,i] >= x_uw_fbl_sp[i,0:n_equal] - delta* np.ones(n_equal))
 
     # objective
-    cost_var = 100*dt_vars
+    cost_var = dt_vars + 1e5 * delta
     ocp.minimize(cost_var)
     opts = {'ipopt.print_level': 0, 'print_time': 0, 'ipopt.sb': 'yes',
             'verbose':False, 'ipopt.tol': 1e-6, 'ipopt.max_iter': 1000}
     ocp.solver('ipopt',opts)
 
     try:
+        print(f"Solving optimization problem...")
         sol = ocp.solve()
         x_uw = sol.value(x_vars).T
         u_uw = sol.value(u_vars).T
         dt_uw = sol.value(dt_vars)
+        t_uw = np.linspace(0, (N-1)*dt_uw, N)
+        print(f"delta: {sol.value(delta)}")
         # print(f"Solution found")
     except Exception as e:
         print(f"Solution not found: {e}")
         print(e)
         x_uw = np.zeros_like(x_ff)
         u_uw = np.zeros_like(u_ff)
+        t_uw = np.linspace(0, (N-1)*dt, N)
         dt_uw = dt
 else:
     # load the solution
@@ -247,59 +255,13 @@ else:
     u_uw = data['u_uw']
     dt_uw = data['dt_uw']
 
-t_uw = np.linspace(0, dt_uw*N, N)
-u_uw_fbl = np.array([u_fbl(x_uw[i,:],u_uw[i,:])[0:2].squeeze() for i in range(N)])
-u_max = np.max(np.abs(u_uw_fbl), axis=0)
-print(f"\nAlpha for replanning uw to have same alpha: {np.max([u_max/(uw_robot.U.upper_bounds[0:2]) for i in range(N)])}")
-print(f"This should be the same as the solution to Prob 1")
-print(f"Replanned dt_uw: {dt_uw} (was {dt}) which is {(dt_uw)/dt*100}%")
+# t_uw = np.linspace(0, dt_uw*N, N)
+# u_uw_fbl = np.array([u_fbl(x_uw[i,:],u_uw[i,:])[0:2].squeeze() for i in range(N)])
+# u_max = np.max(np.abs(u_uw_fbl), axis=0)
+# print(f"\nAlpha for replanning uw to have same alpha: {np.max([u_max/(uw_robot.U.upper_bounds[0:2]) for i in range(N)])}")
+# print(f"This should be the same as the solution to Prob 1")
+# print(f"Replanned dt_uw: {dt_uw} (was {dt}) which is {(dt_uw)/dt*100}%")
 
-
-# # plot the trajectory
-# # plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
-# #                       path="stl_mapping/Planning/figures/sp_trajectory_uw.png")
-# fig, axs = plt.subplots(2,2, figsize=(10, 10))
-# axs[0,0].plot(x_ff[:, 0], x_ff[:, 1], 'g-', label='sp trajectory')
-# axs[0,0].plot(x_uw[:, 0], x_uw[:, 1], 'c-', label='uw trajectory')
-# X0.plot(axs[0,0], color='green', alpha=0.5)
-# Xf.plot(axs[0,0], color='green', alpha=0.5)
-# XA.plot(axs[0,0], color='blue', alpha=0.5)
-# axs[0,0].legend()
-# axs[0,0].grid()
-# axs[0,0].set_aspect('equal', adjustable='box')
-
-# axs[0,1].plot(t_sp, x_ff[:, 0], 'g-', label='sp trajectory')
-# axs[0,1].plot(t_sp, x_ff[:, 1], 'g--')
-# axs[0,1].plot(t_uw, x_uw[:, 0], 'c-', label='uw trajectory')
-# axs[0,1].plot(t_uw, x_uw[:, 1], 'c--')
-# axs[0,1].set_xlabel('Time step')
-# axs[0,1].set_ylabel('Position')
-# axs[0,1].grid()
-# axs[0,1].legend()
-
-# axs[1,0].plot(t_sp, x_ff[:, 2], 'g-', label='sp trajectory')
-# axs[1,0].plot(t_sp, x_ff[:, 3], 'g--')
-# axs[1,0].plot(t_uw, x_uw[:, 2], 'c-', label='uw trajectory')
-# axs[1,0].plot(t_uw, x_uw[:, 3], 'c--')
-# axs[1,0].set_xlabel('Time step')
-# axs[1,0].set_ylabel('Velocity')
-# axs[1,0].grid()
-# axs[1,0].legend()
-
-# # axs[1,1].plot(t_uw,u_uw[:,0],'r',label='effective sp input')
-# # axs[1,1].plot(t_uw,u_uw[:,1],'r--')
-# axs[1,1].plot(t_sp,u_ff[:,0],'g',label='effective sp input')
-# axs[1,1].plot(t_sp,u_ff[:,1],'g--')
-# axs[1,1].axhline(sp_robot.U.lower_bounds[0], color='g', linestyle='-.')
-# axs[1,1].axhline(sp_robot.U.upper_bounds[0], color='g', linestyle='-.')
-# axs[1,1].plot(t_uw,u_uw_fbl[:,0],'c',label='effective uw input')
-# axs[1,1].plot(t_uw,u_uw_fbl[:,1],'c--')
-# axs[1,1].axhline(uw_robot.U.lower_bounds[0], color='c', linestyle='-.')
-# axs[1,1].axhline(uw_robot.U.upper_bounds[0], color='c', linestyle='-.')
-# axs[1,1].set_xlabel('Time step')
-# axs[1,1].set_ylabel('Control input')
-# axs[1,1].grid()
-# axs[1,1].legend()
-
-# plt.tight_layout()
-# plt.savefig("stl_mapping/Planning/figures/sp_uw_trajectory.png")
+# plot the trajectory
+plot_planning_results(uw_robot, t_uw, x_uw, u_uw, X0, Xf, [XA], Obs, alpha=alpha,
+                      path="stl_mapping/Planning/figures/uw_trajectory.png")

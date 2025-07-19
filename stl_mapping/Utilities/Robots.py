@@ -159,11 +159,11 @@ class LinearFreeFlyer6DoF(Robot):
             prog.addConstr(items.x_vars[i, 11] <= np.pi/8, f"r_upper_{i}")
 
 class FreeFlyer(Robot):
-    def __init__(self, casadi=False):
+    def __init__(self, backend='np'):
         nx = 13
         nu = 6
         super().__init__(n_x=nx, n_u=nu)
-        self.casadi = casadi 
+        self.backend = backend
 
         # dynamics in the form: dx = f(x) + g(x)u
         self.mass = 17.8
@@ -181,7 +181,7 @@ class FreeFlyer(Robot):
 
     def _fx(self, x):
         p, q, v, w = x[0:3], x[3:7], x[7:10], x[10:13]
-        if self.casadi:
+        if self.backend == 'cs':
             fx = cs.blockcat([
                 [v],
                 [0.5 * cs.mtimes(skew_symmetric_cs(w), q)],
@@ -198,7 +198,7 @@ class FreeFlyer(Robot):
     
     def _gx(self, x):
         p, q, v, w = x[0:3], x[3:7], x[7:10], x[10:13]
-        if self.casadi:
+        if self.backend == 'cs':
             gx = cs.vertcat(
                 cs.DM.zeros((3, 6)),
                 cs.DM.zeros((4, 6)),
