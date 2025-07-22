@@ -356,10 +356,13 @@ class MPCNode(Node):
 
         x_ref = np.zeros((13, self.mpc.Nx + 1))  # Initialize reference trajectory
         for idx, ti in enumerate(times):
+            # x_ref[:, idx] = np.array([1., 0., 0.,
+            #                           0., 0., 0., 1.,
+            #                           0., 0., 0.,
+            #                           0., 0., 0.]).reshape(13,)
             x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
-
-        x_ref_u = np.tile(-fd_td if self.offset_free else np.zeros_like(fd_td), (1, x_ref.shape[1]))
                 
+        x_ref_u = np.repeat(-fd_td.reshape(-1,1), x_ref.shape[1], axis=1) if self.offset_free else np.zeros((6, x_ref.shape[1]))
         # x_ref contains reference in order p q dp dq, convert to order p, dp, q, dq
         x_ref = np.concatenate((
             x_ref[0:3, :],  # Position
