@@ -9,8 +9,10 @@ class EKFWrenchEstimator:
         # State: [fd, td] in R^6
         self.x = np.zeros(6)
         self.P = np.eye(6) # initial uncertainty
-        self.Q = np.diag([0.05**2]*3 + [0.001**2]*3) # process noise covariance
-        self.R = np.diag([0.001]*3 + [0.001]*3)
+        # self.Q = 0.1 * np.diag([0.05**2]*3 + [0.001**2]*3) # process noise covariance
+        # self.R = 10 * np.diag([0.001]*3 + [0.001]*3)
+        self.Q = np.diag([0.001]*6)
+        self.R = np.diag([0.01]*6)
 
         self.v_prev = None
         self.w_prev = None

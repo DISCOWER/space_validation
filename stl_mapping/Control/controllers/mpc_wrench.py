@@ -52,10 +52,10 @@ class MpcWrench():
             2e0, 2e0, 1e0, 
             1e2, 
             5e0, 5e0, 5e0])             
-        self.R = np.diag([          # State weighting matrix
+        self.R = 0.1*np.diag([          # State weighting matrix
             1e0, 1e0, 1e0,
             1e0, 1e0, 1e0]) 
-        self.P = 20 * self.Q        # Terminal state weighting matrix
+        self.P = 10 * self.Q        # Terminal state weighting matrix
         
         # Bounds
         self.lbx = np.array([0+0.25, -1.58+0.25, -0.5, -0.5, -3])

@@ -19,6 +19,7 @@ from px4_msgs.msg import VehicleThrustSetpoint, VehicleTorqueSetpoint, OffboardC
 from Control.controllers.mpc_wrench import MpcWrench
 from Control.estimators.ekf_wrench_estimator import EKFWrenchEstimator
 from Utilities.rotations import quat_to_euler_np, q_to_rot_mat_np
+from Utilities.rotations import enu_to_ned, ned_to_enu
 
 class MPCNode(Node):
     def __init__(self):
@@ -55,6 +56,11 @@ class MPCNode(Node):
             '/stl_mapping/start', 
             self.start_callback, 
             RELIABLE_QOS)
+        self.actuator_motors_sub = self.create_subscription(
+            ActuatorMotors,
+            'fmu/out/actuator_motors',
+            self.actuator_motors_callback,
+            NORMAL_QOS)
         
         self.get_logger().info("MPC subscribers initialized successfully")
 
@@ -86,6 +92,10 @@ class MPCNode(Node):
         self.reference_path_pub = self.create_publisher(
             Path,
             "stl_mapping/reference_path",
+            10)
+        self.reference_point_pub = self.create_publisher(
+            PoseStamped,
+            "stl_mapping/reference_point",
             10)
         self.entire_path_pub = self.create_publisher(
             Path,
@@ -175,12 +185,12 @@ class MPCNode(Node):
         self.nav_state = msg.nav_state
 
     def actuator_motors_callback(self, msg: ActuatorMotors):
-        B_F = 1.5 * np.array([
+        B_F = 1.6 * np.array([
             [1., -1., 1., -1., 0., 0., 0., 0.],
             [0., 0., 0., 0., -1., 1., -1., 1.],
             [0., 0., 0., 0., 0., 0., 0., 0.]
             ])
-        B_T = 1.5 * 0.12 * np.array([
+        B_T = 1.6 * 0.12 * np.array([
             [0., 0., 0., 0., 0., 0., 0., 0.],
             [0., 0., 0., 0., 0., 0., 0., 0.],
             [-1., 1., 1., -1., -1., 1., 1., -1.]
@@ -360,10 +370,10 @@ class MPCNode(Node):
         self.control, x_pred = self.mpc.get_input(x0, x_ref, fd=self.fd_est, td=self.td_est)
         # print(f"Control: {self.control.flatten()}")
 
-        quat_error = (x_pred[0, 6:10] @ x_ref[6:10, 0])**2
-        self.get_logger().warning(f"quat_error: {1-quat_error}")
-        pos_error = np.linalg.norm(x_pred[0, 0:2] - x_ref[0:2, 0])
-        self.get_logger().warning(f"pos_error: {pos_error}")
+        # quat_error = (x_pred[0, 6:10] @ x_ref[6:10, 0])**2
+        # self.get_logger().warning(f"quat_error: {1-quat_error}")
+        # pos_error = np.linalg.norm(x_pred[0, 0:2] - x_ref[0:2, 0])
+        # self.get_logger().warning(f"pos_error: {pos_error}")
 
         # Publish the reference and predicted path for rviz
         setpoint_path_msg = Path()
@@ -373,6 +383,11 @@ class MPCNode(Node):
             setpoint_path_msg.header = setpoint_pose_msg.header
             setpoint_path_msg.poses.append(setpoint_pose_msg)
         self.reference_path_pub.publish(setpoint_path_msg)
+
+
+        self.reference_point_pub.publish(
+            self.vector2PoseMsg('map', x_ref[0:3, 0], x_ref[6:10, 0])
+        )
 
         x_pred = x_pred.T
         predicted_path_msg = Path()

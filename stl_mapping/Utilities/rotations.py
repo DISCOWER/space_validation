@@ -37,8 +37,7 @@ def q_to_rot_mat_np(q):
     return rot_mat
 
 def v_dot_q(v, q):
-    rot_mat = q_to_rot_mat(q)
-
+    rot_mat = q_to_rot_mat_cs(q)
     return cs.mtimes(rot_mat, v)
 
 def euler_to_quat_cs(pry,order='zyz'):
@@ -134,3 +133,61 @@ def euler_x_to_quat_x_np(x,order='zyx'):
         dq                   # angular velocity
     ))
     return quat_x
+
+def ned_to_enu(pos_ned, quat_ned):
+    """
+    Convert position and quaternion from NED to ENU frame.
+    
+    Parameters:
+        pos_ned (np.ndarray): Position in NED frame.
+        quat_ned (np.ndarray): Quaternion in NED frame.
+    
+    Returns:
+        tuple: Position and quaternion in ENU frame.
+    """
+    T = np.array([
+        [0, 1, 0],
+        [1, 0, 0],
+        [0, 0, -1]
+    ])
+    pos_enu = T @ pos_ned
+    r_ned = R.from_quat(quat_ned)
+    r_enu = T @ r_ned.as_matrix() @ T.T
+    quat_enu = R.from_matrix(r_enu).as_quat()
+    return pos_enu, quat_enu
+
+def enu_to_ned(pos_enu, quat_enu):
+    """
+    Convert position and quaternion from ENU to NED frame.
+    
+    Parameters:
+        pos_enu (np.ndarray): Position in ENU frame.
+        quat_enu (np.ndarray): Quaternion in ENU frame.
+    
+    Returns:
+        tuple: Position and quaternion in NED frame.
+    """
+    T = np.array([
+        [0, 1, 0],
+        [1, 0, 0],
+        [0, 0, -1]
+    ])
+    pos_ned = T @ pos_enu
+    r_enu = R.from_quat(quat_enu)
+    r_ned = T @ r_enu.as_matrix() @ T.T
+    quat_ned = R.from_matrix(r_ned).as_quat()
+    return pos_ned, quat_ned
+
+def u_enu_to_ned(u):
+    """
+    Convert control inputs from ENU to NED frame.
+    
+    Parameters:
+        u (np.ndarray): Control inputs in ENU frame.
+    
+    Returns:
+        np.ndarray: Control inputs in NED frame.
+    """
+    T = np.diag([1, -1, -1, 1, -1, -1])
+    u_ned = T @ u
+    return u_ned

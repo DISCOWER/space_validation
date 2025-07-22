@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.spatial.transform import Rotation as R
 import copy
 
 # reach-avoid gurobi optimization problem
@@ -16,6 +17,7 @@ from Utilities.Robots import FreeFlyer, LinearFreeFlyer6DoF
 from Utilities.sets import HyperRectangle, Polytope
 from Utilities.rotations import quat_to_euler_np, quat_to_euler_cs, euler_to_quat_np, euler_to_quat_cs
 from Utilities.rotations import quat_x_to_euler_x_cs, euler_x_to_quat_x_cs, quat_x_to_euler_x_np, euler_x_to_quat_x_np
+from Utilities.rotations import enu_to_ned, ned_to_enu, u_enu_to_ned
 from Utilities.stl import Pred, Spec, quant_parse_operator, OptProbItems
 from Utilities.plotting import plot_planning_results
 from Utilities.smarc_modelling.src.smarc_modelling.vehicles.BlueROV import BlueROV 
@@ -68,7 +70,7 @@ spec = Spec(phi, t0, tf)
 
 
 # create planner
-if True:
+if False:
     opt = gp.Model("prob1")
     x_vars = opt.addMVar((N, sp_robot.n_x), lb=-np.inf, ub=np.inf, name="X")
     u_vars = opt.addMVar((N, sp_robot.n_u), lb=-np.inf, ub=np.inf, name="U")
@@ -149,6 +151,13 @@ uw_robot = BlueROV() # (quaternion=True)
 sp_robot_nl = FreeFlyer()
 
 def u_fbl(x, v):
+    # convert p and q from ENU to NED
+    x_ned = enu_to_ned(x[:3], x[3:7])
+    # convert dq and dp from FRD body frame to NED inertial frame
+    dp_ned = R.from_quat(x[3:7],scalar_first=True).apply(x[7:10])
+    # convert control input v from ENU to NED
+    v_ned = u_enu_to_ned(v)
+
     fx_uw = uw_robot.fx(x)
     gx_uw = uw_robot.gx(x)
     u_fbl = np.linalg.pinv(gx_uw)@(sp_robot_nl.fx(x) + sp_robot_nl.gx(x)@v - fx_uw)
@@ -228,10 +237,10 @@ if True:
     for i in range(N):
         # ocp.subject_to(u_fbl_cs(x_vars[:,i],u_vars[:,i])[0:2] >= alpha*(uw_robot.U.lower_bounds[0:2]))
         # ocp.subject_to(u_fbl_cs(x_vars[:,i],u_vars[:,i])[0:2] <= alpha*(uw_robot.U.upper_bounds[0:2]))
-        # ocp.subject_to(u_vars[:,i] >= alpha * uw_robot.U.lower_bounds)
-        # ocp.subject_to(u_vars[:,i] <= alpha * uw_robot.U.upper_bounds)
-        ocp.subject_to(u_vars[:,i] >= alpha * u_fbl_cs(x_vars[:,i],uw_robot.U.lower_bounds))
-        ocp.subject_to(u_vars[:,i] <= alpha * u_fbl_cs(x_vars[:,i],uw_robot.U.upper_bounds))
+        ocp.subject_to(u_vars[:,i] >= alpha * uw_robot.U.lower_bounds)
+        ocp.subject_to(u_vars[:,i] <= alpha * uw_robot.U.upper_bounds)
+        # ocp.subject_to(u_vars[:,i] >= alpha * u_fbl_cs(x_vars[:,i],uw_robot.U.lower_bounds))
+        # ocp.subject_to(u_vars[:,i] <= alpha * u_fbl_cs(x_vars[:,i],uw_robot.U.upper_bounds))
 
     # constraints
     for i in range(N-1):
@@ -240,6 +249,7 @@ if True:
     # enforce position equality with the free flyer
     n_equal = 7 # first n_equal states 
     for i in range(N):
+        # ocp.subject_to(x_vars[0:n_equal,i] == x_uw_fbl_sp[i,0:n_equal])
         ocp.subject_to(x_vars[0:n_equal,i] <= x_uw_fbl_sp[i,0:n_equal] + delta* np.ones(n_equal))
         ocp.subject_to(x_vars[0:n_equal,i] >= x_uw_fbl_sp[i,0:n_equal] - delta* np.ones(n_equal))
 
