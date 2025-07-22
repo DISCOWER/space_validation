@@ -354,13 +354,16 @@ class MPCNode(Node):
         x_ref = np.zeros((13, self.mpc.Nx + 1))  # Initialize reference trajectory
         for idx, ti in enumerate(times):
             x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
+
+        x_ref_u = np.tile(-FT if self.offset_free else np.zeros_like(FT), (1, x_ref.shape[1]))
                 
         # x_ref contains reference in order p q dp dq, convert to order p, dp, q, dq
         x_ref = np.concatenate((
             x_ref[0:3, :],  # Position
             x_ref[7:10, :],  # Linear velocity
             x_ref[3:7, :],  # Quaternion
-            x_ref[10:13, :]  # Angular velocity
+            x_ref[10:13, :],  # Angular velocity
+            x_ref_u
         ))
         self.get_logger().info(f"euler: {quat_to_euler_np(x_ref[6:10, 0], order='xyz')}")
         self.get_logger().info(f"x_ref: {x_ref[:, 0].flatten()}")

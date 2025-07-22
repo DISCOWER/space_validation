@@ -187,10 +187,11 @@ class MpcWrench():
         len_x_ref = x_ref.shape[1]
         for k in range(self.Nx + 1):
             if k < len_x_ref:
-                x_ref_k = x_ref[:,k]
+                x_ref_k = x_ref[:self.nx,k]
+                u_ref_k = x_ref[self.nx:self.nx+self.nu,k]
             else:
-                x_ref_k = x_ref[:,-1]
-            u_ref_k = np.zeros(self.nu)
+                x_ref_k = x_ref[:self.nx,-1]
+                u_ref_k = x_ref[self.nx:self.nx+self.nu,-1]
             self.solver.set(k, "p", np.concatenate((x_ref_k, u_ref_k, fd, td), axis=0))
 
         status = self.solver.solve()
