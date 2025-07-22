@@ -185,12 +185,12 @@ class MPCNode(Node):
         self.nav_state = msg.nav_state
 
     def actuator_motors_callback(self, msg: ActuatorMotors):
-        B_F = 1.6 * np.array([
+        B_F = 1.3 * np.array([
             [1., -1., 1., -1., 0., 0., 0., 0.],
             [0., 0., 0., 0., -1., 1., -1., 1.],
             [0., 0., 0., 0., 0., 0., 0., 0.]
             ])
-        B_T = 1.6 * 0.12 * np.array([
+        B_T = 1.3 * 0.12 * np.array([
             [0., 0., 0., 0., 0., 0., 0., 0.],
             [0., 0., 0., 0., 0., 0., 0., 0.],
             [-1., 1., 1., -1., -1., 1., 1., -1.]
@@ -351,11 +351,14 @@ class MPCNode(Node):
                                                   self.get_clock().now().nanoseconds) 
             self.publish_estimated_disturbance(self.fd_est, self.td_est)
 
+            rotmat = q_to_rot_mat_np(self.vehicle_attitude)
+            fd_td = np.concatenate((rotmat.transpose() @ self.fd_est.reshape(3, 1), self.td_est.reshape(3, 1)), axis=0)
+
         x_ref = np.zeros((13, self.mpc.Nx + 1))  # Initialize reference trajectory
         for idx, ti in enumerate(times):
             x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
 
-        x_ref_u = np.tile(-FT if self.offset_free else np.zeros_like(FT), (1, x_ref.shape[1]))
+        x_ref_u = np.tile(-fd_td if self.offset_free else np.zeros_like(fd_td), (1, x_ref.shape[1]))
                 
         # x_ref contains reference in order p q dp dq, convert to order p, dp, q, dq
         x_ref = np.concatenate((
