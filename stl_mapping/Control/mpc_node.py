@@ -11,13 +11,14 @@ from Utilities.get_reference_trajectory import get_reference_trajectory, Referen
         
 from nav_msgs.msg import Path, Odometry
 from visualization_msgs.msg import Marker
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, WrenchStamped
 from std_msgs.msg import Bool
 from px4_msgs.msg import VehicleStatus, VehicleAttitude, VehicleAngularVelocity, VehicleLocalPosition
-from px4_msgs.msg import VehicleThrustSetpoint, VehicleTorqueSetpoint, OffboardControlMode
+from px4_msgs.msg import VehicleThrustSetpoint, VehicleTorqueSetpoint, OffboardControlMode, ActuatorMotors
 
 from Control.controllers.mpc_wrench import MpcWrench
-from Utilities.rotations import quat_to_euler_np
+from Control.estimators.ekf_wrench_estimator import EKFWrenchEstimator
+from Utilities.rotations import quat_to_euler_np, q_to_rot_mat_np
 
 class MPCNode(Node):
     def __init__(self):
@@ -90,8 +91,24 @@ class MPCNode(Node):
             Path,
             'stl_mapping/entire_path',
             10)
+        self.force_torque_app_pub = self.create_publisher(
+            WrenchStamped,
+            "force_torque_app",
+            10)
+        self.disturbance_est_pub = self.create_publisher(
+            WrenchStamped,
+            'disturbance_estimate',
+            10)
         
         self.get_logger().info("MPC publishers initialized successfully")
+
+        # Disturbance variables
+        self.offset_free = True
+        self.F_app = np.zeros((3, 1))  # Force applied
+        self.T_app = np.zeros((3, 1))  # Torque applied
+        self.ekf_estimator = EKFWrenchEstimator()
+        self.fd_est = np.zeros(3)  # Estimated force disturbance
+        self.td_est = np.zeros(3)  # Estimated torque disturbance
 
         # Create the MPC solver and create timer callback to solve
         timer_period = 0.2 # seconds
@@ -157,6 +174,33 @@ class MPCNode(Node):
         # print("  - offboard status: ", VehicleStatus.NAVIGATION_STATE_OFFBOARD)
         self.nav_state = msg.nav_state
 
+    def actuator_motors_callback(self, msg: ActuatorMotors):
+        B_F = 1.5 * np.array([
+            [1., -1., 1., -1., 0., 0., 0., 0.],
+            [0., 0., 0., 0., -1., 1., -1., 1.],
+            [0., 0., 0., 0., 0., 0., 0., 0.]
+            ])
+        B_T = 1.5 * 0.12 * np.array([
+            [0., 0., 0., 0., 0., 0., 0., 0.],
+            [0., 0., 0., 0., 0., 0., 0., 0.],
+            [-1., 1., 1., -1., -1., 1., 1., -1.]
+            ])
+        self.F_app = B_F @ np.array(msg.control[0:8]).reshape(8, 1)
+        self.T_app = B_T @ np.array(msg.control[0:8]).reshape(8, 1)
+
+        wrench_msg = WrenchStamped()
+        wrench_msg.header.stamp = self.get_clock().now().to_msg()
+        wrench_msg.header.frame_id = 'map'
+
+        wrench_msg.wrench.force.x = float(self.F_app[0])
+        wrench_msg.wrench.force.y = float(self.F_app[1])
+        wrench_msg.wrench.force.z = float(self.F_app[2])
+        wrench_msg.wrench.torque.x = float(self.T_app[0])
+        wrench_msg.wrench.torque.y = float(self.T_app[1])
+        wrench_msg.wrench.torque.z = float(self.T_app[2])
+
+        self.force_torque_app_pub.publish(wrench_msg)
+
     def start_callback(self, msg):
         if msg.data:
             self.get_logger().info("Received start signal, beginning MPC computation.")
@@ -165,6 +209,20 @@ class MPCNode(Node):
             self.t0 = time.time()
         else:
             self.get_logger().info("Received stop signal, stopping MPC computation.")
+
+    def publish_estimated_disturbance(self, fd_est, td_est):
+        wrench_msg = WrenchStamped()
+        wrench_msg.header.stamp = self.get_clock().now().to_msg()
+        wrench_msg.header.frame_id = 'map'
+
+        wrench_msg.wrench.force.x = float(fd_est[0])
+        wrench_msg.wrench.force.y = float(fd_est[1])
+        wrench_msg.wrench.force.z = float(fd_est[2])
+        wrench_msg.wrench.torque.x = float(td_est[0])
+        wrench_msg.wrench.torque.y = float(td_est[1])
+        wrench_msg.wrench.torque.z = float(td_est[2])
+
+        self.disturbance_est_pub.publish(wrench_msg)
 
     def publish_wrench_setpoint(self, u):
         force_output_msg = VehicleThrustSetpoint()
@@ -276,7 +334,13 @@ class MPCNode(Node):
             times = np.linspace(t_mpc, t_mpc + self.mpc.Nx * self.mpc.dt, self.mpc.Nx + 1)
             # times = np.arange(t_mpc, t_mpc + self.mpc.Nx * self.mpc.dt, self.mpc.dt)
             # self.get_logger().info(f"t_mpc: {t_mpc}, times: {times}")
-        
+
+        if self.offset_free:
+            FT = np.concatenate((self.F_app, self.T_app), axis=0)
+            self.fd_est, self.td_est = self.ekf_estimator.step(x0.flatten(), FT.flatten(), 
+                                                  self.get_clock().now().nanoseconds) 
+            self.publish_estimated_disturbance(self.fd_est, self.td_est)
+
         x_ref = np.zeros((13, self.mpc.Nx + 1))  # Initialize reference trajectory
         for idx, ti in enumerate(times):
             x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
@@ -293,7 +357,7 @@ class MPCNode(Node):
         # self.get_logger().info(f"x0: {x0.flatten()}")
 
         # Get control input
-        self.control, x_pred = self.mpc.get_input(x0, x_ref)
+        self.control, x_pred = self.mpc.get_input(x0, x_ref, fd=self.fd_est, td=self.td_est)
         # print(f"Control: {self.control.flatten()}")
 
         quat_error = (x_pred[0, 6:10] @ x_ref[6:10, 0])**2

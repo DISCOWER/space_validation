@@ -90,7 +90,7 @@ class MpcWrench():
         nu = model.u.size()[0]
         self.nx = nx
         self.nu = nu
-        ocp.parameter_values = np.zeros(nx+nu)
+        ocp.parameter_values = np.zeros(nx+nu+6)  # x_ref, u_ref, fd, td
 
         # Get variables
         x_ref = model.p[:nx]
@@ -175,7 +175,7 @@ class MpcWrench():
         ocp_solver = AcadosOcpSolver(ocp, json_file=json_path)
         return ocp_solver
 
-    def get_input(self, x0, x_ref):
+    def get_input(self, x0, x_ref, fd=np.zeros(3), td=np.zeros(3)):
         # Properly set x0, i.e. constrain it to x0
         print("trying to set initial state")
         self.solver.set(0, "lbx", x0.flatten())
@@ -191,7 +191,7 @@ class MpcWrench():
             else:
                 x_ref_k = x_ref[:,-1]
             u_ref_k = np.zeros(self.nu)
-            self.solver.set(k, "p", np.concatenate((x_ref_k, u_ref_k), axis=0))
+            self.solver.set(k, "p", np.concatenate((x_ref_k, u_ref_k, fd, td), axis=0))
 
         status = self.solver.solve()
         u_opt = self.solver.get(0, 'u')

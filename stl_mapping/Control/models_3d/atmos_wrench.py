@@ -81,7 +81,12 @@ def atmos_model_wrench():
     # reference
     x_ref = ca.MX.sym('x_ref', x.size()[0])
     u_ref = ca.MX.sym('u_ref', u.size()[0])
-    model.p = ca.vertcat(x_ref, u_ref)
+
+    # disturbance estimate
+    fd = ca.MX.sym('fd', 3)  # force disturbance
+    td = ca.MX.sym('td', 3)  # torque disturbance
+
+    model.p = ca.vertcat(x_ref, u_ref, fd, td)
     
     rotMat = get_rotMat(q)
     w_cross = ca.vertcat(
@@ -94,9 +99,9 @@ def atmos_model_wrench():
     T = ca.vertcat(u[3], u[4], u[5])
 
     pdot = v
-    vdot = mass_inv * ca.mtimes(rotMat, F)
+    vdot = mass_inv * ca.mtimes(rotMat, F) + fd * mass_inv
     qdot = quat_derivative(q, w)
-    wdot = ca.mtimes(inertia_inv, (T - ca.mtimes(w_cross, ca.mtimes(inertia, w))))
+    wdot = ca.mtimes(inertia_inv, (T + td - ca.mtimes(w_cross, ca.mtimes(inertia, w))))
 
     xdot = ca.vertcat(pdot, vdot, qdot, wdot)
 
