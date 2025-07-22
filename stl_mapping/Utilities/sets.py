@@ -139,8 +139,8 @@ class Polytope():
             self.b[i] = -rectangle.lower_bounds[i]
             self.H[i + self.dim, i] = 1
             self.b[i + self.dim] = rectangle.upper_bounds[i]
-        print(f"\nPolytope created with {self.N_faces} faces and dimension {self.dim}")
-        print(f"H: {self.H}, b: {self.b}")
+        # print(f"\nPolytope created with {self.N_faces} faces and dimension {self.dim}")
+        # print(f"H: {self.H}, b: {self.b}")
 
     def print(self):
         return f"Area_[faces={self.N_faces}]"

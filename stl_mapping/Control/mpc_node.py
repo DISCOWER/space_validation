@@ -94,7 +94,7 @@ class MPCNode(Node):
         self.get_logger().info("MPC publishers initialized successfully")
 
         # Create the MPC solver and create timer callback to solve
-        timer_period = 0.5 # seconds
+        timer_period = 0.2 # seconds
         self.timer = self.create_timer(timer_period, self.cmdloop_callback)
 
         timer_period_offboard = 0.1 # seconds

@@ -15,8 +15,8 @@ def plot_planning_results(robot, t, x, u, X0, Xf, ROIs, Obs, alpha=1.0,
 
     axs[1].plot(t, x[:, 6], label='dx')
     axs[1].plot(t, x[:, 7], label='dy')
-    axs[1].set_xlabel('Time step')
-    axs[1].set_ylabel('Velocity')
+    axs[1].set_xlabel('Time (s)')
+    axs[1].set_ylabel('Velocity (m/s)')
     axs[1].legend()
     axs[1].grid()
 
@@ -26,14 +26,14 @@ def plot_planning_results(robot, t, x, u, X0, Xf, ROIs, Obs, alpha=1.0,
     axs[2].plot(t, x[:, 9], 'r--', label='d_pitch')
     axs[2].plot(t, x[:, 10], 'g--', label='d_roll')
     axs[2].plot(t, x[:, 11], 'b--', label='d_yaw')
-    axs[2].set_xlabel('Time step')
+    axs[2].set_xlabel('Time (s)')
     axs[2].set_ylabel('Euler angles (rad)')
     axs[2].legend()
     axs[2].grid()
 
-    axs[3].plot(u[:,0])
-    axs[3].plot(u[:,1])
-    axs[3].plot(u[:,2])
+    axs[3].plot(t, u[:,0])
+    axs[3].plot(t, u[:,1])
+    axs[3].plot(t, u[:,2])
     axs[3].axhline(robot.U.lower_bounds[0], color='g', linestyle='-.', label="U_lb")
     axs[3].axhline(robot.U.upper_bounds[0], color='g', linestyle='-.')
     if hasattr(robot, 'U_effective'):
@@ -41,6 +41,6 @@ def plot_planning_results(robot, t, x, u, X0, Xf, ROIs, Obs, alpha=1.0,
         axs[3].axhline(alpha*robot.U_effective.upper_bounds[0], color='b', linestyle='--')
         axs[3].axhline(robot.U_effective.lower_bounds[0], color='r', linestyle=':', label="U_effective_lb")
         axs[3].axhline(robot.U_effective.upper_bounds[0], color='r', linestyle=':')
-    axs[3].set_xlabel('Time step')
-    axs[3].set_ylabel('Control input')
+    axs[3].set_xlabel('Time (s)')
+    axs[3].set_ylabel('Control input (N)')
     plt.savefig(path)

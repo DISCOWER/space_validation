@@ -123,7 +123,8 @@ class LinearFreeFlyer6DoF(Robot):
             np.array([max_torque]*3) * scale_torque
         ])
         self.U = HyperRectangle(-u_max, u_max)
-        self.D = HyperRectangle(np.array([-1, -1, -1]),np.array([1, 1, 1]))
+        max_floor_force = (36*self.mass)/1000
+        self.D = HyperRectangle(np.array(3*[-max_floor_force]),np.array(3*[max_floor_force]))
 
         # self.U_effective = minkowski_difference(self.U, self.K@self.D)
         # TODO: deal with the fact that K and D are not of same dimension
@@ -160,6 +161,8 @@ class LinearFreeFlyer6DoF(Robot):
 
 class FreeFlyer(Robot):
     def __init__(self, backend='np'):
+        # state: x = [p, q, v, w]
+        # where q is a scalar first unit quaternion
         nx = 13
         nu = 6
         super().__init__(n_x=nx, n_u=nu)
