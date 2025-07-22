@@ -12,7 +12,7 @@ class EKFWrenchEstimator:
         # self.Q = 0.1 * np.diag([0.05**2]*3 + [0.001**2]*3) # process noise covariance
         # self.R = 10 * np.diag([0.001]*3 + [0.001]*3)
         self.Q = np.diag([0.001]*6)
-        self.R = np.diag([0.01]*6)
+        self.R = np.diag([0.01]*9)
 
         self.v_prev = None
         self.w_prev = None
@@ -35,7 +35,7 @@ class EKFWrenchEstimator:
     def predict(self):
         self.P = self.P + self.Q  # x_k+1 = x_k + w_k (random walk)
 
-    def update(self, accel_meas):
+    def update(self, x_dot_meas):
         fd = self.x[0:3]
         td = self.x[3:6]
 
@@ -51,19 +51,20 @@ class EKFWrenchEstimator:
         F_tot = R @ F_cmd + fd
         T_tot = T_cmd + RT @ td
 
+        v_lin = x_dot_meas[0:3]
         a_lin = F_tot / self.mass
         a_ang = self.inertia_inv @ (T_tot - np.cross(w, self.inertia @ w))
-        z_pred = np.concatenate([a_lin, a_ang])
+        z_pred = np.concatenate([v_lin, a_lin, a_ang])
 
         # Jacobian
-        H = np.zeros((6, 6))
-        H[0:3, 0:3] = np.eye(3) / self.mass
-        H[3:6, 3:6] = self.inertia_inv @ RT
+        H = np.zeros((9, 6))
+        H[3:6, 0:3] = np.eye(3) / self.mass
+        H[6:9, 3:6] = self.inertia_inv @ RT
 
         # Kalman update
         S = H @ self.P @ H.T + self.R
         K = self.P @ H.T @ np.linalg.inv(S)
-        y = accel_meas - z_pred
+        y = x_dot_meas - z_pred
         self.x = self.x + K @ y
         self.P = (np.eye(6) - K @ H) @ self.P
 
@@ -77,19 +78,23 @@ class EKFWrenchEstimator:
             
         dt *= 1e-9  # Convert nanoseconds to seconds
 
+        p = x_meas[0:3]
         v = x_meas[3:6]
         w = x_meas[10:13]
 
         if self.first_step:
+            self.p_prev = p
             self.v_prev = v
             self.w_prev = w
             self.first_step = False
             return np.zeros(3), np.zeros(3)
 
+        p_dot = (p - self.p_prev) / dt
         v_dot = (v - self.v_prev) / dt
         w_dot = (w - self.w_prev) / dt
-        accel_meas = np.concatenate([v_dot, w_dot])
+        x_dot_meas = np.concatenate([p_dot, v_dot, w_dot])
 
+        self.p_prev = p
         self.v_prev = v
         self.w_prev = w
 
@@ -97,7 +102,7 @@ class EKFWrenchEstimator:
         self.u = u
 
         self.predict()
-        self.update(accel_meas)
+        self.update(x_dot_meas)
 
         fd = self.x[0:3]
         td = self.x[3:6]
