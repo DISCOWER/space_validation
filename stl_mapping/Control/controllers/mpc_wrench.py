@@ -39,7 +39,7 @@ import os
 from scipy.linalg import block_diag
 import casadi as ca
 from acados_template import AcadosOcp, AcadosOcpSolver
-from ..models_2d.atmos_wrench import atmos_model_wrench
+from ..models.atmos_wrench import atmos_model_wrench
 
 class MpcWrench():
     def __init__(self):
@@ -49,9 +49,9 @@ class MpcWrench():
         self.Nu = 30                # Prediction horizon, inputs
         self.Q = np.diag([          # State weighting matrix
             1e0, 1e0, 1e0,
-            2e0, 2e0, 1e0, 
+            3e1, 3e1, 3e1, 
             1e2, 
-            5e0, 5e0, 5e0])             
+            3e1, 3e1, 3e1])             
         self.R = 0.1*np.diag([          # State weighting matrix
             1e0, 1e0, 1e0,
             1e0, 1e0, 1e0]) 

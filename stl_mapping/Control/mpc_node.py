@@ -116,7 +116,7 @@ class MPCNode(Node):
         self.offset_free = True
         self.F_app = np.zeros((3, 1))  # Force applied
         self.T_app = np.zeros((3, 1))  # Torque applied
-        self.ekf_estimator = EKFWrenchEstimator()
+        self.ekf_estimator = EKFWrenchEstimator(dt=0.05)
         self.fd_est = np.zeros(3)  # Estimated force disturbance
         self.td_est = np.zeros(3)  # Estimated torque disturbance
 
@@ -126,6 +126,9 @@ class MPCNode(Node):
 
         timer_period_offboard = 0.1 # seconds
         self.timer_offboard = self.create_timer(timer_period_offboard, self.publish_offboard_mode)
+
+        timer_period_dist_est = self.ekf_estimator.dt # seconds
+        self.timer_dist_est = self.create_timer(timer_period_dist_est, self.disturbance_estimation_callback)
 
         # Load the plan from a file (declared as launch argument)
         self.plan_path = self.declare_parameter('plan_path', 'sp_solution_bezier.npz').value
@@ -185,12 +188,12 @@ class MPCNode(Node):
         self.nav_state = msg.nav_state
 
     def actuator_motors_callback(self, msg: ActuatorMotors):
-        B_F = 1.3 * np.array([
+        B_F = 1.5 * np.array([
             [1., -1., 1., -1., 0., 0., 0., 0.],
             [0., 0., 0., 0., -1., 1., -1., 1.],
             [0., 0., 0., 0., 0., 0., 0., 0.]
             ])
-        B_T = 1.3 * 0.12 * np.array([
+        B_T = 1.5 * 0.12 * np.array([
             [0., 0., 0., 0., 0., 0., 0., 0.],
             [0., 0., 0., 0., 0., 0., 0., 0.],
             [-1., 1., 1., -1., -1., 1., 1., -1.]
@@ -317,6 +320,24 @@ class MPCNode(Node):
         msg.pose.orientation.z = 0.0
         pub.publish(msg)
 
+    def disturbance_estimation_callback(self):
+        x0 = np.array([self.vehicle_local_position[0],
+                           self.vehicle_local_position[1],
+                           self.vehicle_local_position[2],
+                           self.vehicle_local_velocity[0],
+                           self.vehicle_local_velocity[1],
+                           self.vehicle_local_velocity[2],
+                           self.vehicle_attitude[0],
+                           self.vehicle_attitude[1],
+                           self.vehicle_attitude[2],
+                           self.vehicle_attitude[3],
+                           self.vehicle_angular_velocity[0],
+                           self.vehicle_angular_velocity[1],
+                           self.vehicle_angular_velocity[2]]).reshape(13, 1)
+        FT = np.concatenate((self.F_app, self.T_app), axis=0)
+        self.fd_est, self.td_est = self.ekf_estimator.step(x0.flatten(), FT.flatten()) 
+        self.publish_estimated_disturbance(self.fd_est, self.td_est)
+
     def cmdloop_callback(self):
         # self.get_logger().info("Command loop callback")
         t = time.time()
@@ -346,20 +367,15 @@ class MPCNode(Node):
             # self.get_logger().info(f"t_mpc: {t_mpc}, times: {times}")
 
         if self.offset_free:
-            FT = np.concatenate((self.F_app, self.T_app), axis=0)
-            self.fd_est, self.td_est = self.ekf_estimator.step(x0.flatten(), FT.flatten(), 
-                                                  self.get_clock().now().nanoseconds) 
-            self.publish_estimated_disturbance(self.fd_est, self.td_est)
-
             rotmat = q_to_rot_mat_np(self.vehicle_attitude)
-            fd_td = np.concatenate((rotmat.transpose() @ self.fd_est.reshape(3, 1), self.td_est.reshape(3, 1)), axis=0)
+            u_ref = -np.concatenate((rotmat.transpose() @ self.fd_est.reshape(3, 1), self.td_est.reshape(3, 1)), axis=0)
 
         x_ref = np.zeros((13, self.mpc.Nx + 1))  # Initialize reference trajectory
         for idx, ti in enumerate(times):
             x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
 
-        x_ref_u = np.tile(-fd_td if self.offset_free else np.zeros_like(fd_td), (1, x_ref.shape[1]))
-                
+        x_ref_u = np.tile(u_ref if self.offset_free else np.zeros((6, 1)), (1, x_ref.shape[1]))
+
         # x_ref contains reference in order p q dp dq, convert to order p, dp, q, dq
         x_ref = np.concatenate((
             x_ref[0:3, :],  # Position
@@ -373,7 +389,10 @@ class MPCNode(Node):
         # self.get_logger().info(f"x0: {x0.flatten()}")
 
         # Get control input
-        self.control, x_pred = self.mpc.get_input(x0, x_ref, fd=self.fd_est, td=self.td_est)
+        if self.offset_free:
+            self.control, x_pred = self.mpc.get_input(x0, x_ref, fd=self.fd_est, td=self.td_est)
+        else:
+            self.control, x_pred = self.mpc.get_input(x0, x_ref)
         # print(f"Control: {self.control.flatten()}")
 
         # quat_error = (x_pred[0, 6:10] @ x_ref[6:10, 0])**2
