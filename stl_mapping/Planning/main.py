@@ -17,7 +17,7 @@ from Utilities.Robots import FreeFlyer, LinearFreeFlyer6DoF
 from Utilities.sets import HyperRectangle, Polytope
 from Utilities.rotations import quat_to_euler_np, quat_to_euler_cs, euler_to_quat_np, euler_to_quat_cs
 from Utilities.rotations import quat_x_to_euler_x_cs, euler_x_to_quat_x_cs, quat_x_to_euler_x_np, euler_x_to_quat_x_np
-from Utilities.rotations import enu_to_ned, ned_to_enu, u_enu_to_ned
+from Utilities.rotations import enu_to_ned, ned_to_enu, u_enu_to_ned, enu_to_flu
 from Utilities.stl import Pred, Spec, quant_parse_operator, OptProbItems
 from Utilities.plotting import plot_planning_results
 from Utilities.smarc_modelling.src.smarc_modelling.vehicles.BlueROV import BlueROV 
@@ -33,27 +33,9 @@ bigM = 1e4
 # Robot
 sp_robot = LinearFreeFlyer6DoF()
 
-# # Specification
-# X0 = HyperRectangle(np.array([0, 0, 0]), np.array([0.1, 0.1, 0.1]))
-# Xf = HyperRectangle(np.array([0.90, 0.90, 0]), np.array([1, 1, 0.1]))
-# XA = HyperRectangle(np.array([0.2, 0.8, 0,  -np.pi/2-np.pi/8]), np.array([0.4, 1.0, 0.1,  -np.pi/2+np.pi/8]))
-# # XA = HyperRectangle(np.array([0.2, 0.8, 0]), np.array([0.4, 1.0, 0.1]))
-# Obs = [HyperRectangle(np.array([0.4, -0.1]), np.array([0.6, 0.6])),
-#        HyperRectangle(np.array([0.75, 0.8]), np.array([0.9, 1.1]))]
-# World = HyperRectangle(np.array([0, 0, -10, -10]), np.array([1, 1, 10, 10]))
-# phi = Pred("AND", preds=[
-#     Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)], dims=[0,1,2])]),
-#     Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1,2])]),
-#     Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2, 5])]),
-#     # Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2])]),
-#     Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)], dims=[0,1,6,7])]),
-#     # Pred("G", [t0,tf], preds=[Pred("NEG", preds=[Pred("MU", preds=[Polytope(Obs[0])], dims=[0,1])])]),
-#     # Pred("G", [t0,tf], preds=[Pred("NEG", preds=[Pred("MU", preds=[Polytope(Obs[1])], dims=[0,1])])])
-# ])
-# spec = Spec(phi, t0, tf)
-
 euler_order = 'zyx'
 
+# STL Specification
 X0 = HyperRectangle(np.array([0.5, 0, 0]), np.array([0.6, 0.1, 0.1]))
 Xf = HyperRectangle(np.array([2.5, 1.0, 0]), np.array([2.6, 1.1, 0.1]))
 XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8]))
@@ -68,8 +50,7 @@ phi = Pred("AND", preds=[
 ])
 spec = Spec(phi, t0, tf)
 
-
-# create planner
+# Initial Motion planner on Linear Model
 if False:
     opt = gp.Model("prob1")
     x_vars = opt.addMVar((N, sp_robot.n_x), lb=-np.inf, ub=np.inf, name="X")
@@ -136,15 +117,15 @@ plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, [XA], Obs, alpha=alpha
                       path="stl_mapping/Planning/figures/sp_trajectory.png")
 
 
-# Now we have pitch-roll-yaw angles which we want to convert to unit quaternion
-x_ff_quat = np.zeros((x_ff.shape[0], x_ff.shape[1] + 1))
+#! Convert [p:ENU, e:FLU->ENU, v:ENU, w:ENU] to [p:ENU, q:FLU->ENU, v:ENU, w:FLU]
+x_ff_converted = np.zeros((x_ff.shape[0], x_ff.shape[1] + 1))
 for i in range(x_ff.shape[0]):
-    x_ff_quat[i,:] = euler_x_to_quat_x_np(x_ff[i, :],order=euler_order)
-print(f"euler: {x_ff[:, 3:6]}")
-print(f"quat:  {x_ff_quat[:, 3:7]}")
-print(f"euler: {np.array([quat_to_euler_np(x[3:7], order=euler_order) for x in x_ff_quat])}")
-
-np.savez('stl_mapping/Planning/solutions/sp_solution_quat.npz', x_ff=x_ff_quat, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
+    x_ff_converted[i, :3] = x_ff[i, :3]
+    x_ff_converted[i,3:7] = euler_to_quat_np(x_ff[i, 3:6], order=euler_order)
+    x_ff_converted[i,7:10] = x_ff[i, 6:9]
+    x_ff_converted[i,10:13] = enu_to_flu(x_ff[i, 9:12], x_ff_converted[i, 3:7])
+x_ff = x_ff_converted
+np.savez('stl_mapping/Planning/solutions/sp_solution_quat.npz', x_ff=x_ff, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
 
 # feedback linearization controller for the underwater robot to behave like a free flyer
 uw_robot = BlueROV() # (quaternion=True)
@@ -154,33 +135,48 @@ def u_fbl(x, u):
     '''
     Feedback linearization control for the underwater robot
     Args:
-        x: state [p, q, dp ,dq] in ENU frame
-        v: control input [v_x, v_y, v_z, w_phi, w_theta, w_psi] in ENU frame
+        x: state of FF [p: ENU, q:FLU->ENU, v:ENU , w:FLU] in ENU frame
+        v: control input of FF in ENU frame
     Returns:
-        u_fbl: control input for the underwater robot in FRD body frame
+        u_fbl: control input for the space robot in ENU body frame
     '''
-    # convert p and q from ENU to NED
-    p, q, v, w = x[:3], x[3:7], x[7:10], x[10:13]
-    p_ned, q_ned = enu_to_ned(p, q)
-    # convert dq and dp from ENU to FRD body
-    v = R.from_quat(q_ned).inv().apply(v)  # linear velocity in body frame
-    w = w
-    x = np.concatenate((p_ned, q_ned, v, w))
+    #! Convert [p: ENU, q:FLU->ENU, v:ENU, w:FLU] to [p: NED, q:FRD->NED, v:FRD, w:FRD]
+    # p, q, v, w = x[:3], x[3:7], x[7:10], x[10:13]
+    # # convert p and q from ENU to NED
+    # p_ned, q_ned = enu_to_ned(p, q)
+    # # convert v and w from ENU to NED and then to FRD
+    # v_ned, _ = enu_to_ned(v, q)
+    # v_frd = R.from_quat(q_ned).inv().apply(v_ned)
+    # w_ned, _ = enu_to_ned(w, q)
+    # w_frd = R.from_quat(q_ned).inv().apply(w_ned)
+    # x_ned = np.concatenate((p_ned, q_ned, v_frd, w_frd))
 
-    # convert control input v from ENU to NED
-    u = u_enu_to_ned(u)
+    fx_sp = sp_robot_nl.calculate_fx(x)
+    gx_sp = sp_robot_nl.calculate_gx(x)
+    dx_sp = fx_sp + gx_sp@u
+    dp, dq, dv, dw = dx_sp[:3], dx_sp[3:7], dx_sp[7:10], dx_sp[10:13]
+    #! Now need to convert dx_sp to the right frames...
+    # # convert dp and dq from ENU to NED
+    # dp_ned, dq_ned = enu_to_ned(dp, dq)
+    # # convert dv and dw from ENU to NED and then to FRD
+    # dv_ned, _ = enu_to_ned(dv, dq)
+    # dv_frd = R.from_quat(dq_ned).inv().apply(dv_ned)
+    # dw_ned, _ = enu_to_ned(dw, dq)
+    # dw_frd = R.from_quat(dq_ned).inv().apply(dw_ned)
+    # dx_sp_ned = np.concatenate((dp_ned, dq_ned, dv_frd, dw_frd))
 
-    fx_uw = uw_robot.fx(x)
-    gx_uw = uw_robot.gx(x)
-    u_fbl = np.linalg.pinv(gx_uw)@(sp_robot_nl.fx(x) + sp_robot_nl.gx(x)@u - fx_uw)
+    fx_uw = uw_robot.calculate_fx(x)
+    gx_uw = uw_robot.calculate_gx(x)
+    u_fbl = np.linalg.pinv(gx_uw)@(dx_sp - fx_uw)
     return u_fbl
-def u_fbl_cs(x, v):
-    fx_uw = uw_robot.fx(x)
-    gx_uw = uw_robot.gx(x)
-    u_fbl = cs.mtimes(cs.pinv(gx_uw), sp_robot_nl.fx(x) + cs.mtimes(sp_robot_nl.gx(x),v) - fx_uw)
-    return u_fbl
 
-x = copy.deepcopy(x_ff_quat[0, :])
+# x_test = np.array([0.5, 0, 0, 1, 0, 0, 0, 
+#                    1, 0, 0, 
+#                    0, 0, 0])
+# u_test = np.array([0, 0, 0, 0, 0, 0])
+# u_fbl_test = u_fbl(x_test, u_test)
+
+x = copy.deepcopy(x_ff[0, :])
 x_uw_fbl_sp = np.zeros((N, sp_robot_nl.n_x))
 x_uw_fbl_sp[0, :] = x
 u_uw_fbl_sp = np.zeros((N, sp_robot_nl.n_u))
@@ -203,34 +199,23 @@ plot_planning_results(uw_robot, t_sp, x_uw_fbl_sp_euler, u_uw_fbl_sp, X0, Xf, [X
 
 # Analysis of alpha
 u_max = np.max(np.abs(u_uw_fbl_sp), axis=0)
-print(f"\nAlpha if u_sp applied to BlueROV directly: {np.max(u_max/uw_robot.U.upper_bounds)}")
+print(f"\nAlpha if u_fbl(x_sp,u_sp) applied to BlueROV directly: {np.max(u_max/uw_robot.U.upper_bounds)} (was {alpha} for ff)")
 print(f"This is lower because BlueROV is faster than free flyer")
-
-u_uw = np.array([u_fbl(x_uw_fbl_sp[i,:],u_uw_fbl_sp[i,:]) for i in range(N)]).squeeze()
-u_max = np.max(np.abs(u_uw), axis=0)
-print(f"\nAlpha if u_fbl(x_sp,u_sp) applied to BlueROV directly: {np.max(u_max/uw_robot.U.upper_bounds)}")
 print(f"U should become {np.max(u_max)/alpha} for same alpha (was {uw_robot.U.upper_bounds[0]}) which is {(np.max(u_max)/alpha)/uw_robot.U.upper_bounds[0]*100}%")
-
-
-# # test if different backends are equal
-# uw_robot_cs = BlueROV(backend='cs')
-# uw_robot_np = BlueROV(backend='np')
-# for i in range(100):
-#     x = np.random.rand(13)
-#     u = np.random.rand(6)
-#     x_cs = cs.DM(x)
-#     u_cs = cs.DM(u)
-#     x_uw_cs = uw_robot_cs.step(x_cs, u_cs, dt)
-#     x_uw_np = uw_robot_np.step(x, u, dt)
-#     print(f"Step {i}: {x_uw_cs} == {x_uw_np}")
-
 
 # So now we have to find \phi (for now deltaT) such that
 # alpha for uw is equal to alpha for the free flyer
 # we have bilinear constraints so that is quite tricky but
 # we have good initial guesses regarding obstacle avoidance
-uw_robot = BlueROV(backend='cs')
-sp_robot_nl = FreeFlyer(backend='cs')
+
+def u_fbl_cs(x, v):
+    fx_uw = uw_robot.fx(x)
+    gx_uw = uw_robot.gx(x)
+    u_fbl = cs.mtimes(cs.pinv(gx_uw), sp_robot_nl.fx(x) + cs.mtimes(sp_robot_nl.gx(x),v) - fx_uw)
+    return u_fbl
+
+uw_robot = BlueROV(iX=cs.MX)
+sp_robot_nl = FreeFlyer()
 if True:
     # gradient-based optimization with casadi
     ocp = cs.Opti()

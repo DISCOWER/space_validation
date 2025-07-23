@@ -70,6 +70,21 @@ def euler_to_quat_np(pry, order='zyz'):
     q = r.as_quat(scalar_first=True)  # returns (qw, qx, qy, qz)
     return q
 
+def enu_to_flu(w, q):
+    """
+    Convert angular velocity from ENU to FLU frame.
+    
+    Parameters:
+        w (np.ndarray): Angular velocity in ENU frame.
+        q (np.ndarray): Quaternion representing the orientation of FLU in ENU frame.
+    
+    Returns:
+        np.ndarray: Angular velocity in FLU frame.
+    """
+    r = R.from_quat(q, scalar_first=True)
+    w_flu = r.inv().apply(w)
+    return w_flu
+
 def quat_to_euler_cs(q):
     """
     Convert quaternion (qw, qx, qy, qz) to Euler angles (roll, pitch, yaw).
@@ -173,9 +188,9 @@ def enu_to_ned(pos_enu, quat_enu):
         [0, 0, -1]
     ])
     pos_ned = T @ pos_enu
-    r_enu = R.from_quat(quat_enu)
+    r_enu = R.from_quat(quat_enu, scalar_first=True)
     r_ned = T @ r_enu.as_matrix() @ T.T
-    quat_ned = R.from_matrix(r_ned).as_quat()
+    quat_ned = R.from_matrix(r_ned).as_quat(scalar_first=True)
     return pos_ned, quat_ned
 
 def u_enu_to_ned(u):
