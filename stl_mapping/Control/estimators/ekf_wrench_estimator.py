@@ -1,27 +1,24 @@
 import numpy as np
 
 class EKFWrenchEstimator:
-    def __init__(self):
-        self.mass = 16.8 + 1.0  # kg
-        self.inertia = np.diag([0.297 * self.mass / 16.8] * 3)
+    def __init__(self, dt= 0.1):
+        self.mass = 17.8  # kg
+        self.inertia = np.diag([0.315] * 3)
         self.inertia_inv = np.linalg.inv(self.inertia)
 
-        # State: [fd, td] in R^6
-        self.x = np.zeros(6)
-        self.P = np.eye(6) # initial uncertainty
-        # self.Q = 0.1 * np.diag([0.05**2]*3 + [0.001**2]*3) # process noise covariance
-        # self.R = 10 * np.diag([0.001]*3 + [0.001]*3)
-        self.Q = np.diag([0.001]*6)
-        self.R = np.diag([0.01]*9)
+        self.dt = dt
+        qv = (0.6/self.mass * self.dt)**2
+        qw = [(0.12 / self.inertia[i, i] * self.dt)**2 for i in range(3)]
+        qfd = (0.2*self.dt)**2
+        qtd = (0.05*self.dt)**2
+        rv = (1e-2*self.dt)**2
+        rw = (0.05*self.dt)**2
 
-        self.v_prev = None
-        self.w_prev = None
-        self.first_step = True
-        self.t_prev = None
-        self.t = None
-
-        self.x_meas = None
-        self.u = None
+        # State: [v, w, fd, td] in R^12
+        self.x = np.zeros(12)  # Initial state vector
+        self.P = 100*np.eye(12) # initial uncertainty
+        self.Q = np.diag([qv]*3 + qw + [qfd]*3 + [qtd]*3) # Process noise covariance
+        self.R = np.diag([rv]*3 + [rw]*3) # Measurement noise covariance
 
     def get_rotMat(self, q):
         """Returns rotation matrix from quaternion q = [w, x, y, z]."""
@@ -32,78 +29,60 @@ class EKFWrenchEstimator:
             [2*(x*z - w*y),           2*(y*z + w*x),         1 - 2*x**2 - 2*y**2]
         ])
 
-    def predict(self):
-        self.P = self.P + self.Q  # x_k+1 = x_k + w_k (random walk)
+    def predict(self, q, F_app, T_app):
+        v = self.x[0:3]
+        w = self.x[3:6]
+        fd = self.x[6:9]
+        td = self.x[9:12]
 
-    def update(self, x_dot_meas):
-        fd = self.x[0:3]
-        td = self.x[3:6]
-
-        q = self.x_meas[6:10]
-        w = self.x_meas[10:13]
-        F_cmd = self.u[:3]
-        T_cmd = self.u[3:6]
-
+        # System dynamics
         R = self.get_rotMat(q)
-        RT = R.T
+        F_tot = R @ F_app + fd
+        T_tot = T_app + td
 
-        # Predicted measurements
-        F_tot = R @ F_cmd + fd
-        T_tot = T_cmd + RT @ td
-
-        v_lin = x_dot_meas[0:3]
         a_lin = F_tot / self.mass
         a_ang = self.inertia_inv @ (T_tot - np.cross(w, self.inertia @ w))
-        z_pred = np.concatenate([v_lin, a_lin, a_ang])
 
-        # Jacobian
-        H = np.zeros((9, 6))
-        H[3:6, 0:3] = np.eye(3) / self.mass
-        H[6:9, 3:6] = self.inertia_inv @ RT
+        # Euler integration
+        v_new = v + a_lin * self.dt
+        w_new = w + a_ang * self.dt
 
-        # Kalman update
+        self.x = np.hstack((v_new, w_new, fd, td))
+
+        # Jacobian matrix F
+        F = np.eye(12)
+        F[0:3, 6:9] = np.eye(3) * (self.dt / self.mass)
+        F[3:6, 9:12] = self.inertia_inv * self.dt
+
+        self.P = F @ self.P @ F.T + self.Q
+
+    def update(self, v_meas, w_meas):
+        # Measurement is [v, w] directly
+        z = np.hstack((v_meas, w_meas))
+
+        # Measurement Jacobian H
+        H = np.zeros((6, 12))
+        H[0:3, 0:3] = np.eye(3)
+        H[3:6, 3:6] = np.eye(3)
+
         S = H @ self.P @ H.T + self.R
         K = self.P @ H.T @ np.linalg.inv(S)
-        y = x_dot_meas - z_pred
+        y = z - (H @ self.x)
         self.x = self.x + K @ y
-        self.P = (np.eye(6) - K @ H) @ self.P
+        self.P = (np.eye(12) - K @ H) @ self.P
 
-    def step(self, x_meas, u, t):
-        if self.t_prev is None:
-            self.t_prev = t
-            dt = 0.1
-        else:
-            dt = t - self.t_prev
-            self.t_prev = t
-            
-        dt *= 1e-9  # Convert nanoseconds to seconds
+    def step(self, x_meas, u):
+        F_app = u[:3]
+        T_app = u[3:6]
 
-        p = x_meas[0:3]
-        v = x_meas[3:6]
-        w = x_meas[10:13]
+        v_meas = x_meas[3:6]
+        w_meas = x_meas[10:13]
+        q_meas = x_meas[6:10]
 
-        if self.first_step:
-            self.p_prev = p
-            self.v_prev = v
-            self.w_prev = w
-            self.first_step = False
-            return np.zeros(3), np.zeros(3)
+        self.predict(q_meas, F_app, T_app)
+        self.update(v_meas, w_meas)
 
-        p_dot = (p - self.p_prev) / dt
-        v_dot = (v - self.v_prev) / dt
-        w_dot = (w - self.w_prev) / dt
-        x_dot_meas = np.concatenate([p_dot, v_dot, w_dot])
-
-        self.p_prev = p
-        self.v_prev = v
-        self.w_prev = w
-
-        self.x_meas = x_meas
-        self.u = u
-
-        self.predict()
-        self.update(x_dot_meas)
-
-        fd = self.x[0:3]
-        td = self.x[3:6]
+        fd = self.x[6:9]
+        td = self.x[9:12]
+        
         return fd, td
