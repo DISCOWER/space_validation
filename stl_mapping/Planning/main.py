@@ -45,7 +45,7 @@ World = HyperRectangle(np.array([0, -1.5, -10, -10]), np.array([4, 1.5, 10, 10])
 phi = Pred("AND", preds=[
     Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)], dims=[0,1,2])]),
     Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1,2])]),
-    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2, 3])]), # 3: pitch, 4: roll, 5: yaw
+    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2,3])]),
     Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)], dims=[0,1,6,7])]),
 ])
 spec = Spec(phi, t0, tf)
@@ -117,14 +117,19 @@ plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, [XA], Obs, alpha=alpha
                       path="stl_mapping/Planning/figures/sp_trajectory.png")
 
 
-#! Convert [p:ENU, e:FLU->ENU, v:ENU, w:ENU] to [p:ENU, q:FLU->ENU, v:ENU, w:FLU]
+#! Convert [p:ENU, e:FLU->ENU, v:ENU, w:FLU] to [p:ENU, q:FLU->ENU, v:ENU, w:FLU]
 x_ff_converted = np.zeros((x_ff.shape[0], x_ff.shape[1] + 1))
 for i in range(x_ff.shape[0]):
     x_ff_converted[i, :3] = x_ff[i, :3]
     x_ff_converted[i,3:7] = euler_to_quat_np(x_ff[i, 3:6], order=euler_order)
     x_ff_converted[i,7:10] = x_ff[i, 6:9]
-    x_ff_converted[i,10:13] = enu_to_flu(x_ff[i, 9:12], x_ff_converted[i, 3:7])
+    x_ff_converted[i,10:13] = x_ff[i, 9:12] #enu_to_flu(x_ff[i, 9:12], x_ff_converted[i, 3:7])
 x_ff = x_ff_converted
+#! Convert [F: ENU, tau: FLU] to [F: FLU, tau:FLU]
+#TODO
+u_ff_converted = np.zeros_like(u_ff)
+for i in range(u_ff.shape[0]):
+    u_ff_converted
 np.savez('stl_mapping/Planning/solutions/sp_solution_quat.npz', x_ff=x_ff, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
 
 # feedback linearization controller for the underwater robot to behave like a free flyer
@@ -155,7 +160,8 @@ def u_fbl(x, u):
     gx_sp = sp_robot_nl.calculate_gx(x)
     dx_sp = fx_sp + gx_sp@u
     dp, dq, dv, dw = dx_sp[:3], dx_sp[3:7], dx_sp[7:10], dx_sp[10:13]
-    #! Now need to convert dx_sp to the right frames...
+    #! Now [dp: NED, dq:FRD->NED, dv:FRD, dw:FRD] to [dp: ENU, dq:FLU->ENU, dv:FLU, dw:FLU]
+
     # # convert dp and dq from ENU to NED
     # dp_ned, dq_ned = enu_to_ned(dp, dq)
     # # convert dv and dw from ENU to NED and then to FRD
