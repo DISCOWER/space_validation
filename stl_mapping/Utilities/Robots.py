@@ -183,6 +183,20 @@ class FreeFlyer(Robot):
         )
 
     def _fx(self, x):
+        # p = cs.SX.sym('p', 3)
+        # q = cs.SX.sym('q', 4)
+        # v = cs.SX.sym('v', 3)
+        # w = cs.SX.sym('w', 3)
+        # fx = cs.Function('fx', [p, q, v, w],
+        #     [
+        #         cs.blockcat([
+        #             [v],
+        #             [0.5 * skew_symmetric_cs(w) @ q],
+        #             [cs.SX.zeros(3,)],
+        #             [cs.SX(np.linalg.inv(self.inertia)) @ cs.cross(-w, (self.inertia @ w))]
+        #         ])
+        #     ]
+        # )
         p, q, v, w = x[0:3], x[3:7], x[7:10], x[10:13]
         if self.backend == 'cs':
             fx = cs.blockcat([

@@ -150,17 +150,29 @@ np.savez('stl_mapping/Planning/solutions/sp_solution_quat.npz', x_ff=x_ff_quat, 
 uw_robot = BlueROV() # (quaternion=True)
 sp_robot_nl = FreeFlyer()
 
-def u_fbl(x, v):
+def u_fbl(x, u):
+    '''
+    Feedback linearization control for the underwater robot
+    Args:
+        x: state [p, q, dp ,dq] in ENU frame
+        v: control input [v_x, v_y, v_z, w_phi, w_theta, w_psi] in ENU frame
+    Returns:
+        u_fbl: control input for the underwater robot in FRD body frame
+    '''
     # convert p and q from ENU to NED
-    x_ned = enu_to_ned(x[:3], x[3:7])
-    # convert dq and dp from FRD body frame to NED inertial frame
-    dp_ned = R.from_quat(x[3:7],scalar_first=True).apply(x[7:10])
+    p, q, v, w = x[:3], x[3:7], x[7:10], x[10:13]
+    p_ned, q_ned = enu_to_ned(p, q)
+    # convert dq and dp from ENU to FRD body
+    v = R.from_quat(q_ned).inv().apply(v)  # linear velocity in body frame
+    w = w
+    x = np.concatenate((p_ned, q_ned, v, w))
+
     # convert control input v from ENU to NED
-    v_ned = u_enu_to_ned(v)
+    u = u_enu_to_ned(u)
 
     fx_uw = uw_robot.fx(x)
     gx_uw = uw_robot.gx(x)
-    u_fbl = np.linalg.pinv(gx_uw)@(sp_robot_nl.fx(x) + sp_robot_nl.gx(x)@v - fx_uw)
+    u_fbl = np.linalg.pinv(gx_uw)@(sp_robot_nl.fx(x) + sp_robot_nl.gx(x)@u - fx_uw)
     return u_fbl
 def u_fbl_cs(x, v):
     fx_uw = uw_robot.fx(x)
