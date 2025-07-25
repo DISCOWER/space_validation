@@ -111,8 +111,8 @@ def atmos_model_wrench():
     model.u = u
 
     # limits
-    F_lim = 2 * 1.7 * (1 - 0.125) * 2/3
-    T_lim = 4 * 0.12 * 1.7 * (1 - 0.125) * 1/3
+    F_lim = 2 * 1.4 * 2/3
+    T_lim = 4 * 0.12 * 1.4 * 1/3
     model.u_min = np.array([-F_lim, -F_lim, -F_lim, -T_lim, -T_lim, -T_lim])
     model.u_max = np.array([F_lim, F_lim, F_lim, T_lim, T_lim, T_lim])
 

@@ -3,13 +3,11 @@ import time
 import rclpy
 from rclpy.node import Node
 from rclpy.clock import Clock
-from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
-import casadi as cs
 import os
 from Utilities.qos_profiles import NORMAL_QOS, RELIABLE_QOS
 from Utilities.get_reference_trajectory import get_reference_trajectory, ReferenceTrajectory
         
-from nav_msgs.msg import Path, Odometry
+from nav_msgs.msg import Path
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import PoseStamped, WrenchStamped
 from std_msgs.msg import Bool
@@ -19,7 +17,15 @@ from px4_msgs.msg import VehicleThrustSetpoint, VehicleTorqueSetpoint, OffboardC
 from Control.controllers.mpc_wrench import MpcWrench
 from Control.estimators.ekf_wrench_estimator import EKFWrenchEstimator
 from Utilities.rotations import quat_to_euler_np, q_to_rot_mat_np
-from Utilities.rotations import enu_to_ned, ned_to_enu
+
+# The PX4 uses normalized wrench input. If NORMALIZED_WRENCH is True, the control
+# input has to be normalized. I will at some point do a PR to the PX4 to
+# support non-normalized wrench input.
+NORMALIZED_WRENCH = True  # Use normalized wrench for control input
+F_thruster = 1.4  # Thrust force per motor
+r_thruster = 0.12  # Distance from center to thruster in meters
+F_scaling = 2 * F_thruster if NORMALIZED_WRENCH else 1.0
+T_scaling = 4 * r_thruster * F_thruster if NORMALIZED_WRENCH else 1.0
 
 class MPCNode(Node):
     def __init__(self):
@@ -31,6 +37,11 @@ class MPCNode(Node):
         self.get_logger().info("MPC solver initialized successfully")
 
         # Subscribers
+        self.status_sub_v1 = self.create_subscription(
+            VehicleStatus,
+            'fmu/out/vehicle_status_v1',
+            self.vehicle_status_callback,
+            NORMAL_QOS)
         self.status_sub = self.create_subscription(
             VehicleStatus,
             'fmu/out/vehicle_status',
@@ -101,9 +112,9 @@ class MPCNode(Node):
             Path,
             'stl_mapping/entire_path',
             10)
-        self.force_torque_app_pub = self.create_publisher(
+        self.force_torque_cmd_pub = self.create_publisher(
             WrenchStamped,
-            "force_torque_app",
+            "force_torque_cmd",
             10)
         self.disturbance_est_pub = self.create_publisher(
             WrenchStamped,
@@ -114,8 +125,8 @@ class MPCNode(Node):
 
         # Disturbance variables
         self.offset_free = True
-        self.F_app = np.zeros((3, 1))  # Force applied
-        self.T_app = np.zeros((3, 1))  # Torque applied
+        self.F_cmd = np.zeros((3, 1))  # Force commanded
+        self.T_cmd = np.zeros((3, 1))  # Torque commanded
         self.ekf_estimator = EKFWrenchEstimator(dt=0.05)
         self.fd_est = np.zeros(3)  # Estimated force disturbance
         self.td_est = np.zeros(3)  # Estimated torque disturbance
@@ -188,31 +199,31 @@ class MPCNode(Node):
         self.nav_state = msg.nav_state
 
     def actuator_motors_callback(self, msg: ActuatorMotors):
-        B_F = 1.4 * np.array([
+        B_F = F_thruster * np.array([
             [1., -1., 1., -1., 0., 0., 0., 0.],
             [0., 0., 0., 0., -1., 1., -1., 1.],
             [0., 0., 0., 0., 0., 0., 0., 0.]
             ])
-        B_T = 1.4 * 0.12 * np.array([
+        B_T = F_thruster * r_thruster * np.array([
             [0., 0., 0., 0., 0., 0., 0., 0.],
             [0., 0., 0., 0., 0., 0., 0., 0.],
             [-1., 1., 1., -1., -1., 1., 1., -1.]
             ])
-        self.F_app = B_F @ np.array(msg.control[0:8]).reshape(8, 1)
-        self.T_app = B_T @ np.array(msg.control[0:8]).reshape(8, 1)
+        self.F_cmd = B_F @ np.array(msg.control[0:8]).reshape(8, 1)
+        self.T_cmd = B_T @ np.array(msg.control[0:8]).reshape(8, 1)
 
         wrench_msg = WrenchStamped()
         wrench_msg.header.stamp = self.get_clock().now().to_msg()
         wrench_msg.header.frame_id = 'map'
 
-        wrench_msg.wrench.force.x = float(self.F_app[0])
-        wrench_msg.wrench.force.y = float(self.F_app[1])
-        wrench_msg.wrench.force.z = float(self.F_app[2])
-        wrench_msg.wrench.torque.x = float(self.T_app[0])
-        wrench_msg.wrench.torque.y = float(self.T_app[1])
-        wrench_msg.wrench.torque.z = float(self.T_app[2])
+        wrench_msg.wrench.force.x = float(self.F_cmd[0])
+        wrench_msg.wrench.force.y = float(self.F_cmd[1])
+        wrench_msg.wrench.force.z = float(self.F_cmd[2])
+        wrench_msg.wrench.torque.x = float(self.T_cmd[0])
+        wrench_msg.wrench.torque.y = float(self.T_cmd[1])
+        wrench_msg.wrench.torque.z = float(self.T_cmd[2])
 
-        self.force_torque_app_pub.publish(wrench_msg)
+        self.force_torque_cmd_pub.publish(wrench_msg)
 
     def start_callback(self, msg):
         if msg.data:
@@ -243,6 +254,11 @@ class MPCNode(Node):
 
         torque_output_msg = VehicleTorqueSetpoint()
         torque_output_msg.timestamp = int(Clock().now().nanoseconds / 1000)
+
+        # Scaling
+        u[0:3] /= F_scaling
+        u[3:6] /= T_scaling
+
         # ENU -> NED transformation
         force_output_msg.xyz = [u[0]*0.5, -u[1]*0.5, -u[2]*0.5]
         torque_output_msg.xyz = [u[3]*0.5, -u[4]*0.5, -u[5]*0.5]
@@ -336,10 +352,7 @@ class MPCNode(Node):
                            self.vehicle_angular_velocity[0],
                            self.vehicle_angular_velocity[1],
                            self.vehicle_angular_velocity[2]]).reshape(13, 1)
-        FT = np.concatenate((self.F_app, self.T_app), axis=0)
-        self.fd_est, self.td_est = self.ekf_estimator.step(x0.flatten(), FT.flatten()) 
-        # self.fd_est = np.zeros_like(self.fd_est)
-        # self.td_est = np.zeros_like(self.td_est)
+        self.fd_est, self.td_est = self.ekf_estimator.step(x0.flatten(), self.F_cmd.flatten(), self.T_cmd.flatten())
         self.publish_estimated_disturbance(self.fd_est, self.td_est)
 
     def cmdloop_callback(self):
