@@ -29,7 +29,7 @@ class EKFWrenchEstimator:
             [2*(x*z - w*y),           2*(y*z + w*x),         1 - 2*x**2 - 2*y**2]
         ])
 
-    def predict(self, q, F_app, T_app):
+    def predict(self, q, F_cmd, T_cmd):
         v = self.x[0:3]
         w = self.x[3:6]
         fd = self.x[6:9]
@@ -37,8 +37,8 @@ class EKFWrenchEstimator:
 
         # System dynamics
         R = self.get_rotMat(q)
-        F_tot = R @ F_app + fd
-        T_tot = T_app + td
+        F_tot = R @ F_cmd + fd
+        T_tot = T_cmd + td
 
         a_lin = F_tot / self.mass
         a_ang = self.inertia_inv @ (T_tot - np.cross(w, self.inertia @ w))
@@ -71,15 +71,12 @@ class EKFWrenchEstimator:
         self.x = self.x + K @ y
         self.P = (np.eye(12) - K @ H) @ self.P
 
-    def step(self, x_meas, u):
-        F_app = u[:3]
-        T_app = u[3:6]
-
+    def step(self, x_meas, F_cmd, T_cmd):
         v_meas = x_meas[3:6]
         w_meas = x_meas[10:13]
         q_meas = x_meas[6:10]
 
-        self.predict(q_meas, F_app, T_app)
+        self.predict(q_meas, F_cmd, T_cmd)
         self.update(v_meas, w_meas)
 
         fd = self.x[6:9]
