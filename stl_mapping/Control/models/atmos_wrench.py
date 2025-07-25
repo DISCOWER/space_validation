@@ -63,7 +63,7 @@ def atmos_model_wrench():
     model.name = 'atmos_ff'
 
     # parameters
-    mass = 17.8
+    mass = 16.8 #(16.8: empty, 17.8: full)  # kg
     mass_inv = 1/mass
     inertia = np.diag([0.315]*3)
     inertia_inv = np.linalg.inv(inertia)

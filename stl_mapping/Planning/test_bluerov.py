@@ -68,7 +68,7 @@ def run_simulation(t_span, x0, dt, blueROV:BlueROV):
     u = np.zeros(6)
     u[0] = 20  # force in x-direction
     u[1] = 50 # force in y-direction
-    u[2] = -10 # force in z-direction
+    # u[2] = -10 # force in z-direction
     #u[3] = -1 # torque around x-axis
     #u[4] = -1 # torque around the y-axis
     #u[5] = -1 # torque around the z-axis

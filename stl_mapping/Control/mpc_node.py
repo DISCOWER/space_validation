@@ -188,12 +188,12 @@ class MPCNode(Node):
         self.nav_state = msg.nav_state
 
     def actuator_motors_callback(self, msg: ActuatorMotors):
-        B_F = 1.5 * np.array([
+        B_F = 1.4 * np.array([
             [1., -1., 1., -1., 0., 0., 0., 0.],
             [0., 0., 0., 0., -1., 1., -1., 1.],
             [0., 0., 0., 0., 0., 0., 0., 0.]
             ])
-        B_T = 1.5 * 0.12 * np.array([
+        B_T = 1.4 * 0.12 * np.array([
             [0., 0., 0., 0., 0., 0., 0., 0.],
             [0., 0., 0., 0., 0., 0., 0., 0.],
             [-1., 1., 1., -1., -1., 1., 1., -1.]
@@ -243,10 +243,12 @@ class MPCNode(Node):
 
         torque_output_msg = VehicleTorqueSetpoint()
         torque_output_msg.timestamp = int(Clock().now().nanoseconds / 1000)
-
         # ENU -> NED transformation
-        force_output_msg.xyz = [u[0], -u[1], -u[2]]
-        torque_output_msg.xyz = [u[3], -u[4], -u[5]]
+        force_output_msg.xyz = [u[0]*0.5, -u[1]*0.5, -u[2]*0.5]
+        torque_output_msg.xyz = [u[3]*0.5, -u[4]*0.5, -u[5]*0.5]
+        # EKF in FLU frame so don't transform
+        # self.F_app = u[:3]
+        # self.T_app = u[3:6]
 
         self.publisher_thrust_setpoint.publish(force_output_msg)
         self.publisher_torque_setpoint.publish(torque_output_msg)
@@ -336,6 +338,8 @@ class MPCNode(Node):
                            self.vehicle_angular_velocity[2]]).reshape(13, 1)
         FT = np.concatenate((self.F_app, self.T_app), axis=0)
         self.fd_est, self.td_est = self.ekf_estimator.step(x0.flatten(), FT.flatten()) 
+        # self.fd_est = np.zeros_like(self.fd_est)
+        # self.td_est = np.zeros_like(self.td_est)
         self.publish_estimated_disturbance(self.fd_est, self.td_est)
 
     def cmdloop_callback(self):
@@ -367,6 +371,7 @@ class MPCNode(Node):
             # self.get_logger().info(f"t_mpc: {t_mpc}, times: {times}")
 
         if self.offset_free:
+            # rotation matrix of FRU in ENU
             rotmat = q_to_rot_mat_np(self.vehicle_attitude)
             u_ref = -np.concatenate((rotmat.transpose() @ self.fd_est.reshape(3, 1), self.td_est.reshape(3, 1)), axis=0)
 
@@ -376,19 +381,19 @@ class MPCNode(Node):
             #                           0., 0., 0., 1.,
             #                           0., 0., 0.,
             #                           0., 0., 0.]).reshape(13,)
-            x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
+            x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='zyx')
 
         x_ref_u = np.tile(u_ref if self.offset_free else np.zeros((6, 1)), (1, x_ref.shape[1]))
 
         # x_ref contains reference in order p q dp dq, convert to order p, dp, q, dq
         x_ref = np.concatenate((
-            x_ref[0:3, :],  # Position
-            x_ref[7:10, :],  # Linear velocity
-            x_ref[3:7, :],  # Quaternion
-            x_ref[10:13, :],  # Angular velocity
+            x_ref[0:3, :],      # Position [ENU]
+            x_ref[7:10, :],     # Linear velocity [ENU]
+            x_ref[3:7, :],      # Quaternion [FLU in ENU]
+            x_ref[10:13, :],    # Angular velocity [FLU]
             x_ref_u
         ))
-        self.get_logger().info(f"euler: {quat_to_euler_np(x_ref[6:10, 0], order='xyz')}")
+        self.get_logger().info(f"euler: {quat_to_euler_np(x_ref[6:10, 0], order='zyx')}")
         self.get_logger().info(f"x_ref: {x_ref[:, 0].flatten()}")
         # self.get_logger().info(f"x0: {x0.flatten()}")
 

@@ -97,7 +97,7 @@ class LinearFreeFlyer6DoF(Robot):
     def __init__(self):
         super().__init__(n_x=12, n_u=6)
         # dynamics in the form: dx = f(x) + g(x)u
-        self.mass = 17.8
+        self.mass = 16.8 #(16.8: empty, 17.8: full)  # kg
         self.inertia = np.diag((0.1454, 0.1366, 0.1594))
 
         self.A = np.zeros((12, 12))
@@ -178,7 +178,7 @@ class FreeFlyer(Robot):
         super().__init__(n_x=nx, n_u=nu)
 
         # dynamics in the form: dx = f(x) + g(x)u
-        self.mass = 17.8
+        self.mass = 16.8 #(16.8: empty, 17.8: full)  # kg
         self.inertia = np.diag((0.1454, 0.1366, 0.1594))
         self.max_thrust = 1.
         self.max_torque = 0.5

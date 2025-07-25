@@ -39,6 +39,7 @@ euler_order = 'zyx'
 X0 = HyperRectangle(np.array([0.5, 0, 0]), np.array([0.6, 0.1, 0.1]))
 Xf = HyperRectangle(np.array([2.5, 1.0, 0]), np.array([2.6, 1.1, 0.1]))
 XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8]))
+# later converted to polytopes for predicates of the form Ax \leq b: Polytope = (A,b)
 # XA = HyperRectangle(np.array([2.5, -1.0, 0]), np.array([2.6, -0.9, 0.1]))
 Obs = []
 World = HyperRectangle(np.array([0, -1.5, -10, -10]), np.array([4, 1.5, 10, 10]))
@@ -51,7 +52,7 @@ phi = Pred("AND", preds=[
 spec = Spec(phi, t0, tf)
 
 # Initial Motion planner on Linear Model
-if False:
+if True:
     opt = gp.Model("prob1")
     x_vars = opt.addMVar((N, sp_robot.n_x), lb=-np.inf, ub=np.inf, name="X")
     u_vars = opt.addMVar((N, sp_robot.n_u), lb=-np.inf, ub=np.inf, name="U")
@@ -125,17 +126,23 @@ for i in range(x_ff.shape[0]):
     x_ff_converted[i,7:10] = x_ff[i, 6:9]
     x_ff_converted[i,10:13] = x_ff[i, 9:12] #enu_to_flu(x_ff[i, 9:12], x_ff_converted[i, 3:7])
 x_ff = x_ff_converted
+
+#TODO: 1. this is a valid conversion (Lin to non-lin) if the system (with zero roll) is differentially flat
+#TODO:    this means that this linear decoupling is valid, and x_ff and u_ff are valid for the nonlinear space robot
+#TODO:    CHECK THIS!
+
 #! Convert [F: ENU, tau: FLU] to [F: FLU, tau:FLU]
-#TODO
-u_ff_converted = np.zeros_like(u_ff)
-for i in range(u_ff.shape[0]):
-    u_ff_converted
+# u_ff_converted = np.zeros_like(u_ff)
+# for i in range(u_ff.shape[0]):
+#     u_ff_converted = 1.0
 np.savez('stl_mapping/Planning/solutions/sp_solution_quat.npz', x_ff=x_ff, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
 
 # feedback linearization controller for the underwater robot to behave like a free flyer
 uw_robot = BlueROV() # (quaternion=True)
 sp_robot_nl = FreeFlyer()
 
+#TODO: 1. fix the BlueRov model such that it behaves equal to David's model (yaw and pitch seem wrong)
+#TODO: 2. fix frame conversions for feedback linearization (below)
 def u_fbl(x, u):
     '''
     Feedback linearization control for the underwater robot
@@ -220,6 +227,11 @@ def u_fbl_cs(x, v):
     u_fbl = cs.mtimes(cs.pinv(gx_uw), sp_robot_nl.fx(x) + cs.mtimes(sp_robot_nl.gx(x),v) - fx_uw)
     return u_fbl
 
+#TODO: now we either solve the time-scaling of trajectory and control input
+#TODO: or we solve the optimization problem to make alpha equal, we need to figure out what is warranted
+#TODO: - time-scaling?
+#TODO: - control bound scaling? (only valid for faster systems, but still, is it valid?)
+#TODO: - trajectory optimization? (this should be valid, but perhaps dirtier than warranted)
 uw_robot = BlueROV(iX=cs.MX)
 sp_robot_nl = FreeFlyer()
 if True:

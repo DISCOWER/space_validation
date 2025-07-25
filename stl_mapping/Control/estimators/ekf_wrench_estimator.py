@@ -2,7 +2,7 @@ import numpy as np
 
 class EKFWrenchEstimator:
     def __init__(self, dt= 0.1):
-        self.mass = 17.8  # kg
+        self.mass = 16.8 #(16.8: empty, 17.8: full)  # kg
         self.inertia = np.diag([0.315] * 3)
         self.inertia_inv = np.linalg.inv(self.inertia)
 
