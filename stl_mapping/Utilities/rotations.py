@@ -22,7 +22,6 @@ def q_to_rot_mat_cs(q):
         cs.horzcat(1 - 2 * (qy ** 2 + qz ** 2), 2 * (qx * qy - qw * qz), 2 * (qx * qz + qw * qy)),
         cs.horzcat(2 * (qx * qy + qw * qz), 1 - 2 * (qx ** 2 + qz ** 2), 2 * (qy * qz - qw * qx)),
         cs.horzcat(2 * (qx * qz - qw * qy), 2 * (qy * qz + qw * qx), 1 - 2 * (qx ** 2 + qy ** 2)))
-
     return rot_mat
 
 def q_to_rot_mat_np(q):
@@ -33,8 +32,15 @@ def q_to_rot_mat_np(q):
         [2 * (qx * qy + qw * qz), 1 - 2 * (qx ** 2 + qz ** 2), 2 * (qy * qz - qw * qx)],
         [2 * (qx * qz - qw * qy), 2 * (qy * qz + qw * qx), 1 - 2 * (qx ** 2 + qy ** 2)]
     ])
-
     return rot_mat
+
+def quat_mult(q1, q2):
+    return cs.vertcat(
+            q1[0]*q2[0] - q1[1]*q2[1] - q1[2]*q2[2] - q1[3]*q2[3],
+            q1[0]*q2[1] + q1[1]*q2[0] + q1[2]*q2[3] - q1[3]*q2[2],
+            q1[0]*q2[2] - q1[1]*q2[3] + q1[2]*q2[0] + q1[3]*q2[1],
+            q1[0]*q2[3] + q1[1]*q2[2] - q1[2]*q2[1] + q1[3]*q2[0]
+        )
 
 def v_dot_q(v, q):
     rot_mat = q_to_rot_mat_cs(q)
@@ -107,27 +113,6 @@ def quat_to_euler_np(q,order='zyz'):
     euler = q.as_euler(order, degrees=False)  # returns (
     return euler
 
-def quat_x_to_euler_x_cs(x):
-    # assumes x = [p, q, dp, dq]
-    euler_x = cs.vertcat(
-        x[0:3],                   # position
-        quat_to_euler_cs(x[3:7]),    # euler angles
-        x[7:10],                  # linear velocity
-        x[10:13]                  # angular velocity
-    )
-    return euler_x
-
-def euler_x_to_quat_x_cs(x):
-    # assumes x = [p, q, dp, dq]
-    p, q, dp, dq = x[0:3], x[3:6], x[6:9], x[9:12]
-    quat_x = cs.vertcat(
-        p,                   # position
-        euler_to_quat_cs(q),    # quaternion
-        dp,                  # linear velocity
-        dq                   # angular velocity
-    )
-    return quat_x
-
 def quat_x_to_euler_x_np(x, order='zyz'):
     # assumes x = [p, q, dp, dq]
     euler_x = np.concatenate((
@@ -137,6 +122,7 @@ def quat_x_to_euler_x_np(x, order='zyz'):
         x[10:13]                  # angular velocity
     ))
     return euler_x
+
 
 def euler_x_to_quat_x_np(x,order='zyx'):
     # assumes x = [p, q, dp, dq]

@@ -4,7 +4,7 @@ import gurobipy as gp
 from Utilities.sets import HyperRectangle, Zonotope
 from Utilities.rotations import skew_symmetric_cs, skew_symmetric_np, q_to_rot_mat_cs, q_to_rot_mat_np
 from Utilities.rotations import euler_to_quat_cs, euler_to_quat_np, quat_to_euler_cs, quat_to_euler_np
-from Utilities.rotations import quat_x_to_euler_x_cs, euler_x_to_quat_x_cs
+from Utilities.rotations import quat_mult
 from Utilities.sets import compute_K
 from Utilities.stl import OptProbItems
 
@@ -41,15 +41,16 @@ class Robot:
         return dx
     
     def step(self, x=None, u=None, dt=0.1)-> np.ndarray:
-        # Update the state using the dynamics
-        if x is not None:
-            self.set_state(x)
-        if u is not None:
-            self.set_control(u)
-        # Calculate the dynamics
-        dx = self.dynamics(u)
-        self.x += dx * dt
-        return self.x
+        # # Update the state using the dynamics
+        # if x is not None:
+        #     self.set_state(x)
+        # if u is not None:
+        #     self.set_control(u)
+        # # Calculate the dynamics
+        # dx = self.dynamics(u)
+        # self.x += dx * dt
+        return x + (self.calculate_fx(x) + self.calculate_gx(x)@u) * dt
+        # return self.x
 
     def add_state_constraints(self, prog:gp.Model, items:OptProbItems):
         # Add constraitns on the state that are fundamental:
@@ -200,7 +201,7 @@ class FreeFlyer(Robot):
                 [
                     cs.blockcat([
                         [v],
-                        [0.5 * skew_symmetric_cs(w) @ q],
+                        [0.5 * quat_mult(q, cs.vertcat(0,w))],
                         [cs.SX.zeros(3,)],
                         [cs.SX(np.linalg.inv(self.inertia)) @ cs.cross(-w, (self.inertia @ w))]
                     ])

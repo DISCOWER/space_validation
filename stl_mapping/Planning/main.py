@@ -16,7 +16,7 @@ sys.path.insert(0, parent_dir)
 from Utilities.Robots import FreeFlyer, LinearFreeFlyer6DoF
 from Utilities.sets import HyperRectangle, Polytope
 from Utilities.rotations import quat_to_euler_np, quat_to_euler_cs, euler_to_quat_np, euler_to_quat_cs
-from Utilities.rotations import quat_x_to_euler_x_cs, euler_x_to_quat_x_cs, quat_x_to_euler_x_np, euler_x_to_quat_x_np
+from Utilities.rotations import quat_x_to_euler_x_np, euler_x_to_quat_x_np
 from Utilities.rotations import enu_to_ned, ned_to_enu, u_enu_to_ned, enu_to_flu
 from Utilities.stl import Pred, Spec, quant_parse_operator, OptProbItems
 from Utilities.plotting import plot_planning_results
@@ -46,7 +46,7 @@ World = HyperRectangle(np.array([0, -1.5, -10, -10]), np.array([4, 1.5, 10, 10])
 phi = Pred("AND", preds=[
     Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)], dims=[0,1,2])]),
     Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1,2])]),
-    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2,3])]),
+    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2, 3])]),
     Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)], dims=[0,1,6,7])]),
 ])
 spec = Spec(phi, t0, tf)
@@ -55,19 +55,20 @@ spec = Spec(phi, t0, tf)
 if True:
     opt = gp.Model("prob1")
     x_vars = opt.addMVar((N, sp_robot.n_x), lb=-np.inf, ub=np.inf, name="X")
-    u_vars = opt.addMVar((N, sp_robot.n_u), lb=-np.inf, ub=np.inf, name="U")
+    u_vars = opt.addMVar((N-1, sp_robot.n_u), lb=-np.inf, ub=np.inf, name="U")
     t_sp = np.linspace(0,(N-1)*dt, N)
     alpha_vars = opt.addVar(lb=0, ub=1, name="alpha")
     opt.update()
 
     items = OptProbItems(x_vars, u_vars, t_sp)
 
-    for i in range(N):
+    for i in range(N-1):
         opt.addConstrs((u_vars[i, j] >= alpha_vars*sp_robot.U_effective.lower_bounds[j] for j in range(sp_robot.n_u)))
         opt.addConstrs((u_vars[i, j] <= alpha_vars*sp_robot.U_effective.upper_bounds[j] for j in range(sp_robot.n_u)))
 
     # constraints
-    opt.addConstrs((x_vars[i+1,:] == sp_robot.step(x_vars[i, :], u_vars[i, :], dt) for i in range(N-1)))
+    for i in range(N-1):
+        opt.addConstr(x_vars[i+1,:] == sp_robot.step(x_vars[i, :], u_vars[i, :], dt))
     sp_robot.add_state_constraints(opt, items)
 
     # initial orientation and velocity constraints
@@ -78,11 +79,21 @@ if True:
     quant_parse_operator(opt, spec.phi, items)
 
     cost_var = opt.addVar(lb=-np.inf, ub=np.inf, name="cost")
-    act_abs_var = opt.addMVar((N, sp_robot.n_u))
-    act_int_var = opt.addVar()
-    opt.addConstrs((act_abs_var[i,j] == gp.abs_(u_vars[i,j]) for i in range(N) for j in range(sp_robot.n_u)), name="act_int")
-    opt.addConstr(act_int_var == gp.quicksum([act_abs_var[i,j] for i in range(N) for j in range(sp_robot.n_u)]), name="act_int_sum")
-    opt.addConstr(cost_var == 1*alpha_vars - 10000*spec.phi.rho + 0.0001*act_int_var) # quad_cost
+
+    # # Quadratic actuation cost
+    # act_quadu_vars = opt.addMVar((N-1,))
+    # act_quadu_var = opt.addVar()
+    # opt.addConstrs((act_quadu_vars[i] == u_vars[i,:]@u_vars[i,:] for i in range(N-1)), name="act_int")
+    # opt.addConstr(act_quadu_var == gp.quicksum([act_quadu_vars[i] for i in range(N-1)]), name="act_int_sum")
+
+    # L1 actuation cost
+    act_absu_vars = opt.addMVar((N-1,sp_robot.n_u))
+    act_absu_var = opt.addVar(lb=0, ub=np.inf)
+    opt.addConstrs((act_absu_vars[i, j] == gp.abs_(u_vars[i, j]) for i in range(N-1) for j in range(sp_robot.n_u)), name="act_abs")
+    opt.addConstr(act_absu_var == gp.quicksum([act_absu_vars[i, j] for i in range(N-1) for j in range(sp_robot.n_u)]), name="act_abs_sum")
+
+    # Final cost
+    opt.addConstr(cost_var == 1*alpha_vars - 1000*spec.phi.rho + 0.01*act_absu_var) # quad_cost
     opt.setObjective(cost_var, gp.GRB.MINIMIZE)
     opt.setParam('OutputFlag', 0)  # Suppress Gurobi output
     opt.optimize()
@@ -94,7 +105,7 @@ if True:
         denom = denom.sum(sp_robot.KD)
         print(f"Beta from solving Prob 1: {denom.divide(sp_robot.U)}")
         print(f"Spatial robustness: rho = {spec.phi.rho.X}")
-        print(f"Control integral summed: {act_int_var.X}")
+        # print(f"Control integral summed: {act_quadu_var.X}")
     else:
         print(f"No optimal solution found")
         print(f"Status: {scs[opt.status]}")
@@ -113,11 +124,6 @@ else:
     dt = data['dt']
     t_sp = data['times']
 
-# plot the trajectory
-plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
-                      path="stl_mapping/Planning/figures/sp_trajectory.png")
-
-
 #! Convert [p:ENU, e:FLU->ENU, v:ENU, w:FLU] to [p:ENU, q:FLU->ENU, v:ENU, w:FLU]
 x_ff_converted = np.zeros((x_ff.shape[0], x_ff.shape[1] + 1))
 for i in range(x_ff.shape[0]):
@@ -126,6 +132,11 @@ for i in range(x_ff.shape[0]):
     x_ff_converted[i,7:10] = x_ff[i, 6:9]
     x_ff_converted[i,10:13] = x_ff[i, 9:12] #enu_to_flu(x_ff[i, 9:12], x_ff_converted[i, 3:7])
 x_ff = x_ff_converted
+
+# plot the trajectory
+plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
+                      path="stl_mapping/Planning/figures/sp_trajectory.png")
+
 
 #TODO: 1. this is a valid conversion (Lin to non-lin) if the system (with zero roll) is differentially flat
 #TODO:    this means that this linear decoupling is valid, and x_ff and u_ff are valid for the nonlinear space robot
