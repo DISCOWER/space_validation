@@ -192,3 +192,19 @@ def u_enu_to_ned(u):
     T = np.diag([1, -1, -1, 1, -1, -1])
     u_ned = T @ u
     return u_ned
+
+def q_ned_to_q_enu(q_ned):
+        # Convert NED quaternion to ENU quaternion
+        # q is in the form (qw, qx, qy, qz) and describes the rotation from body frame to global frame
+        # Yes, NED <-> ENU  is symmetric
+        q_enu = 1/np.sqrt(2) * np.array([q_ned[0] + q_ned[3], q_ned[1] + q_ned[2], q_ned[1] - q_ned[2], q_ned[0] - q_ned[3]])
+        q_enu /= np.linalg.norm(q_enu)
+        return q_enu.astype(float)
+    
+def q_enu_to_q_ned(q_enu):
+    # Convert ENU quaternion to NED quaternion
+    # q is in the form (qw, qx, qy, qz) and describes the rotation from body frame to global frame
+    # Yes, NED <-> ENU  is symmetric
+    q_ned = 1/np.sqrt(2) * np.array([q_enu[0] + q_enu[3], q_enu[1] + q_enu[2], q_enu[1] - q_enu[2], q_enu[0] - q_enu[3]])
+    q_ned /= np.linalg.norm(q_ned)
+    return q_ned.astype(float)

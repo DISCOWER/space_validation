@@ -197,13 +197,18 @@ class FreeFlyer(Robot):
             q = cs.SX.sym('q', 4)
             v = cs.SX.sym('v', 3)
             w = cs.SX.sym('w', 3)
+            w_cross = cs.vertcat(
+                cs.horzcat(0, -w[2], w[1]),
+                cs.horzcat(w[2], 0, -w[0]),
+                cs.horzcat(-w[1], w[0], 0)
+            )
             self._fx_sym = cs.Function('fx', [p, q, v, w],
                 [
                     cs.blockcat([
                         [v],
-                        [0.5 * quat_mult(q, cs.vertcat(0,w))],
+                        [0.5 * quat_mult(q, cs.vertcat(0, w))],
                         [cs.SX.zeros(3,)],
-                        [cs.SX(np.linalg.inv(self.inertia)) @ cs.cross(-w, (self.inertia @ w))]
+                        [-cs.SX(np.linalg.inv(self.inertia)) @ cs.mtimes(w_cross, cs.mtimes(self.inertia, w))]
                     ])
                 ]
             )

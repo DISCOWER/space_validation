@@ -43,6 +43,9 @@ def plot_planning_results(robot, t, x, u,
     if Obs is not None:
         [obs.plot(ax_p, color='red', alpha=0.5) for obs in Obs]
     ax_p.set_aspect('equal', adjustable='box')
+    ax_p.set_xlabel('X (m)')
+    ax_p.set_ylabel('Y (m)')
+    ax_p.grid()
 
     ax_v.plot(t, v[:, 0], label='dx')
     ax_v.plot(t, v[:, 1], label='dy')
@@ -82,6 +85,7 @@ def plot_planning_results(robot, t, x, u,
     ax_f.set_xlabel('Time (s)')
     ax_f.set_ylabel('Control input (N)')
     ax_f.legend()
+    ax_f.grid()
 
     ax_t.plot(t[:u.shape[0]], u[:,3], label='u4')
     ax_t.plot(t[:u.shape[0]], u[:,4], label='u5')
@@ -89,6 +93,7 @@ def plot_planning_results(robot, t, x, u,
     ax_t.set_xlabel('Time (s)')
     ax_t.set_ylabel('Torque input (Nm)')
     ax_t.legend()
+    ax_t.grid()
 
     if plot:
         plt.savefig(path)

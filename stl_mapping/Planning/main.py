@@ -41,6 +41,7 @@ Xf = HyperRectangle(np.array([2.5, 1.0, 0]), np.array([2.6, 1.1, 0.1]))
 XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8]))
 # later converted to polytopes for predicates of the form Ax \leq b: Polytope = (A,b)
 # XA = HyperRectangle(np.array([2.5, -1.0, 0]), np.array([2.6, -0.9, 0.1]))
+# XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8, -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8, -np.pi/2+np.pi/8]))
 Obs = []
 World = HyperRectangle(np.array([0, -1.5, -10, -10]), np.array([4, 1.5, 10, 10]))
 phi = Pred("AND", preds=[
@@ -52,7 +53,7 @@ phi = Pred("AND", preds=[
 spec = Spec(phi, t0, tf)
 
 # Initial Motion planner on Linear Model
-if True:
+if False:
     opt = gp.Model("prob1")
     x_vars = opt.addMVar((N, sp_robot.n_x), lb=-np.inf, ub=np.inf, name="X")
     u_vars = opt.addMVar((N-1, sp_robot.n_u), lb=-np.inf, ub=np.inf, name="U")
@@ -132,24 +133,29 @@ for i in range(x_ff.shape[0]):
     x_ff_converted[i,7:10] = x_ff[i, 6:9]
     x_ff_converted[i,10:13] = x_ff[i, 9:12] #enu_to_flu(x_ff[i, 9:12], x_ff_converted[i, 3:7])
 x_ff = x_ff_converted
+#! Convert [F: ENU, tau: FLU] to [F: FLU, tau:FLU]
+u_ff_converted = np.zeros_like(u_ff)
+for i in range(u_ff.shape[0]):
+    q = R.from_quat(x_ff[i, 3:7], scalar_first=True)
+    u_ff_converted[i, :] = np.hstack((q.inv().apply(u_ff[i, 0:3]), u_ff[i, 3:6]))  # convert u from ENU to body FLU body frame
+u_ff = u_ff_converted
 
 # plot the trajectory
 plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
                       path="stl_mapping/Planning/figures/sp_trajectory.png")
 
+np.savez('stl_mapping/Planning/solutions/sp_solution_quat.npz', x_ff=x_ff, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
 
 #TODO: 1. this is a valid conversion (Lin to non-lin) if the system (with zero roll) is differentially flat
 #TODO:    this means that this linear decoupling is valid, and x_ff and u_ff are valid for the nonlinear space robot
 #TODO:    CHECK THIS!
 
-#! Convert [F: ENU, tau: FLU] to [F: FLU, tau:FLU]
-# u_ff_converted = np.zeros_like(u_ff)
-# for i in range(u_ff.shape[0]):
-#     u_ff_converted = 1.0
-np.savez('stl_mapping/Planning/solutions/sp_solution_quat.npz', x_ff=x_ff, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
+
+
+
 
 # feedback linearization controller for the underwater robot to behave like a free flyer
-uw_robot = BlueROV() # (quaternion=True)
+uw_robot = BlueROV()
 sp_robot_nl = FreeFlyer()
 
 #TODO: 1. fix the BlueRov model such that it behaves equal to David's model (yaw and pitch seem wrong)
@@ -163,35 +169,32 @@ def u_fbl(x, u):
     Returns:
         u_fbl: control input for the space robot in ENU body frame
     '''
+    R_enu_to_ned = R.from_quat(np.array([0, 1, 0, 0]), scalar_first=True)
+    R_flu_to_frd = R.from_quat(np.array([0, 1, 0, 0]), scalar_first=True)
+
     #! Convert [p: ENU, q:FLU->ENU, v:ENU, w:FLU] to [p: NED, q:FRD->NED, v:FRD, w:FRD]
-    # p, q, v, w = x[:3], x[3:7], x[7:10], x[10:13]
-    # # convert p and q from ENU to NED
-    # p_ned, q_ned = enu_to_ned(p, q)
-    # # convert v and w from ENU to NED and then to FRD
-    # v_ned, _ = enu_to_ned(v, q)
-    # v_frd = R.from_quat(q_ned).inv().apply(v_ned)
-    # w_ned, _ = enu_to_ned(w, q)
-    # w_frd = R.from_quat(q_ned).inv().apply(w_ned)
-    # x_ned = np.concatenate((p_ned, q_ned, v_frd, w_frd))
+    from Utilities.rotations import q_enu_to_q_ned
+    p, q, v, w = x[:3], x[3:7], x[7:10], x[10:13]
+    p_ned = np.array([p[1], p[0], -p[2]])
+    q_ned = q_enu_to_q_ned(q)
+    v_ned = np.array([v[1], v[0], -v[2]])
+    w_frd = np.array([w[1], w[0], -w[2]])
+    x_ned = np.concatenate((p_ned, q_ned, v_ned, w_frd))
 
     fx_sp = sp_robot_nl.calculate_fx(x)
     gx_sp = sp_robot_nl.calculate_gx(x)
     dx_sp = fx_sp + gx_sp@u
-    dp, dq, dv, dw = dx_sp[:3], dx_sp[3:7], dx_sp[7:10], dx_sp[10:13]
     #! Now [dp: NED, dq:FRD->NED, dv:FRD, dw:FRD] to [dp: ENU, dq:FLU->ENU, dv:FLU, dw:FLU]
+    dp, dq, dv, dw = dx_sp[:3], dx_sp[3:7], dx_sp[7:10], dx_sp[10:13]
+    dp_ned = np.array([dp[0], -dp[1], -dp[2]])
+    dq_ned = np.array([dq[0], dq[1], -dq[2], -dq[3]])
+    dv_ned = np.array([dv[0], -dv[1], -dv[2]])
+    dw_frd = np.array([dw[0], -dw[1], -dw[2]])
+    dx_sp_ned = np.concatenate((dp_ned, dq_ned, dv_ned, dw_frd))
 
-    # # convert dp and dq from ENU to NED
-    # dp_ned, dq_ned = enu_to_ned(dp, dq)
-    # # convert dv and dw from ENU to NED and then to FRD
-    # dv_ned, _ = enu_to_ned(dv, dq)
-    # dv_frd = R.from_quat(dq_ned).inv().apply(dv_ned)
-    # dw_ned, _ = enu_to_ned(dw, dq)
-    # dw_frd = R.from_quat(dq_ned).inv().apply(dw_ned)
-    # dx_sp_ned = np.concatenate((dp_ned, dq_ned, dv_frd, dw_frd))
-
-    fx_uw = uw_robot.calculate_fx(x)
-    gx_uw = uw_robot.calculate_gx(x)
-    u_fbl = np.linalg.pinv(gx_uw)@(dx_sp - fx_uw)
+    fx_uw = uw_robot.calculate_fx(x_ned)
+    gx_uw = uw_robot.calculate_gx(x_ned)
+    u_fbl = np.linalg.pinv(gx_uw)@(dx_sp_ned - fx_uw)
     return u_fbl
 
 # x_test = np.array([0.5, 0, 0, 1, 0, 0, 0, 
@@ -212,13 +215,8 @@ for i in range(N-1):
     x_uw_fbl_sp[i+1, :] = x
     u_uw_fbl_sp[i, :] = u
 
-# convert to euler angles for intuitive plotting
-x_uw_fbl_sp_euler = np.zeros((x_uw_fbl_sp.shape[0], x_uw_fbl_sp.shape[1] - 1))
-for i in range(x_uw_fbl_sp.shape[0]):
-    x_uw_fbl_sp_euler[i, :] = quat_x_to_euler_x_np(x_uw_fbl_sp[i, :], order=euler_order)
-
 # plot the trajectory
-plot_planning_results(uw_robot, t_sp, x_uw_fbl_sp_euler, u_uw_fbl_sp, X0, Xf, [XA], Obs, alpha=alpha,
+plot_planning_results(uw_robot, t_sp, x_uw_fbl_sp, u_uw_fbl_sp, X0, Xf, [XA], Obs, alpha=alpha,
                       path="stl_mapping/Planning/figures/sp_trajectory_uw.png")
 
 # Analysis of alpha

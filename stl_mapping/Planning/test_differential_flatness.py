@@ -30,9 +30,11 @@ x_nl[0,:] = x_lin[0,:]
 for i in range(u_lin.shape[0]):
     # convert u from ENU to body FLU body frame
     rot = R.from_quat(x_nl[i,3:7],scalar_first=True)
-    u = np.hstack((rot.inv().apply(u_lin[i,0:3]), u_lin[i,3:6]))
+    u = np.hstack((rot.inv().apply(u_lin[i,0:3]), u_lin[i,3:6]))#rot.inv().apply(u_lin[i,3:6])))
 
     x_nl[i+1,:] = ff.step(x_nl[i,:], u, dt)
+    # re-normalize the quaternion
+    x_nl[i+1,3:7] /= np.linalg.norm(x_nl[i+1,3:7])
 
 print(f"x_nl[0,:]: {x_nl[0,:]}")
 print(f"x_lin[0,:]: {x_lin[0,:]}")
