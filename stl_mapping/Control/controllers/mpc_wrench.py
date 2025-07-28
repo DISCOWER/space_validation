@@ -49,8 +49,8 @@ class MpcWrench():
         self.Nu = 30                # Prediction horizon, inputs
         self.Q = np.diag([          # State weighting matrix
             1e0, 1e0, 1e0,
-            3e1, 3e1, 3e1, 
-            1e2, 
+            1e2,
+            3e1, 3e1, 3e1,  
             3e1, 3e1, 3e1])             
         self.R = 0.1*np.diag([          # State weighting matrix
             1e0, 1e0, 1e0,
@@ -60,7 +60,7 @@ class MpcWrench():
         # Bounds
         self.lbx = np.array([0+0.25, -1.58+0.25, -0.5, -0.5, -3])
         self.ubx = np.array([4.1-0.25, 1.74-0.25, 0.5, 0.5, 3])
-        self.idxbx = np.array([0, 1, 3, 4, 12]) # Indexes of states that are bounded
+        self.idxbx = np.array([0, 1, 7, 8, 12]) # Indexes of states that are bounded
 
         # Weight on slack varibles
         self.W_slack = np.array([1e4]*len(self.idxbx))
@@ -115,11 +115,11 @@ class MpcWrench():
         ocp.cost.W_e = block_diag(self.P)
 
         # quat_error = ca.fabs(model.x[6:10].T @ x_ref[6:10])
-        quat_error = (model.x[6:10].T @ x_ref[6:10])**2
+        quat_error = (model.x[3:7].T @ x_ref[3:7])**2
         # quat_error = ca.fmax(0, ca.fmin(1, quat_error))
         ocp.model.cost_y_expr = ca.vertcat(
             model.x[0:3] - x_ref[0:3],   # Position error
-            model.x[3:6] - x_ref[3:6],   # Velocity error
+            model.x[7:10] - x_ref[7:10],   # Velocity error
             quat_error,
             model.x[10:13] - x_ref[10:13],  # Angular velocity error
             model.u - u_ref, # Control error
@@ -127,14 +127,14 @@ class MpcWrench():
         # Terminal cost 
         ocp.model.cost_y_expr_e = ca.vertcat(
             model.x[0:3] - x_ref[0:3],
-            model.x[3:6] - x_ref[3:6],
+            model.x[3:7] - x_ref[3:7],
             quat_error,
             model.x[10:13] - x_ref[10:13],
         )
         ocp.cost.yref = np.zeros(ocp.model.cost_y_expr.shape[0])  # Reference for full cost function
-        ocp.cost.yref[6] = 1    # Quaternion reference
+        ocp.cost.yref[3] = 1    # Quaternion reference
         ocp.cost.yref_e = np.zeros(ocp.model.cost_y_expr_e.shape[0])  # Terminal reference
-        ocp.cost.yref_e[6] = 1  # Quaternion reference
+        ocp.cost.yref_e[3] = 1  # Quaternion reference
 
         # Constraints
         ocp.constraints.lbu = model.u_min
@@ -147,7 +147,7 @@ class MpcWrench():
         ocp.constraints.idxsbx = np.arange(len(self.idxbx)) # All states are slack variables
 
         ocp.constraints.x0 = np.zeros(nx)  # Initial state
-        ocp.constraints.x0[6] = 1  # Initial quaternion
+        ocp.constraints.x0[3] = 1  # Initial quaternion
 
         # Set up the constraints for the other agents
         # ocp.constraints.lh = np.full(0, -1e9)   # lower bounds on con_h_expr

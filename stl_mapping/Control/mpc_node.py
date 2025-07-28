@@ -342,13 +342,13 @@ class MPCNode(Node):
         x0 = np.array([self.vehicle_local_position[0],
                            self.vehicle_local_position[1],
                            self.vehicle_local_position[2],
-                           self.vehicle_local_velocity[0],
-                           self.vehicle_local_velocity[1],
-                           self.vehicle_local_velocity[2],
                            self.vehicle_attitude[0],
                            self.vehicle_attitude[1],
                            self.vehicle_attitude[2],
                            self.vehicle_attitude[3],
+                           self.vehicle_local_velocity[0],
+                           self.vehicle_local_velocity[1],
+                           self.vehicle_local_velocity[2],
                            self.vehicle_angular_velocity[0],
                            self.vehicle_angular_velocity[1],
                            self.vehicle_angular_velocity[2]]).reshape(13, 1)
@@ -362,13 +362,13 @@ class MPCNode(Node):
         x0 = np.array([self.vehicle_local_position[0],
                            self.vehicle_local_position[1],
                            self.vehicle_local_position[2],
-                           self.vehicle_local_velocity[0],
-                           self.vehicle_local_velocity[1],
-                           self.vehicle_local_velocity[2],
                            self.vehicle_attitude[0],
                            self.vehicle_attitude[1],
                            self.vehicle_attitude[2],
                            self.vehicle_attitude[3],
+                           self.vehicle_local_velocity[0],
+                           self.vehicle_local_velocity[1],
+                           self.vehicle_local_velocity[2],
                            self.vehicle_angular_velocity[0],
                            self.vehicle_angular_velocity[1],
                            self.vehicle_angular_velocity[2]]).reshape(13, 1)
@@ -398,15 +398,7 @@ class MPCNode(Node):
 
         x_ref_u = np.tile(u_ref if self.offset_free else np.zeros((6, 1)), (1, x_ref.shape[1]))
 
-        # x_ref contains reference in order p q dp dq, convert to order p, dp, q, dq
-        x_ref = np.concatenate((
-            x_ref[0:3, :],      # Position [ENU]
-            x_ref[7:10, :],     # Linear velocity [ENU]
-            x_ref[3:7, :],      # Quaternion [FLU in ENU]
-            x_ref[10:13, :],    # Angular velocity [FLU]
-            x_ref_u
-        ))
-        self.get_logger().info(f"euler: {quat_to_euler_np(x_ref[6:10, 0], order='zyx')}")
+        self.get_logger().info(f"euler: {quat_to_euler_np(x_ref[3:7, 0], order='zyx')}")
         self.get_logger().info(f"x_ref: {x_ref[:, 0].flatten()}")
         # self.get_logger().info(f"x0: {x0.flatten()}")
 
@@ -426,21 +418,21 @@ class MPCNode(Node):
         setpoint_path_msg = Path()
         for idx in range(x_ref.shape[1]):
             setpoint = x_ref[:, idx]
-            setpoint_pose_msg = self.vector2PoseMsg('map', setpoint[0:3], setpoint[6:10])
+            setpoint_pose_msg = self.vector2PoseMsg('map', setpoint[0:3], setpoint[3:7])
             setpoint_path_msg.header = setpoint_pose_msg.header
             setpoint_path_msg.poses.append(setpoint_pose_msg)
         self.reference_path_pub.publish(setpoint_path_msg)
 
 
         self.reference_point_pub.publish(
-            self.vector2PoseMsg('map', x_ref[0:3, 0], x_ref[6:10, 0])
+            self.vector2PoseMsg('map', x_ref[0:3, 0], x_ref[3:7, 0])
         )
 
         x_pred = x_pred.T
         predicted_path_msg = Path()
         for idx in range(x_pred.shape[1]):
             predicted_state = x_pred[:, idx]
-            predicted_pose_msg = self.vector2PoseMsg('map', predicted_state[0:3], predicted_state[6:10])
+            predicted_pose_msg = self.vector2PoseMsg('map', predicted_state[0:3], predicted_state[3:7])
             predicted_path_msg.header = predicted_pose_msg.header
             predicted_path_msg.poses.append(predicted_pose_msg)
         self.predicted_path_pub.publish(predicted_path_msg)

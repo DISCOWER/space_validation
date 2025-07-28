@@ -169,16 +169,19 @@ def u_fbl(x, u):
     Returns:
         u_fbl: control input for the space robot in ENU body frame
     '''
-    R_enu_to_ned = R.from_quat(np.array([0, 1, 0, 0]), scalar_first=True)
-    R_flu_to_frd = R.from_quat(np.array([0, 1, 0, 0]), scalar_first=True)
+    R_enu_to_ned = R.from_quat(np.array([0, 1, 0, 0]), scalar_first=True) # 180 degrees rotation around x
+    R_flu_to_frd = R.from_matrix(np.array([[0, 1, 0], [1, 0, 0], [0, 0, -1]])) # 90 degrees rotation around z
 
     #! Convert [p: ENU, q:FLU->ENU, v:ENU, w:FLU] to [p: NED, q:FRD->NED, v:FRD, w:FRD]
-    from Utilities.rotations import q_enu_to_q_ned
+    from Utilities.rotations import q_enu_to_q_ned, quat_mult
     p, q, v, w = x[:3], x[3:7], x[7:10], x[10:13]
     p_ned = np.array([p[1], p[0], -p[2]])
-    q_ned = q_enu_to_q_ned(q)
+    q_R = R.from_quat(q, scalar_first=True)
+    q_ned = R_enu_to_ned * q_R * R_flu_to_frd
+    q_ned = q_ned.as_quat(scalar_first=True)  # convert to quaternion
+    print(f"p_ned: {p_ned}, q_ned: {q_ned}")
     v_ned = np.array([v[1], v[0], -v[2]])
-    w_frd = np.array([w[1], w[0], -w[2]])
+    w_frd = np.array([w[0], -w[1], -w[2]])
     x_ned = np.concatenate((p_ned, q_ned, v_ned, w_frd))
 
     fx_sp = sp_robot_nl.calculate_fx(x)

@@ -70,10 +70,10 @@ def atmos_model_wrench():
 
     # states
     p = ca.MX.sym('p', 3)
-    v = ca.MX.sym('v', 3)
     q = ca.MX.sym('q', 4)
+    v = ca.MX.sym('v', 3)
     w = ca.MX.sym('w', 3)
-    x = ca.vertcat(p, v, q, w)
+    x = ca.vertcat(p, q, v, w)
 
     # controls
     u = ca.MX.sym('u', 6)
@@ -99,11 +99,11 @@ def atmos_model_wrench():
     T = ca.vertcat(u[3], u[4], u[5])
 
     pdot = v
-    vdot = mass_inv * ca.mtimes(rotMat, F) + fd * mass_inv
     qdot = quat_derivative(q, w)
+    vdot = mass_inv * ca.mtimes(rotMat, F) + fd * mass_inv
     wdot = ca.mtimes(inertia_inv, (T + td - ca.mtimes(w_cross, ca.mtimes(inertia, w))))
 
-    xdot = ca.vertcat(pdot, vdot, qdot, wdot)
+    xdot = ca.vertcat(pdot, qdot, vdot, wdot)
 
     # Assign dynamics and controls
     model.f_expl_expr = xdot

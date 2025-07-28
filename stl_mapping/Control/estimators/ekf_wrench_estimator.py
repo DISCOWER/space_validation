@@ -72,9 +72,9 @@ class EKFWrenchEstimator:
         self.P = (np.eye(12) - K @ H) @ self.P
 
     def step(self, x_meas, F_cmd, T_cmd):
-        v_meas = x_meas[3:6]
+        q_meas = x_meas[3:7]
+        v_meas = x_meas[7:10]
         w_meas = x_meas[10:13]
-        q_meas = x_meas[6:10]
 
         self.predict(q_meas, F_cmd, T_cmd)
         self.update(v_meas, w_meas)
