@@ -12,7 +12,7 @@ from Utilities.beziers import eval_bezier
 from Utilities.Robots import FreeFlyer, LinearFreeFlyer6DoF
 from Utilities.plotting import plot_planning_results
 
-data = np.load('stl_mapping/Planning/solutions/sp_solution_quat.npz')
+data = np.load('stl_mapping/Planning/solutions/sp_solution_nl.npz')
 
 ff_lin = LinearFreeFlyer6DoF()
 x_lin = data['x_ff']
@@ -30,7 +30,8 @@ x_nl[0,:] = x_lin[0,:]
 for i in range(u_lin.shape[0]):
     # convert u from ENU to body FLU body frame
     rot = R.from_quat(x_nl[i,3:7],scalar_first=True)
-    u = np.hstack((rot.inv().apply(u_lin[i,0:3]), u_lin[i,3:6]))#rot.inv().apply(u_lin[i,3:6])))
+    # u = np.hstack((rot.inv().apply(u_lin[i,0:3]), u_lin[i,3:6]))#rot.inv().apply(u_lin[i,3:6])))
+    u = u_lin[i,:]
 
     x_nl[i+1,:] = ff.step(x_nl[i,:], u, dt)
     # re-normalize the quaternion

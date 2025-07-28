@@ -33,27 +33,27 @@ bigM = 1e4
 # Robot
 sp_robot = LinearFreeFlyer6DoF()
 
-euler_order = 'zyx'
+euler_order = 'xyz'
 
 # STL Specification
 X0 = HyperRectangle(np.array([0.5, 0, 0]), np.array([0.6, 0.1, 0.1]))
 Xf = HyperRectangle(np.array([2.5, 1.0, 0]), np.array([2.6, 1.1, 0.1]))
-XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8]))
+# XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8]))
 # later converted to polytopes for predicates of the form Ax \leq b: Polytope = (A,b)
 # XA = HyperRectangle(np.array([2.5, -1.0, 0]), np.array([2.6, -0.9, 0.1]))
-# XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8, -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8, -np.pi/2+np.pi/8]))
+XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8, -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8, -np.pi/2+np.pi/8]))
 Obs = []
 World = HyperRectangle(np.array([0, -1.5, -10, -10]), np.array([4, 1.5, 10, 10]))
 phi = Pred("AND", preds=[
     Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)], dims=[0,1,2])]),
     Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1,2])]),
-    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2, 3])]),
+    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2, 3, 5])]),
     Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)], dims=[0,1,6,7])]),
 ])
 spec = Spec(phi, t0, tf)
 
 # Initial Motion planner on Linear Model
-if False:
+if True:
     opt = gp.Model("prob1")
     x_vars = opt.addMVar((N, sp_robot.n_x), lb=-np.inf, ub=np.inf, name="X")
     u_vars = opt.addMVar((N-1, sp_robot.n_u), lb=-np.inf, ub=np.inf, name="U")
@@ -115,10 +115,10 @@ if False:
     u_ff = u_vars.X
     alpha = alpha_vars.X
     # save x_ff and u_ff to a csv file
-    np.savez('stl_mapping/Planning/solutions/sp_solution_euler.npz', x_ff=x_ff, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
+    np.savez('stl_mapping/Planning/solutions/sp_solution_lin.npz', x_ff=x_ff, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
 else:
     # or load instead
-    data = np.load('stl_mapping/Planning/solutions/sp_solution_euler.npz')
+    data = np.load('stl_mapping/Planning/solutions/sp_solution_lin.npz')
     x_ff = data['x_ff']
     u_ff = data['u_ff']
     alpha = data['alpha']
@@ -144,7 +144,7 @@ u_ff = u_ff_converted
 plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
                       path="stl_mapping/Planning/figures/sp_trajectory.png")
 
-np.savez('stl_mapping/Planning/solutions/sp_solution_quat.npz', x_ff=x_ff, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
+np.savez('stl_mapping/Planning/solutions/sp_solution_nl.npz', x_ff=x_ff, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
 
 #TODO: 1. this is a valid conversion (Lin to non-lin) if the system (with zero roll) is differentially flat
 #TODO:    this means that this linear decoupling is valid, and x_ff and u_ff are valid for the nonlinear space robot
@@ -176,28 +176,31 @@ def u_fbl(x, u):
     from Utilities.rotations import q_enu_to_q_ned, quat_mult
     p, q, v, w = x[:3], x[3:7], x[7:10], x[10:13]
     p_ned = np.array([p[1], p[0], -p[2]])
-    q_R = R.from_quat(q, scalar_first=True)
-    q_ned = R_enu_to_ned * q_R * R_flu_to_frd
-    q_ned = q_ned.as_quat(scalar_first=True)  # convert to quaternion
+    q_ned = np.array([q[0], q[1], q[2], -q[3]])
+    # q_R = R.from_quat(q, scalar_first=True)
+    # q_ned = R_enu_to_ned * q_R * R_flu_to_frd
+    # q_ned = q_ned.as_quat(scalar_first=True)  # convert to quaternion
     print(f"p_ned: {p_ned}, q_ned: {q_ned}")
     v_ned = np.array([v[1], v[0], -v[2]])
-    w_frd = np.array([w[0], -w[1], -w[2]])
-    x_ned = np.concatenate((p_ned, q_ned, v_ned, w_frd))
+    v_frd = R.from_quat(q_ned, scalar_first=True).apply(v_ned)
+    w_frd = np.array([w[1], w[0], -w[2]])
+    x_ned = np.concatenate((p_ned, q_ned, v_frd, w_frd))
 
     fx_sp = sp_robot_nl.calculate_fx(x)
     gx_sp = sp_robot_nl.calculate_gx(x)
     dx_sp = fx_sp + gx_sp@u
     #! Now [dp: NED, dq:FRD->NED, dv:FRD, dw:FRD] to [dp: ENU, dq:FLU->ENU, dv:FLU, dw:FLU]
     dp, dq, dv, dw = dx_sp[:3], dx_sp[3:7], dx_sp[7:10], dx_sp[10:13]
-    dp_ned = np.array([dp[0], -dp[1], -dp[2]])
-    dq_ned = np.array([dq[0], dq[1], -dq[2], -dq[3]])
-    dv_ned = np.array([dv[0], -dv[1], -dv[2]])
-    dw_frd = np.array([dw[0], -dw[1], -dw[2]])
-    dx_sp_ned = np.concatenate((dp_ned, dq_ned, dv_ned, dw_frd))
+    dp_enu = np.array([dp[1], dp[0], -dp[2]])
+    dq_enu = np.array([dq[0], dq[1], dq[2], -dq[3]])
+    dv_enu = np.array([dv[1], dv[0], -dv[2]])
+    dw_enu = np.array([dw[1], dw[0], -dw[2]])
+    dx_sp_enu = np.concatenate((dp_enu, dq_enu, dv_enu, dw_enu))
 
     fx_uw = uw_robot.calculate_fx(x_ned)
     gx_uw = uw_robot.calculate_gx(x_ned)
-    u_fbl = np.linalg.pinv(gx_uw)@(dx_sp_ned - fx_uw)
+    u_fbl = np.linalg.pinv(gx_uw)@(dx_sp_enu - fx_uw)
+    print(f"u: {u}, u_fbl: {u_fbl}")
     return u_fbl
 
 # x_test = np.array([0.5, 0, 0, 1, 0, 0, 0, 
