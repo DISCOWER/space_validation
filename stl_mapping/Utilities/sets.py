@@ -28,12 +28,12 @@ class HyperRectangle():
     def __init__(self, lower_bounds:np.ndarray, upper_bounds:np.ndarray):
         self.lower_bounds = lower_bounds
         self.upper_bounds = upper_bounds
-        assert len(self.lower_bounds) == len(self.upper_bounds), "Lower and upper bounds must have the same length."
-        assert np.all(self.lower_bounds <= self.upper_bounds), "Lower bounds must be less than or equal to upper bounds."
-        self.dim = len(self.lower_bounds)
+        # assert len(self.lower_bounds) == len(self.upper_bounds), "Lower and upper bounds must have the same length."
+        # assert np.all(self.lower_bounds <= self.upper_bounds), "Lower bounds must be less than or equal to upper bounds."
+        # self.dim = len(self.lower_bounds)
         self.center = (self.lower_bounds + self.upper_bounds) / 2
         self.size = self.upper_bounds - self.lower_bounds
-        self.volume = np.prod(self.size)
+        # self.volume = np.prod(self.size)
 
         # obtain the inequalities of the hyperrectangle in the form of Ax <= b
         self.A = np.array([[-1, 0],
@@ -46,19 +46,19 @@ class HyperRectangle():
                            self.upper_bounds[1]])
 
     def sum(self, other):
-        assert self.dim == other.dim, "Hyperrectangles must have the same dimension."
+        # assert self.dim == other.dim, "Hyperrectangles must have the same dimension."
         new_lower_bounds = self.lower_bounds + other.lower_bounds
         new_upper_bounds = self.upper_bounds + other.upper_bounds
         return HyperRectangle(new_lower_bounds, new_upper_bounds)
 
     def subtract(self, other):
-        assert self.dim == other.dim, "Hyperrectangles must have the same dimension."
+        # assert self.dim == other.dim, "Hyperrectangles must have the same dimension."
         new_lower_bounds = self.lower_bounds - other.lower_bounds
         new_upper_bounds = self.upper_bounds - other.upper_bounds
         return HyperRectangle(new_lower_bounds, new_upper_bounds)
     
     def divide(self, other):
-        assert self.dim == other.dim, "Hyperrectangles must have the same dimension."
+        # assert self.dim == other.dim, "Hyperrectangles must have the same dimension."
         new_lower_bounds = self.lower_bounds / other.lower_bounds
         new_upper_bounds = self.upper_bounds / other.upper_bounds
         return new_lower_bounds

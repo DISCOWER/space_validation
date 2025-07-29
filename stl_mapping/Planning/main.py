@@ -207,13 +207,13 @@ def u_fbl(x, u):
     fx_uw = uw_robot.calculate_fx(x_ned)
     gx_uw = uw_robot.calculate_gx(x_ned)
     u_fbl = np.linalg.pinv(gx_uw)@(dx_sp_ned - fx_uw)
-    print(f"u: {u}, u_fbl: {u_fbl}")
+    # print(f"u: {u}, u_fbl: {u_fbl}")
     return u_fbl
 
 
-x_ff = copy.deepcopy(x_ff[0, :])
+x_ff_i = copy.deepcopy(x_ff[0, :])
 #! Convert [p: ENU, q:FLU->ENU, v:ENU, w:FLU] to [p: NED, q:FRD->NED, v:FRD, w:FRD]
-p, q, v, w = x_ff[:3], x_ff[3:7], x_ff[7:10], x_ff[10:13]
+p, q, v, w = x_ff_i[:3], x_ff_i[3:7], x_ff_i[7:10], x_ff_i[10:13]
 p_ned = np.array([p[1], p[0], -p[2]])
 q_ned = 1/np.sqrt(2) * np.array([q[0] + q[3], q[1] + q[2], q[1] - q[2], q[0] - q[3]])
 q_ned = q_ned / np.linalg.norm(q_ned)  # normalize quaternion
@@ -235,15 +235,14 @@ for i in range(N-1):
     v_ned = R_q.apply(v)
     v_enu = np.array([v_ned[1], v_ned[0], -v_ned[2]])
     w_enu = np.array([w[0], -w[1], -w[2]])
-    x_ff = np.concatenate((p_enu, q_enu, v_enu, w_enu))
+    x_ff_i = np.concatenate((p_enu, q_enu, v_enu, w_enu))
 
     #TODO: x into u_fbl should be in FF frame convention
     #TODO: x into the step function should be in BR frame convention
-    u_uw = u_fbl(x_ff, u_ff[i, :])
+    u_uw = u_fbl(x_ff_i, u_ff[i, :])
     x_uw = uw_robot.step(x_uw, u_uw, dt)
-    # re-normalize the quaternion
     x_uw[3:7] /= np.linalg.norm(x_uw[3:7])
-    print(f"q: {x_uw[3:7]}")
+    # print(f"q: {x_uw[3:7]}")
     x_uw_fbl_sp[i+1, :] = x_uw
     u_uw_fbl_sp[i, :] = u_uw
 
@@ -266,6 +265,15 @@ print(f"U should become {np.max(u_max)/alpha} for same alpha (was {uw_robot.U.up
 
 
 
+uw_robot = BlueROV(iX=cs.SX)
+# call compute_K a bunch of times with different states to check what the values are
+for i in range(1):
+    print(f"D: {uw_robot.D.lower_bounds}")
+    print(f"U: {uw_robot.U.lower_bounds}")
+    # print(f"U: {uw_robot.U}")
+    print(f"gx: {uw_robot.calculate_gx(np.random.rand(13))}")
+
+    print(f"K: {uw_robot.calculate_K(np.random.rand(13))}")
 
 
 #TODO: now we either solve the time-scaling of trajectory and control input
@@ -287,14 +295,17 @@ if True:
     ocp.set_initial(u_vars, u_uw_fbl_sp.T)
     ocp.set_initial(dt_vars, 0.5)
 
-    ocp.subject_to(dt_vars >= 0)
+    ocp.subject_to(0.1 <= dt_vars)
+    ocp.subject_to(dt_vars <= dt)
     ocp.subject_to(delta >= 0)
 
     for i in range(N):
-        # ocp.subject_to(u_vars[:,i] >= alpha * uw_robot.calculate_U_effective(x_vars[:,i]).lower_bounds)
-        # ocp.subject_to(u_vars[:,i] <= alpha * uw_robot.calculate_U_effective(x_vars[:,i]).upper_bounds)
-        ocp.subject_to(u_vars[:,i] >= u_fbl_cs(x_vars[:,i], alpha*uw_robot.calculate_U_effective(x_vars[:,i]).lower_bounds).squeeze())
-        ocp.subject_to(u_vars[:,i] <= u_fbl_cs(x_vars[:,i], alpha*uw_robot.calculate_U_effective(x_vars[:,i]).upper_bounds).squeeze())
+        # ocp.subject_to(u_vars[:,i] >= alpha * uw_robot.U.lower_bounds)
+        # ocp.subject_to(u_vars[:,i] <= alpha * uw_robot.U.upper_bounds)
+        ocp.subject_to(u_vars[:,i] >= alpha * uw_robot.calculate_U_effective(x_vars[:,i]).lower_bounds)
+        ocp.subject_to(u_vars[:,i] <= alpha * uw_robot.calculate_U_effective(x_vars[:,i]).upper_bounds)
+        # ocp.subject_to(u_vars[:,i] >= u_fbl_cs(x_vars[:,i], alpha*uw_robot.calculate_U_effective(x_vars[:,i]).lower_bounds).squeeze())
+        # ocp.subject_to(u_vars[:,i] <= u_fbl_cs(x_vars[:,i], alpha*uw_robot.calculate_U_effective(x_vars[:,i]).upper_bounds).squeeze())
 
     # constraints
     for i in range(N-1):
