@@ -42,6 +42,14 @@ def quat_mult(q1, q2):
             q1[0]*q2[3] + q1[1]*q2[2] - q1[2]*q2[1] + q1[3]*q2[0]
         )
 
+def quat_mult_np(q1, q2):
+    return np.array([
+        q1[0]*q2[0] - q1[1]*q2[1] - q1[2]*q2[2] - q1[3]*q2[3],
+        q1[0]*q2[1] + q1[1]*q2[0] + q1[2]*q2[3] - q1[3]*q2[2],
+        q1[0]*q2[2] - q1[1]*q2[3] + q1[2]*q2[0] + q1[3]*q2[1],
+        q1[0]*q2[3] + q1[1]*q2[2] - q1[2]*q2[1] + q1[3]*q2[0]
+    ])
+
 def v_dot_q(v, q):
     rot_mat = q_to_rot_mat_cs(q)
     return cs.mtimes(rot_mat, v)

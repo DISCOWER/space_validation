@@ -9,3 +9,13 @@ Numpy, Scipy, Casadi, Gurobi and some basic stuff.
 # Steps
 1. Clone repo
 2. `git submodule init`
+
+# Steps for space
+1. in `PX4-Autopilot`, run command `PX4_UXRCE_DDS_NS=snap make px4_sitl_spacecraft gz_atmos`
+2. start microros with `micro-xrce-dds-agent udp4 -p 8888`
+3. start QGC with `./startQGC`
+
+# Steps for uw
+1. in `PX4-Autopilot`, run command `PX4_UXRCE_DDS_NS=snap make px4_sitl_uuw gz_uuv_bluerov2_heavy`
+2. start microros with `micro-xrce-dds-agent udp4 -p 8888`
+3. start QGC with `./startQGC`

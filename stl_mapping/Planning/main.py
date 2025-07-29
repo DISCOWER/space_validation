@@ -40,20 +40,20 @@ X0 = HyperRectangle(np.array([0.5, 0, 0]), np.array([0.6, 0.1, 0.1]))
 Xf = HyperRectangle(np.array([2.5, 1.0, 0]), np.array([2.6, 1.1, 0.1]))
 # XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8]))
 # later converted to polytopes for predicates of the form Ax \leq b: Polytope = (A,b)
-# XA = HyperRectangle(np.array([2.5, -1.0, 0]), np.array([2.6, -0.9, 0.1]))
-XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8, -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8, -np.pi/2+np.pi/8]))
+XA = HyperRectangle(np.array([2.5, -1.0, 0]), np.array([2.6, -0.9, 0.1]))
+# XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8, -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8, -np.pi/2+np.pi/8]))
 Obs = []
 World = HyperRectangle(np.array([0, -1.5, -10, -10]), np.array([4, 1.5, 10, 10]))
 phi = Pred("AND", preds=[
     Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)], dims=[0,1,2])]),
     Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1,2])]),
-    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2, 3, 5])]),
+    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2])]),
     Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)], dims=[0,1,6,7])]),
 ])
 spec = Spec(phi, t0, tf)
 
 # Initial Motion planner on Linear Model
-if True:
+if False:
     opt = gp.Model("prob1")
     x_vars = opt.addMVar((N, sp_robot.n_x), lb=-np.inf, ub=np.inf, name="X")
     u_vars = opt.addMVar((N-1, sp_robot.n_u), lb=-np.inf, ub=np.inf, name="U")
@@ -146,9 +146,14 @@ plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, [XA], Obs, alpha=alpha
 
 np.savez('stl_mapping/Planning/solutions/sp_solution_nl.npz', x_ff=x_ff, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
 
-#TODO: 1. this is a valid conversion (Lin to non-lin) if the system (with zero roll) is differentially flat
+#TODO: 1. this is a valid conversion (Lin to non-lin) if the system (with zero roll) is differentially flat?
 #TODO:    this means that this linear decoupling is valid, and x_ff and u_ff are valid for the nonlinear space robot
 #TODO:    CHECK THIS!
+
+
+
+
+
 
 
 
@@ -160,6 +165,9 @@ sp_robot_nl = FreeFlyer()
 
 #TODO: 1. fix the BlueRov model such that it behaves equal to David's model (yaw and pitch seem wrong)
 #TODO: 2. fix frame conversions for feedback linearization (below)
+R_frd_to_flu = R.from_quat(np.array([0, 1, 0, 0]), scalar_first=True) # 180 degrees rotation around x
+R_enu_to_ned = R.from_quat((1/np.sqrt(2))*np.array([0, 1, 1, 0]), scalar_first=True) # 90 degrees rotation around z
+
 def u_fbl(x, u):
     '''
     Feedback linearization control for the underwater robot
@@ -169,57 +177,75 @@ def u_fbl(x, u):
     Returns:
         u_fbl: control input for the space robot in ENU body frame
     '''
-    R_enu_to_ned = R.from_quat(np.array([0, 1, 0, 0]), scalar_first=True) # 180 degrees rotation around x
-    R_flu_to_frd = R.from_matrix(np.array([[0, 1, 0], [1, 0, 0], [0, 0, -1]])) # 90 degrees rotation around z
-
-    #! Convert [p: ENU, q:FLU->ENU, v:ENU, w:FLU] to [p: NED, q:FRD->NED, v:FRD, w:FRD]
-    from Utilities.rotations import q_enu_to_q_ned, quat_mult
     p, q, v, w = x[:3], x[3:7], x[7:10], x[10:13]
-    p_ned = np.array([p[1], p[0], -p[2]])
-    q_ned = np.array([q[0], q[1], q[2], -q[3]])
-    # q_R = R.from_quat(q, scalar_first=True)
-    # q_ned = R_enu_to_ned * q_R * R_flu_to_frd
-    # q_ned = q_ned.as_quat(scalar_first=True)  # convert to quaternion
-    print(f"p_ned: {p_ned}, q_ned: {q_ned}")
-    v_ned = np.array([v[1], v[0], -v[2]])
-    v_frd = R.from_quat(q_ned, scalar_first=True).apply(v_ned)
-    w_frd = np.array([w[1], w[0], -w[2]])
-    x_ned = np.concatenate((p_ned, q_ned, v_frd, w_frd))
+    R_q = R.from_quat(q, scalar_first=True)
 
     fx_sp = sp_robot_nl.calculate_fx(x)
     gx_sp = sp_robot_nl.calculate_gx(x)
     dx_sp = fx_sp + gx_sp@u
-    #! Now [dp: NED, dq:FRD->NED, dv:FRD, dw:FRD] to [dp: ENU, dq:FLU->ENU, dv:FLU, dw:FLU]
+
+    from Utilities.rotations import quat_mult_np
+    #! Now [dp: ENU, dq:FLU->ENU, dv: ENU, dw:FLU] to [dp: NED, dq:FRD->NED, dv:FRD, dw:FRD] 
     dp, dq, dv, dw = dx_sp[:3], dx_sp[3:7], dx_sp[7:10], dx_sp[10:13]
-    dp_enu = np.array([dp[1], dp[0], -dp[2]])
-    dq_enu = np.array([dq[0], dq[1], dq[2], -dq[3]])
-    dv_enu = np.array([dv[1], dv[0], -dv[2]])
-    dw_enu = np.array([dw[1], dw[0], -dw[2]])
-    dx_sp_enu = np.concatenate((dp_enu, dq_enu, dv_enu, dw_enu))
+    dp_ned = np.array([dp[1], dp[0], -dp[2]])
+    dq_ned = 1/np.sqrt(2) * np.array([dq[0] + dq[3], dq[1] + dq[2], dq[1] - dq[2], dq[0] - dq[3]])
+    dv_flu = R_q.inv().apply(dv)
+    dv_frd = np.array([dv_flu[0], -dv_flu[1], -dv_flu[2]])
+    dw_frd = np.array([dw[0], -dw[1], -dw[2]])
+    dx_sp_ned = np.concatenate((dp_ned, dq_ned, dv_frd, dw_frd))
+
+    #! Convert [p: ENU, q:FLU->ENU, v:ENU, w:FLU] to [p: NED, q:FRD->NED, v:FRD, w:FRD]
+    p, q, v, w = x[:3], x[3:7], x[7:10], x[10:13]
+    p_ned = np.array([p[1], p[0], -p[2]])
+    q_ned = 1/np.sqrt(2) * np.array([q[0] + q[3], q[1] + q[2], q[1] - q[2], q[0] - q[3]])
+    q_ned = q_ned / np.linalg.norm(q_ned)  # normalize quaternion
+    v_flu = R_q.inv().apply(v)
+    v_frd = np.array([v_flu[0], -v_flu[1], -v_flu[2]])
+    w_frd = np.array([w[0], -w[1], -w[2]])
+    x_ned = np.concatenate((p_ned, q_ned, v_frd, w_frd))
 
     fx_uw = uw_robot.calculate_fx(x_ned)
     gx_uw = uw_robot.calculate_gx(x_ned)
-    u_fbl = np.linalg.pinv(gx_uw)@(dx_sp_enu - fx_uw)
+    u_fbl = np.linalg.pinv(gx_uw)@(dx_sp_ned - fx_uw)
     print(f"u: {u}, u_fbl: {u_fbl}")
     return u_fbl
 
-# x_test = np.array([0.5, 0, 0, 1, 0, 0, 0, 
-#                    1, 0, 0, 
-#                    0, 0, 0])
-# u_test = np.array([0, 0, 0, 0, 0, 0])
-# u_fbl_test = u_fbl(x_test, u_test)
 
-x = copy.deepcopy(x_ff[0, :])
+x_ff = copy.deepcopy(x_ff[0, :])
+#! Convert [p: ENU, q:FLU->ENU, v:ENU, w:FLU] to [p: NED, q:FRD->NED, v:FRD, w:FRD]
+p, q, v, w = x_ff[:3], x_ff[3:7], x_ff[7:10], x_ff[10:13]
+p_ned = np.array([p[1], p[0], -p[2]])
+q_ned = 1/np.sqrt(2) * np.array([q[0] + q[3], q[1] + q[2], q[1] - q[2], q[0] - q[3]])
+q_ned = q_ned / np.linalg.norm(q_ned)  # normalize quaternion
+v_flu = R.from_quat(q, scalar_first=True).inv().apply(v)
+v_frd = np.array([v_flu[0], -v_flu[1], -v_flu[2]])
+w_frd = np.array([w[0], -w[1], -w[2]])
+x_uw = np.concatenate((p_ned, q_ned, v_frd, w_frd))
+
 x_uw_fbl_sp = np.zeros((N, sp_robot_nl.n_x))
-x_uw_fbl_sp[0, :] = x
+x_uw_fbl_sp[0, :] = x_uw
 u_uw_fbl_sp = np.zeros((N, sp_robot_nl.n_u))
 for i in range(N-1):
-    u = u_fbl(x, u_ff[i, :])
-    x = uw_robot.step(x, u, dt)
-    x = np.array(x).squeeze()
-    u = np.array(u).squeeze()
-    x_uw_fbl_sp[i+1, :] = x
-    u_uw_fbl_sp[i, :] = u
+    #! Convert [p: NED, q:FRD->NED, v:FRD, w:FRD] to [p: ENU, q:FLU->ENU, v:ENU, w:FLU]
+    p, q, v, w = x_uw[:3], x_uw[3:7], x_uw[7:10], x_uw[10:13]
+    R_q = R.from_quat(q, scalar_first=True)
+    p_enu = np.array([p[1], p[0], -p[2]])
+    q_enu = 1/np.sqrt(2) * np.array([q[0] + q[3], q[1] + q[2], q[1] - q[2], q[0] - q[3]])
+    q_enu = q_enu / np.linalg.norm(q_enu)  # normalize quaternion
+    v_ned = R_q.apply(v)
+    v_enu = np.array([v_ned[1], v_ned[0], -v_ned[2]])
+    w_enu = np.array([w[0], -w[1], -w[2]])
+    x_ff = np.concatenate((p_enu, q_enu, v_enu, w_enu))
+
+    #TODO: x into u_fbl should be in FF frame convention
+    #TODO: x into the step function should be in BR frame convention
+    u_uw = u_fbl(x_ff, u_ff[i, :])
+    x_uw = uw_robot.step(x_uw, u_uw, dt)
+    # re-normalize the quaternion
+    x_uw[3:7] /= np.linalg.norm(x_uw[3:7])
+    print(f"q: {x_uw[3:7]}")
+    x_uw_fbl_sp[i+1, :] = x_uw
+    u_uw_fbl_sp[i, :] = u_uw
 
 # plot the trajectory
 plot_planning_results(uw_robot, t_sp, x_uw_fbl_sp, u_uw_fbl_sp, X0, Xf, [XA], Obs, alpha=alpha,
@@ -231,16 +257,16 @@ print(f"\nAlpha if u_fbl(x_sp,u_sp) applied to BlueROV directly: {np.max(u_max/u
 print(f"This is lower because BlueROV is faster than free flyer")
 print(f"U should become {np.max(u_max)/alpha} for same alpha (was {uw_robot.U.upper_bounds[0]}) which is {(np.max(u_max)/alpha)/uw_robot.U.upper_bounds[0]*100}%")
 
-# So now we have to find \phi (for now deltaT) such that
-# alpha for uw is equal to alpha for the free flyer
-# we have bilinear constraints so that is quite tricky but
-# we have good initial guesses regarding obstacle avoidance
 
-def u_fbl_cs(x, v):
-    fx_uw = uw_robot.fx(x)
-    gx_uw = uw_robot.gx(x)
-    u_fbl = cs.mtimes(cs.pinv(gx_uw), sp_robot_nl.fx(x) + cs.mtimes(sp_robot_nl.gx(x),v) - fx_uw)
-    return u_fbl
+
+
+
+
+
+
+
+
+
 
 #TODO: now we either solve the time-scaling of trajectory and control input
 #TODO: or we solve the optimization problem to make alpha equal, we need to figure out what is warranted
@@ -259,25 +285,23 @@ if True:
 
     ocp.set_initial(x_vars, x_uw_fbl_sp.T)
     ocp.set_initial(u_vars, u_uw_fbl_sp.T)
-    ocp.set_initial(dt_vars, 0.02)
+    ocp.set_initial(dt_vars, 0.5)
 
     ocp.subject_to(dt_vars >= 0)
     ocp.subject_to(delta >= 0)
 
     for i in range(N):
-        # ocp.subject_to(u_fbl_cs(x_vars[:,i],u_vars[:,i])[0:2] >= alpha*(uw_robot.U.lower_bounds[0:2]))
-        # ocp.subject_to(u_fbl_cs(x_vars[:,i],u_vars[:,i])[0:2] <= alpha*(uw_robot.U.upper_bounds[0:2]))
-        ocp.subject_to(u_vars[:,i] >= alpha * uw_robot.U.lower_bounds)
-        ocp.subject_to(u_vars[:,i] <= alpha * uw_robot.U.upper_bounds)
-        # ocp.subject_to(u_vars[:,i] >= alpha * u_fbl_cs(x_vars[:,i],uw_robot.U.lower_bounds))
-        # ocp.subject_to(u_vars[:,i] <= alpha * u_fbl_cs(x_vars[:,i],uw_robot.U.upper_bounds))
+        # ocp.subject_to(u_vars[:,i] >= alpha * uw_robot.calculate_U_effective(x_vars[:,i]).lower_bounds)
+        # ocp.subject_to(u_vars[:,i] <= alpha * uw_robot.calculate_U_effective(x_vars[:,i]).upper_bounds)
+        ocp.subject_to(u_vars[:,i] >= u_fbl_cs(x_vars[:,i], alpha*uw_robot.calculate_U_effective(x_vars[:,i]).lower_bounds).squeeze())
+        ocp.subject_to(u_vars[:,i] <= u_fbl_cs(x_vars[:,i], alpha*uw_robot.calculate_U_effective(x_vars[:,i]).upper_bounds).squeeze())
 
     # constraints
     for i in range(N-1):
         ocp.subject_to(x_vars[:,i+1] == uw_robot.step(x_vars[:,i], u_vars[:,i], dt_vars))
     
     # enforce position equality with the free flyer
-    n_equal = 7 # first n_equal states 
+    n_equal = 7 # first n_equal states: [p,q]
     for i in range(N):
         # ocp.subject_to(x_vars[0:n_equal,i] == x_uw_fbl_sp[i,0:n_equal])
         ocp.subject_to(x_vars[0:n_equal,i] <= x_uw_fbl_sp[i,0:n_equal] + delta* np.ones(n_equal))

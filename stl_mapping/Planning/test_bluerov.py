@@ -83,7 +83,7 @@ def run_simulation(t_span, x0, dt, blueROV:BlueROV):
     data[:nx,0] = x0
     data[nx:,0] = u
 
-    in_ENU = True
+    in_ENU = False
     frame_message_printed = False
 
     for i in range(n_sim-1):

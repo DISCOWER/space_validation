@@ -124,11 +124,10 @@ class LinearFreeFlyer6DoF(Robot):
         max_torque = 0.714
         scale_thrust = 2/3
         scale_torque = 1/3
-        u_max = np.concatenate([
-            np.array([max_thrust]*3) * scale_thrust,
-            np.array([max_torque]*3) * scale_torque
-        ])
-        self.U = HyperRectangle(-u_max, u_max)
+        self.U = HyperRectangle(
+            np.array([-scale_thrust*max_thrust]*3 + [-scale_torque*max_torque]*3),
+            np.array([scale_thrust*max_thrust]*3 + [scale_torque*max_torque]*3)
+        )
         max_floor_force = (36*self.mass)/1000
         self.D = HyperRectangle(np.array(3*[-max_floor_force]),np.array(3*[max_floor_force]))
 
@@ -138,7 +137,6 @@ class LinearFreeFlyer6DoF(Robot):
             self.K@self.D.lower_bounds,
             self.K@self.D.upper_bounds
         )
-
         self.U_effective = self.U.subtract(self.KD)
 
     def calculate_fx(self,x):
@@ -181,15 +179,69 @@ class FreeFlyer(Robot):
         # dynamics in the form: dx = f(x) + g(x)u
         self.mass = 16.8 #(16.8: empty, 17.8: full)  # kg
         self.inertia = np.diag((0.1454, 0.1366, 0.1594))
-        self.max_thrust = 1.
-        self.max_torque = 0.5
-
+        max_thrust = 2.125
+        max_torque = 0.714
+        scale_thrust = 2/3
+        scale_torque = 1/3
         self.U = HyperRectangle(
-            np.array([-self.max_thrust]*3 + [-self.max_torque]*3),
-            np.array([self.max_thrust]*3 + [self.max_torque]*3)
+            np.array([-scale_thrust*max_thrust]*3 + [-scale_torque*max_torque]*3),
+            np.array([scale_thrust*max_thrust]*3 + [scale_torque*max_torque]*3)
         )
+
         self.create_fx()
         self.create_gx()
+        self.create_cx()
+
+        # TODO: deal with the fact that K and D are not of same dimension
+        max_floor_force = (36*self.mass)/1000
+        max_floor_torque = 0.01 #?
+        self.D = HyperRectangle(
+            np.array(3*[-max_floor_force] + 3*[-max_floor_torque]),
+            np.array(3*[max_floor_force] + 3*[max_floor_torque])
+        )
+        self.create_K()
+        self.create_U_effective()
+
+        
+    def create_K(self):
+        if not hasattr(self, '_K_sym'):
+            p = cs.SX.sym('p', 3)
+            q = cs.SX.sym('q', 4)
+            v = cs.SX.sym('v', 3)
+            w = cs.SX.sym('w', 3)
+            self._K_sym = cs.Function('K', [p, q, v, w],
+                [
+                    cs.pinv(self.calculate_gx(cs.vertcat(p, q, v, w))) @ self.calculate_cx(cs.vertcat(p, q, v, w))
+                ]
+            )
+    def calculate_K(self, x):
+        p, q, v, w = x[0:3], x[3:7], x[7:10], x[10:13]
+        if isinstance(p, np.ndarray):
+            return np.array(self._K_sym(p, q, v, w)).reshape((self.n_u, self.n_x))
+        else:
+            return self._K_sym(p, q, v, w)
+
+
+    def create_U_effective(self):
+        if not hasattr(self, '_U_effective_sym'):
+            p = cs.SX.sym('p', 3)
+            q = cs.SX.sym('q', 4)
+            v = cs.SX.sym('v', 3)
+            w = cs.SX.sym('w', 3)
+            self._U_effective_sym = cs.Function('U_effective', [p, q, v, w],
+                [
+                    self.U.lower_bounds - self._K_sym(p, q, v, w)@self.D.lower_bounds,
+                    self.U.upper_bounds - self._K_sym(p, q, v, w)@self.D.upper_bounds
+                ]
+            )
+    def calculate_U_effective(self, x):
+        p, q, v, w = x[0:3], x[3:7], x[7:10], x[10:13]
+        lb, ub = self._U_effective_sym(p, q, v, w)
+        if isinstance(x, np.ndarray):
+            return HyperRectangle(np.array(lb), np.array(ub))
+        else:
+            return HyperRectangle(lb, ub)
+
 
     def create_fx(self):
         if not hasattr(self, '_fx_sym'):
@@ -220,6 +272,7 @@ class FreeFlyer(Robot):
         else:
             return self._fx_sym(p, q, v, w)
     
+
     def create_gx(self):
         if not hasattr(self, '_gx_sym'):
             p = cs.SX.sym('p', 3)
@@ -248,3 +301,24 @@ class FreeFlyer(Robot):
             return np.array(self._gx_sym(p, q, v, w)).reshape((self.n_x, self.n_u))
         else:
             return self._gx_sym(p, q, v, w)
+        
+
+    def create_cx(self):
+        if not hasattr(self, '_cx_sym'):
+            p = cs.SX.sym('p', 3)
+            q = cs.SX.sym('q', 4)
+            v = cs.SX.sym('v', 3)
+            w = cs.SX.sym('w', 3)
+            cx = cs.SX.zeros((13,6))
+            cx[6:12, :] = cs.SX.eye(6)
+            self._cx_sym = cs.Function('cx', [p, q, v, w],
+                [
+                    cx
+                ]
+            )
+    def calculate_cx(self, x):
+        p, q, v, w = x[0:3], x[3:7], x[7:10], x[10:13]
+        if isinstance(p, np.ndarray):
+            return np.array(self._cx_sym(p, q, v, w)).reshape((self.n_u, self.n_x))
+        else:
+            return self._cx_sym(p, q, v, w)
