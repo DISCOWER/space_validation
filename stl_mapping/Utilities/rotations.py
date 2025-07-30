@@ -34,21 +34,6 @@ def q_to_rot_mat_np(q):
     ])
     return rot_mat
 
-def quat_mult(q1, q2):
-    return cs.vertcat(
-            q1[0]*q2[0] - q1[1]*q2[1] - q1[2]*q2[2] - q1[3]*q2[3],
-            q1[0]*q2[1] + q1[1]*q2[0] + q1[2]*q2[3] - q1[3]*q2[2],
-            q1[0]*q2[2] - q1[1]*q2[3] + q1[2]*q2[0] + q1[3]*q2[1],
-            q1[0]*q2[3] + q1[1]*q2[2] - q1[2]*q2[1] + q1[3]*q2[0]
-        )
-
-def quat_mult_np(q1, q2):
-    return np.array([
-        q1[0]*q2[0] - q1[1]*q2[1] - q1[2]*q2[2] - q1[3]*q2[3],
-        q1[0]*q2[1] + q1[1]*q2[0] + q1[2]*q2[3] - q1[3]*q2[2],
-        q1[0]*q2[2] - q1[1]*q2[3] + q1[2]*q2[0] + q1[3]*q2[1],
-        q1[0]*q2[3] + q1[1]*q2[2] - q1[2]*q2[1] + q1[3]*q2[0]
-    ])
 
 def v_dot_q(v, q):
     rot_mat = q_to_rot_mat_cs(q)
@@ -112,26 +97,6 @@ def quat_to_euler_cs(q):
 
     return cs.vertcat(roll, pitch, yaw)
 
-def quat_to_euler_np(q,order='zyz'):
-    """
-    Convert quaternion (qw, qx, qy, qz) to Euler angles (roll, pitch, yaw).
-    Angles are in radians.
-    """
-    q = R.from_quat(q, scalar_first=True)  # convert to scipy Rotation object
-    euler = q.as_euler(order, degrees=False)  # returns (
-    return euler
-
-def quat_x_to_euler_x_np(x, order='zyz'):
-    # assumes x = [p, q, dp, dq]
-    euler_x = np.concatenate((
-        x[0:3],                   # position
-        quat_to_euler_np(x[3:7], order=order),    # euler angles
-        x[7:10],                  # linear velocity
-        x[10:13]                  # angular velocity
-    ))
-    return euler_x
-
-
 def euler_x_to_quat_x_np(x,order='zyx'):
     # assumes x = [p, q, dp, dq]
     p, q, dp, dq = x[0:3], x[3:6], x[6:9], x[9:12]
@@ -143,76 +108,36 @@ def euler_x_to_quat_x_np(x,order='zyx'):
     ))
     return quat_x
 
-def ned_to_enu(pos_ned, quat_ned):
-    """
-    Convert position and quaternion from NED to ENU frame.
-    
-    Parameters:
-        pos_ned (np.ndarray): Position in NED frame.
-        quat_ned (np.ndarray): Quaternion in NED frame.
-    
-    Returns:
-        tuple: Position and quaternion in ENU frame.
-    """
-    T = np.array([
-        [0, 1, 0],
-        [1, 0, 0],
-        [0, 0, -1]
-    ])
-    pos_enu = T @ pos_ned
-    r_ned = R.from_quat(quat_ned)
-    r_enu = T @ r_ned.as_matrix() @ T.T
-    quat_enu = R.from_matrix(r_enu).as_quat()
-    return pos_enu, quat_enu
+def x_ff_to_x_uw(x_ff, normalize_quat=True):
+    #! Convert [p: ENU, q:FLU->ENU, v:ENU, w:FLU] to [p: NED, q:FRD->NED, v:FRD, w:FRD]
+    p, q, v, w = x_ff[0:3], x_ff[3:7], x_ff[7:10], x_ff[10:13]
+    p_ned = np.array([p[1], p[0], -p[2]])
+    q_ned = 1/np.sqrt(2) * np.array([q[0] + q[3], q[1] + q[2], q[1] - q[2], q[0] - q[3]])
+    if normalize_quat:
+        q_ned = q_ned / np.linalg.norm(q_ned)  # normalize quaternion
+    v_flu = R.from_quat(q, scalar_first=True).inv().apply(v)
+    v_frd = np.array([v_flu[0], -v_flu[1], -v_flu[2]])
+    w_frd = np.array([w[0], -w[1], -w[2]])
+    x_uw = np.concatenate((p_ned, q_ned, v_frd, w_frd))
+    return x_uw
 
-def enu_to_ned(pos_enu, quat_enu):
-    """
-    Convert position and quaternion from ENU to NED frame.
-    
-    Parameters:
-        pos_enu (np.ndarray): Position in ENU frame.
-        quat_enu (np.ndarray): Quaternion in ENU frame.
-    
-    Returns:
-        tuple: Position and quaternion in NED frame.
-    """
-    T = np.array([
-        [0, 1, 0],
-        [1, 0, 0],
-        [0, 0, -1]
-    ])
-    pos_ned = T @ pos_enu
-    r_enu = R.from_quat(quat_enu, scalar_first=True)
-    r_ned = T @ r_enu.as_matrix() @ T.T
-    quat_ned = R.from_matrix(r_ned).as_quat(scalar_first=True)
-    return pos_ned, quat_ned
+def x_uw_to_x_ff(x_uw, normalize_quat=True):
+    #! Convert [p: NED, q:FRD->NED, v:FRD, w:FRD] to [p: ENU, q:FLU->ENU, v:ENU, w:FLU]
+    p, q, v, w = x_uw[:3], x_uw[3:7], x_uw[7:10], x_uw[10:13]
+    p_enu = np.array([p[1], p[0], -p[2]])
+    q_enu = 1/np.sqrt(2) * np.array([q[0] + q[3], q[1] + q[2], q[1] - q[2], q[0] - q[3]])
+    if normalize_quat:
+        q_enu = q_enu / np.linalg.norm(q_enu)  # normalize quaternion
+    v_ned = R.from_quat(q, scalar_first=True).apply(v)
+    v_enu = np.array([v_ned[1], v_ned[0], -v_ned[2]])
+    w_enu = np.array([w[0], -w[1], -w[2]])
+    x_ff = np.concatenate((p_enu, q_enu, v_enu, w_enu))
+    return x_ff
 
-def u_enu_to_ned(u):
-    """
-    Convert control inputs from ENU to NED frame.
-    
-    Parameters:
-        u (np.ndarray): Control inputs in ENU frame.
-    
-    Returns:
-        np.ndarray: Control inputs in NED frame.
-    """
-    T = np.diag([1, -1, -1, 1, -1, -1])
-    u_ned = T @ u
-    return u_ned
-
-def q_ned_to_q_enu(q_ned):
-        # Convert NED quaternion to ENU quaternion
-        # q is in the form (qw, qx, qy, qz) and describes the rotation from body frame to global frame
-        # Yes, NED <-> ENU  is symmetric
-        q_enu = 1/np.sqrt(2) * np.array([q_ned[0] + q_ned[3], q_ned[1] + q_ned[2], q_ned[1] - q_ned[2], q_ned[0] - q_ned[3]])
-        q_enu /= np.linalg.norm(q_enu)
-        return q_enu.astype(float)
-    
-def q_enu_to_q_ned(q_enu):
-    # Convert ENU quaternion to NED quaternion
-    # q is in the form (qw, qx, qy, qz) and describes the rotation from body frame to global frame
-    # Yes, NED <-> ENU  is symmetric
-    q_ned = 1/np.sqrt(2) * np.array([q_enu[0] + q_enu[3], q_enu[1] + q_enu[2], q_enu[1] - q_enu[2], q_enu[0] - q_enu[3]])
-    q_ned /= np.linalg.norm(q_ned)
-    return q_ned.astype(float)
+def quat_mult(q1, q2):
+    return cs.vertcat(
+            q1[0]*q2[0] - q1[1]*q2[1] - q1[2]*q2[2] - q1[3]*q2[3],
+            q1[0]*q2[1] + q1[1]*q2[0] + q1[2]*q2[3] - q1[3]*q2[2],
+            q1[0]*q2[2] - q1[1]*q2[3] + q1[2]*q2[0] + q1[3]*q2[1],
+            q1[0]*q2[3] + q1[1]*q2[2] - q1[2]*q2[1] + q1[3]*q2[0]
+        )

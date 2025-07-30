@@ -15,9 +15,8 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
 from Utilities.Robots import FreeFlyer, LinearFreeFlyer6DoF
 from Utilities.sets import HyperRectangle, Polytope
-from Utilities.rotations import quat_to_euler_np, quat_to_euler_cs, euler_to_quat_np, euler_to_quat_cs
-from Utilities.rotations import quat_x_to_euler_x_np, euler_x_to_quat_x_np
-from Utilities.rotations import enu_to_ned, ned_to_enu, u_enu_to_ned, enu_to_flu
+from Utilities.rotations import euler_to_quat_np, euler_to_quat_cs
+from Utilities.rotations import x_ff_to_x_uw, x_uw_to_x_ff
 from Utilities.stl import Pred, Spec, quant_parse_operator, OptProbItems
 from Utilities.plotting import plot_planning_results
 from Utilities.smarc_modelling.src.smarc_modelling.vehicles.BlueROV import BlueROV 
@@ -41,7 +40,6 @@ Xf = HyperRectangle(np.array([2.5, 1.0, 0]), np.array([2.6, 1.1, 0.1]))
 # XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8]))
 # later converted to polytopes for predicates of the form Ax \leq b: Polytope = (A,b)
 XA = HyperRectangle(np.array([2.5, -1.0, 0]), np.array([2.6, -0.9, 0.1]))
-# XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8, -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8, -np.pi/2+np.pi/8]))
 Obs = []
 World = HyperRectangle(np.array([0, -1.5, -10, -10]), np.array([4, 1.5, 10, 10]))
 phi = Pred("AND", preds=[
@@ -53,7 +51,7 @@ phi = Pred("AND", preds=[
 spec = Spec(phi, t0, tf)
 
 # Initial Motion planner on Linear Model
-if False:
+if True:
     opt = gp.Model("prob1")
     x_vars = opt.addMVar((N, sp_robot.n_x), lb=-np.inf, ub=np.inf, name="X")
     u_vars = opt.addMVar((N-1, sp_robot.n_u), lb=-np.inf, ub=np.inf, name="U")
@@ -165,10 +163,7 @@ sp_robot_nl = FreeFlyer()
 
 #TODO: 1. fix the BlueRov model such that it behaves equal to David's model (yaw and pitch seem wrong)
 #TODO: 2. fix frame conversions for feedback linearization (below)
-R_frd_to_flu = R.from_quat(np.array([0, 1, 0, 0]), scalar_first=True) # 180 degrees rotation around x
-R_enu_to_ned = R.from_quat((1/np.sqrt(2))*np.array([0, 1, 1, 0]), scalar_first=True) # 90 degrees rotation around z
-
-def u_fbl(x, u):
+def u_fbl(x_sp, u_sp):
     '''
     Feedback linearization control for the underwater robot
     Args:
@@ -177,73 +172,42 @@ def u_fbl(x, u):
     Returns:
         u_fbl: control input for the space robot in ENU body frame
     '''
-    p, q, v, w = x[:3], x[3:7], x[7:10], x[10:13]
-    R_q = R.from_quat(q, scalar_first=True)
+    fx_sp = sp_robot_nl.calculate_fx(x_sp)
+    gx_sp = sp_robot_nl.calculate_gx(x_sp)
+    dx_sp = fx_sp + gx_sp@u_sp
 
-    fx_sp = sp_robot_nl.calculate_fx(x)
-    gx_sp = sp_robot_nl.calculate_gx(x)
-    dx_sp = fx_sp + gx_sp@u
-
-    from Utilities.rotations import quat_mult_np
     #! Now [dp: ENU, dq:FLU->ENU, dv: ENU, dw:FLU] to [dp: NED, dq:FRD->NED, dv:FRD, dw:FRD] 
     dp, dq, dv, dw = dx_sp[:3], dx_sp[3:7], dx_sp[7:10], dx_sp[10:13]
     dp_ned = np.array([dp[1], dp[0], -dp[2]])
     dq_ned = 1/np.sqrt(2) * np.array([dq[0] + dq[3], dq[1] + dq[2], dq[1] - dq[2], dq[0] - dq[3]])
-    dv_flu = R_q.inv().apply(dv)
+    dv_flu = R.from_quat(x_sp[3:7], scalar_first=True).inv().apply(dv)
     dv_frd = np.array([dv_flu[0], -dv_flu[1], -dv_flu[2]])
     dw_frd = np.array([dw[0], -dw[1], -dw[2]])
     dx_sp_ned = np.concatenate((dp_ned, dq_ned, dv_frd, dw_frd))
 
-    #! Convert [p: ENU, q:FLU->ENU, v:ENU, w:FLU] to [p: NED, q:FRD->NED, v:FRD, w:FRD]
-    p, q, v, w = x[:3], x[3:7], x[7:10], x[10:13]
-    p_ned = np.array([p[1], p[0], -p[2]])
-    q_ned = 1/np.sqrt(2) * np.array([q[0] + q[3], q[1] + q[2], q[1] - q[2], q[0] - q[3]])
-    q_ned = q_ned / np.linalg.norm(q_ned)  # normalize quaternion
-    v_flu = R_q.inv().apply(v)
-    v_frd = np.array([v_flu[0], -v_flu[1], -v_flu[2]])
-    w_frd = np.array([w[0], -w[1], -w[2]])
-    x_ned = np.concatenate((p_ned, q_ned, v_frd, w_frd))
+    x_uw = x_ff_to_x_uw(x_sp)
 
-    fx_uw = uw_robot.calculate_fx(x_ned)
-    gx_uw = uw_robot.calculate_gx(x_ned)
+    fx_uw = uw_robot.calculate_fx(x_uw)
+    gx_uw = uw_robot.calculate_gx(x_uw)
     u_fbl = np.linalg.pinv(gx_uw)@(dx_sp_ned - fx_uw)
     # print(f"u: {u}, u_fbl: {u_fbl}")
     return u_fbl
 
 
 x_ff_i = copy.deepcopy(x_ff[0, :])
-#! Convert [p: ENU, q:FLU->ENU, v:ENU, w:FLU] to [p: NED, q:FRD->NED, v:FRD, w:FRD]
-p, q, v, w = x_ff_i[:3], x_ff_i[3:7], x_ff_i[7:10], x_ff_i[10:13]
-p_ned = np.array([p[1], p[0], -p[2]])
-q_ned = 1/np.sqrt(2) * np.array([q[0] + q[3], q[1] + q[2], q[1] - q[2], q[0] - q[3]])
-q_ned = q_ned / np.linalg.norm(q_ned)  # normalize quaternion
-v_flu = R.from_quat(q, scalar_first=True).inv().apply(v)
-v_frd = np.array([v_flu[0], -v_flu[1], -v_flu[2]])
-w_frd = np.array([w[0], -w[1], -w[2]])
-x_uw = np.concatenate((p_ned, q_ned, v_frd, w_frd))
+x_uw_i = x_ff_to_x_uw(x_ff_i)
 
 x_uw_fbl_sp = np.zeros((N, sp_robot_nl.n_x))
-x_uw_fbl_sp[0, :] = x_uw
+x_uw_fbl_sp[0, :] = x_uw_i
 u_uw_fbl_sp = np.zeros((N, sp_robot_nl.n_u))
 for i in range(N-1):
-    #! Convert [p: NED, q:FRD->NED, v:FRD, w:FRD] to [p: ENU, q:FLU->ENU, v:ENU, w:FLU]
-    p, q, v, w = x_uw[:3], x_uw[3:7], x_uw[7:10], x_uw[10:13]
-    R_q = R.from_quat(q, scalar_first=True)
-    p_enu = np.array([p[1], p[0], -p[2]])
-    q_enu = 1/np.sqrt(2) * np.array([q[0] + q[3], q[1] + q[2], q[1] - q[2], q[0] - q[3]])
-    q_enu = q_enu / np.linalg.norm(q_enu)  # normalize quaternion
-    v_ned = R_q.apply(v)
-    v_enu = np.array([v_ned[1], v_ned[0], -v_ned[2]])
-    w_enu = np.array([w[0], -w[1], -w[2]])
-    x_ff_i = np.concatenate((p_enu, q_enu, v_enu, w_enu))
+    x_ff_i = x_uw_to_x_ff(x_uw_i)
 
-    #TODO: x into u_fbl should be in FF frame convention
-    #TODO: x into the step function should be in BR frame convention
     u_uw = u_fbl(x_ff_i, u_ff[i, :])
-    x_uw = uw_robot.step(x_uw, u_uw, dt)
-    x_uw[3:7] /= np.linalg.norm(x_uw[3:7])
-    # print(f"q: {x_uw[3:7]}")
-    x_uw_fbl_sp[i+1, :] = x_uw
+    x_uw_i = uw_robot.step(x_uw_i, u_uw, dt)
+    x_uw_i[3:7] /= np.linalg.norm(x_uw_i[3:7])
+    # save state and control
+    x_uw_fbl_sp[i+1, :] = x_uw_i
     u_uw_fbl_sp[i, :] = u_uw
 
 # plot the trajectory
@@ -265,16 +229,15 @@ print(f"U should become {np.max(u_max)/alpha} for same alpha (was {uw_robot.U.up
 
 
 
-uw_robot = BlueROV(iX=cs.SX)
-# call compute_K a bunch of times with different states to check what the values are
-for i in range(1):
-    print(f"D: {uw_robot.D.lower_bounds}")
-    print(f"U: {uw_robot.U.lower_bounds}")
-    # print(f"U: {uw_robot.U}")
-    print(f"gx: {uw_robot.calculate_gx(np.random.rand(13))}")
+# uw_robot = BlueROV(iX=cs.SX)
+# # call compute_K a bunch of times with different states to check what the values are
+# for i in range(1):
+#     print(f"D: {uw_robot.D.lower_bounds}")
+#     print(f"U: {uw_robot.U.lower_bounds}")
+#     # print(f"U: {uw_robot.U}")
+#     print(f"gx: {uw_robot.calculate_gx(np.random.rand(13))}")
 
-    print(f"K: {uw_robot.calculate_K(np.random.rand(13))}")
-
+#     print(f"K: {uw_robot.calculate_K(np.random.rand(13))}")
 
 #TODO: now we either solve the time-scaling of trajectory and control input
 #TODO: or we solve the optimization problem to make alpha equal, we need to figure out what is warranted

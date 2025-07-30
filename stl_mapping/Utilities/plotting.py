@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from Utilities.rotations import quat_to_euler_np, euler_to_quat_np
+from Utilities.rotations import euler_to_quat_np
 
 def plot_planning_results(robot, t, x, u, 
                           X0=None, Xf=None, ROIs=None, Obs=None, alpha=1.0,

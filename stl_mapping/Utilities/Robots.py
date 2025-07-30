@@ -3,7 +3,7 @@ import casadi as cs
 import gurobipy as gp
 from Utilities.sets import HyperRectangle, Zonotope
 from Utilities.rotations import skew_symmetric_cs, skew_symmetric_np, q_to_rot_mat_cs, q_to_rot_mat_np
-from Utilities.rotations import euler_to_quat_cs, euler_to_quat_np, quat_to_euler_cs, quat_to_euler_np
+from Utilities.rotations import euler_to_quat_cs, euler_to_quat_np
 from Utilities.rotations import quat_mult
 from Utilities.sets import compute_K
 from Utilities.stl import OptProbItems
