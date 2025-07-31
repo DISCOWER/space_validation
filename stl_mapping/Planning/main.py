@@ -113,10 +113,10 @@ if True:
     u_ff = u_vars.X
     alpha = alpha_vars.X
     # save x_ff and u_ff to a csv file
-    np.savez('stl_mapping/Planning/solutions/sp_solution_lin.npz', x_ff=x_ff, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
+    np.savez('stl_mapping/Planning/solutions/atmos_solution_lin.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
 else:
     # or load instead
-    data = np.load('stl_mapping/Planning/solutions/sp_solution_lin.npz')
+    data = np.load('stl_mapping/Planning/solutions/atmos_solution_lin.npz')
     x_ff = data['x_ff']
     u_ff = data['u_ff']
     alpha = data['alpha']
@@ -140,9 +140,9 @@ u_ff = u_ff_converted
 
 # plot the trajectory
 plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
-                      path="stl_mapping/Planning/figures/sp_trajectory.png")
+                      path="stl_mapping/Planning/figures/atmos_trajectory.png")
 
-np.savez('stl_mapping/Planning/solutions/sp_solution_nl.npz', x_ff=x_ff, u_ff=u_ff, dt=dt, alpha=alpha, times=t_sp)
+np.savez('stl_mapping/Planning/solutions/atmos_solution.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
 
 #TODO: 1. this is a valid conversion (Lin to non-lin) if the system (with zero roll) is differentially flat?
 #TODO:    this means that this linear decoupling is valid, and x_ff and u_ff are valid for the nonlinear space robot
@@ -176,7 +176,7 @@ def u_fbl(x_sp, u_sp):
     gx_sp = sp_robot_nl.calculate_gx(x_sp)
     dx_sp = fx_sp + gx_sp@u_sp
 
-    #! Now [dp: ENU, dq:FLU->ENU, dv: ENU, dw:FLU] to [dp: NED, dq:FRD->NED, dv:FRD, dw:FRD] 
+    #! Now [dp: ENU, dq:FLfU->ENU, dv: ENU, dw:FLU] to [dp: NED, dq:FRD->NED, dv:FRD, dw:FRD] 
     dp, dq, dv, dw = dx_sp[:3], dx_sp[3:7], dx_sp[7:10], dx_sp[10:13]
     dp_ned = np.array([dp[1], dp[0], -dp[2]])
     dq_ned = 1/np.sqrt(2) * np.array([dq[0] + dq[3], dq[1] + dq[2], dq[1] - dq[2], dq[0] - dq[3]])
@@ -210,9 +210,13 @@ for i in range(N-1):
     x_uw_fbl_sp[i+1, :] = x_uw_i
     u_uw_fbl_sp[i, :] = u_uw
 
+
+# save the trajectory
+np.savez('stl_mapping/Planning/solutions/bluerov_solution_fbl.npz', x=x_uw_fbl_sp, u=u_uw_fbl_sp, dt=dt, alpha=alpha, times=t_sp)
+
 # plot the trajectory
 plot_planning_results(uw_robot, t_sp, x_uw_fbl_sp, u_uw_fbl_sp, X0, Xf, [XA], Obs, alpha=alpha,
-                      path="stl_mapping/Planning/figures/sp_trajectory_uw.png")
+                      path="stl_mapping/Planning/figures/atmos_trajectory_as_bluerov.png")
 
 # Analysis of alpha
 u_max = np.max(np.abs(u_uw_fbl_sp), axis=0)
@@ -307,7 +311,7 @@ if True:
         dt_uw = dt
 else:
     # load the solution
-    data = np.load("solutions/uw_solution.npz")
+    data = np.load("solutions/bluerov_solution.npz")
     x_uw = data['x_uw']
     u_uw = data['u_uw']
     dt_uw = data['dt_uw']
@@ -319,6 +323,9 @@ else:
 # print(f"This should be the same as the solution to Prob 1")
 # print(f"Replanned dt_uw: {dt_uw} (was {dt}) which is {(dt_uw)/dt*100}%")
 
+# save the trajectory
+np.savez('stl_mapping/Planning/solutions/bluerov_solution.npz', x=x_uw, u=u_uw, dt=dt_uw, alpha=alpha, times=t_uw)
+
 # plot the trajectory
 plot_planning_results(uw_robot, t_uw, x_uw, u_uw, X0, Xf, [XA], Obs, alpha=alpha,
-                      path="stl_mapping/Planning/figures/uw_trajectory.png")
+                      path="stl_mapping/Planning/figures/bluerov_trajectory.png")

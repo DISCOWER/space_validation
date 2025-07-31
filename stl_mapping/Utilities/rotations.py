@@ -69,6 +69,15 @@ def euler_to_quat_np(pry, order='zyz'):
     q = r.as_quat(scalar_first=True)  # returns (qw, qx, qy, qz)
     return q
 
+def quat_to_euler_np(q, order='zyz'):
+    """
+    Convert quaternion (qw, qx, qy, qz) to Euler angles (roll, pitch, yaw).
+    Angles are in radians.
+    """
+    r = R.from_quat(q)
+    euler_angles = r.as_euler(order, degrees=False)  # returns (roll, pitch, yaw)
+    return euler_angles
+
 def enu_to_flu(w, q):
     """
     Convert angular velocity from ENU to FLU frame.

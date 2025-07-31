@@ -32,7 +32,9 @@ class MPCNode(Node):
         super().__init__('mpc_node')
         self.get_logger().info("Initializing MPC Node")
 
-        self.mpc = MpcWrench()
+        self.model_name = self.declare_parameter('model_name', 'atmos').value
+
+        self.mpc = MpcWrench(model_name=self.model_name)
         self.control = np.zeros((self.mpc.nu, 1))
         self.get_logger().info("MPC solver initialized successfully")
 
@@ -57,9 +59,9 @@ class MPCNode(Node):
             'fmu/out/vehicle_angular_velocity',
             self.vehicle_angular_velocity_callback,
             NORMAL_QOS)
-        self.local_position_sub = self.create_subscription(
+        self.local_position_sub_v1 = self.create_subscription(
             VehicleLocalPosition,
-            'fmu/out/vehicle_local_position',
+            'fmu/out/vehicle_local_position_v1',
             self.vehicle_local_position_callback,
             NORMAL_QOS)
         self.start_sub = self.create_subscription(
@@ -124,7 +126,7 @@ class MPCNode(Node):
         self.get_logger().info("MPC publishers initialized successfully")
 
         # Disturbance variables
-        self.offset_free = True
+        self.offset_free = False
         self.F_cmd = np.zeros((3, 1))  # Force commanded
         self.T_cmd = np.zeros((3, 1))  # Torque commanded
         self.ekf_estimator = EKFWrenchEstimator(dt=0.05)
@@ -142,7 +144,7 @@ class MPCNode(Node):
         self.timer_dist_est = self.create_timer(timer_period_dist_est, self.disturbance_estimation_callback)
 
         # Load the plan from a file (declared as launch argument)
-        self.plan_path = self.declare_parameter('plan_path', 'sp_solution_bezier.npz').value
+        self.plan_path = self.declare_parameter('plan_path', f'{self.model_name}_solution_bezier.npz').value
 
         this_file_dir = os.path.dirname(os.path.abspath(__file__))
         path = os.path.abspath(os.path.join(this_file_dir, '../../../../share/stl_mapping/'))
@@ -387,6 +389,8 @@ class MPCNode(Node):
             # rotation matrix of FRU in ENU
             rotmat = q_to_rot_mat_np(self.vehicle_attitude)
             u_ref = -np.concatenate((rotmat.transpose() @ self.fd_est.reshape(3, 1), self.td_est.reshape(3, 1)), axis=0)
+        else:
+            u_ref = np.zeros((6, 1))
 
         x_ref = np.zeros((13, self.mpc.Nx + 1))  # Initialize reference trajectory
         for idx, ti in enumerate(times):
@@ -396,7 +400,7 @@ class MPCNode(Node):
             #                           0., 0., 0.]).reshape(13,)
             x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='zyx')
 
-        x_ref_u = np.tile(u_ref if self.offset_free else np.zeros((6, 1)), (1, x_ref.shape[1]))
+        x_ref = np.vstack((x_ref, np.repeat(u_ref, x_ref.shape[1], axis=1)))  # Append u_ref to x_ref
 
         self.get_logger().info(f"euler: {quat_to_euler_np(x_ref[3:7, 0], order='zyx')}")
         self.get_logger().info(f"x_ref: {x_ref[:, 0].flatten()}")

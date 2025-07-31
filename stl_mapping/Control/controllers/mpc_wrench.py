@@ -40,9 +40,10 @@ from scipy.linalg import block_diag
 import casadi as ca
 from acados_template import AcadosOcp, AcadosOcpSolver
 from ..models.atmos_wrench import atmos_model_wrench
+from ..models.bluerov_wrench import bluerov_model_wrench
 
 class MpcWrench():
-    def __init__(self):
+    def __init__(self, model_name:str='atmos'):
         # Define the controller parameters
         self.dt = 0.2               # MPC time step [s]
         self.Nx = 30                # Prediction horizon, states             
@@ -67,6 +68,7 @@ class MpcWrench():
         self.idx_slack = np.array([0, 1, 2, 3, 4]) # Indexes of slack variables
 
         # Create the OCP
+        self.model_name = model_name
         self.solver = self.setup()
 
     def setup(self):
@@ -82,7 +84,14 @@ class MpcWrench():
         ocp.code_export_directory = codegen_dir
 
         # Define the model
-        model = atmos_model_wrench()
+        if self.model_name == 'atmos':
+            print("Using Atmos model")
+            model = atmos_model_wrench()
+        elif self.model_name == 'bluerov':
+            print("Using BlueROV model")
+            model = bluerov_model_wrench()
+        else:
+            raise ValueError(f"Model {self.model_name} not recognized. Use 'atmos' or 'bluerov'.")
         ocp.model = model
 
         # Set dimensions
@@ -119,16 +128,16 @@ class MpcWrench():
         # quat_error = ca.fmax(0, ca.fmin(1, quat_error))
         ocp.model.cost_y_expr = ca.vertcat(
             model.x[0:3] - x_ref[0:3],   # Position error
-            model.x[7:10] - x_ref[7:10],   # Velocity error
             quat_error,
+            model.x[7:10] - x_ref[7:10],   # Velocity error
             model.x[10:13] - x_ref[10:13],  # Angular velocity error
             model.u - u_ref, # Control error
         )
         # Terminal cost 
         ocp.model.cost_y_expr_e = ca.vertcat(
             model.x[0:3] - x_ref[0:3],
-            model.x[3:7] - x_ref[3:7],
             quat_error,
+            model.x[7:10] - x_ref[7:10],
             model.x[10:13] - x_ref[10:13],
         )
         ocp.cost.yref = np.zeros(ocp.model.cost_y_expr.shape[0])  # Reference for full cost function

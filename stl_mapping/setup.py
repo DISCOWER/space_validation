@@ -29,16 +29,8 @@ setup(
     # tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-                # planning and missions
-
                 # controllers
                 'mpc_node = Control.mpc_node:main',
-
-                # helpers
-                # 'odom_to_vehicle_local_position = stl_mapping.helpers.odom_to_vehicle_local_position:main',
-                # 'odom_to_vehicle_angular_velocity = stl_mapping.helpers.odom_to_vehicle_angular_velocity:main',
-                # 'odom_to_vehicle_attitude = stl_mapping.helpers.odom_to_vehicle_attitude:main',
-
         ],
     },
 )

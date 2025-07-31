@@ -16,6 +16,6 @@ Numpy, Scipy, Casadi, Gurobi and some basic stuff.
 3. start QGC with `./startQGC`
 
 # Steps for uw
-1. in `PX4-Autopilot`, run command `PX4_UXRCE_DDS_NS=snap make px4_sitl_uuw gz_uuv_bluerov2_heavy`
+1. in `PX4-Autopilot`, run command `PX4_UXRCE_DDS_NS=snap make px4_sitl_uuv gz_uuv_bluerov2_heavy`
 2. start microros with `micro-xrce-dds-agent udp4 -p 8888`
 3. start QGC with `./startQGC`
