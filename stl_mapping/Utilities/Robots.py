@@ -138,6 +138,7 @@ class LinearFreeFlyer6DoF(Robot):
             self.K@self.D.upper_bounds
         )
         self.U_effective = self.U.subtract(self.KD)
+        print(f"U_effective: {self.U_effective.center}, {self.U_effective.lower_bounds}, {self.U_effective.upper_bounds}")
 
     def calculate_fx(self,x):
         return self.A@x

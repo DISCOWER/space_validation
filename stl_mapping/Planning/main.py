@@ -35,17 +35,17 @@ sp_robot = LinearFreeFlyer6DoF()
 euler_order = 'xyz'
 
 # STL Specification
-X0 = HyperRectangle(np.array([0.5, 0, 0]), np.array([0.6, 0.1, 0.1]))
-Xf = HyperRectangle(np.array([2.5, 1.0, 0]), np.array([2.6, 1.1, 0.1]))
-# XA = HyperRectangle(np.array([2.5, -1.0, 0,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 0.1,  -np.pi/2+np.pi/8]))
+X0 = HyperRectangle(np.array([0.5, 0, 2.0]), np.array([0.6, 0.1, 2.1]))
+Xf = HyperRectangle(np.array([2.5, 1.0, 2.0]), np.array([2.6, 1.1, 2.1]))
+XA = HyperRectangle(np.array([2.5, -1.0, 2.0,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 2.1,  -np.pi/2+np.pi/8]))
 # later converted to polytopes for predicates of the form Ax \leq b: Polytope = (A,b)
-XA = HyperRectangle(np.array([2.5, -1.0, 0]), np.array([2.6, -0.9, 0.1]))
+# XA = HyperRectangle(np.array([2.5, -1.0, 2.0]), np.array([2.6, -0.9, 2.1]))
 Obs = []
 World = HyperRectangle(np.array([0, -1.5, -10, -10]), np.array([4, 1.5, 10, 10]))
 phi = Pred("AND", preds=[
     Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)], dims=[0,1,2])]),
     Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1,2])]),
-    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2])]),
+    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2,5])]),
     Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)], dims=[0,1,6,7])]),
 ])
 spec = Spec(phi, t0, tf)
@@ -147,14 +147,17 @@ np.savez('stl_mapping/Planning/solutions/atmos_solution.npz', x=x_ff, u=u_ff, dt
 #TODO: 1. this is a valid conversion (Lin to non-lin) if the system (with zero roll) is differentially flat?
 #TODO:    this means that this linear decoupling is valid, and x_ff and u_ff are valid for the nonlinear space robot
 #TODO:    CHECK THIS!
-
-
-
-
-
-
-
-
+# sp_robot_nl = FreeFlyer()
+# x_ff_nl = np.zeros((x_ff.shape[0], x_ff.shape[1]))
+# u_ff_nl = np.zeros((u_ff.shape[0], u_ff.shape[1]))
+# x_ff_i = copy.deepcopy(x_ff[0, :])
+# x_ff_nl[0, :] = x_ff_i
+# for i in range(x_ff.shape[0]-1):
+#     x_ff_i = sp_robot_nl.step(x_ff_i, u_ff[i, :], dt)
+#     x_ff_i[3:7] /= np.linalg.norm(x_ff_i[3:7])  # normalize quaternion
+#     x_ff_nl[i+1, :] = x_ff_i
+# plot_planning_results(sp_robot_nl, t_sp, x_ff_nl, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
+#                       path="stl_mapping/Planning/figures/atmos_trajectory_as_ff.png")
 
 
 # feedback linearization controller for the underwater robot to behave like a free flyer
