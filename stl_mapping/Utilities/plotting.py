@@ -6,18 +6,34 @@ def plot_planning_results(robot, t, x, u,
                           X0=None, Xf=None, ROIs=None, Obs=None, alpha=1.0,
                           in_axs = None, plot=True,
                           path="stl_mapping/Planning/figures/sp_trajectory.png"):
+    # if x.shape[1] == 12:
+    #     p, e, v, w = x[:, 0:3], x[:, 3:6], x[:, 6:9], x[:, 9:12]
+    #     q = np.zeros((x.shape[0], 4))
+    #     for i in range(x.shape[0]):
+    #         q[i, :] = euler_to_quat_np(e[i, :], order='zyx')
+    #     x = np.hstack((p, q, v, w))
+    #     print(f"Converted state representation:\n{x}")
+    # elif x.shape[1] == 13:
+    #     p, q, v, w = x[:, 0:3], x[:, 3:7], x[:, 7:10], x[:, 10:13]
+    # else:
+    #     raise ValueError("State vector x must have 12 or 13 columns.")
     if x.shape[1] == 12:
-        p, e, v, w = x[:, 0:3], x[:, 3:6], x[:, 6:9], x[:, 9:12]
-        q = np.zeros((x.shape[0], 4))
-        for i in range(x.shape[0]):
-            q[i, :] = euler_to_quat_np(e[i, :], order='zyx')
-        x = np.hstack((p, q, v, w))
-        print(f"Converted state representation:\n{x}")
+        p_idxs = [0, 1, 2]
+        q_idxs = [3, 4, 5]
+        v_idxs = [6, 7, 8]
+        w_idxs = [9, 10, 11]
     elif x.shape[1] == 13:
-        p, q, v, w = x[:, 0:3], x[:, 3:7], x[:, 7:10], x[:, 10:13]
+        p_idxs = [0, 1, 2]
+        q_idxs = [3, 4, 5, 6]
+        v_idxs = [7, 8, 9]
+        w_idxs = [10, 11, 12]
     else:
         raise ValueError("State vector x must have 12 or 13 columns.")
     
+    p = x[:, p_idxs]
+    q = x[:, q_idxs]
+    v = x[:, v_idxs]
+    w = x[:, w_idxs]
 
     # plot the trajectory
     if in_axs is None:
@@ -58,9 +74,13 @@ def plot_planning_results(robot, t, x, u,
     ax_q.plot(t, q[:, 0], 'r', label='q0')
     ax_q.plot(t, q[:, 1], 'g', label='q1')
     ax_q.plot(t, q[:, 2], 'b', label='q2')
-    ax_q.plot(t, q[:, 3], 'k', label='q3')
+    if q.shape[1] == 4:  # If quaternion representation
+        ax_q.plot(t, q[:, 3], 'k', label='q3')
     ax_q.set_xlabel('Time (s)')
-    ax_q.set_ylabel('Euler angles (rad)')
+    if q.shape[1] == 4:
+        ax_q.set_ylabel('Quaternion (q0, q1, q2, q3)')
+    else:
+        ax_q.set_ylabel('Euler angles (pitch roll yaw)')
     ax_q.legend()
     ax_q.grid()
 

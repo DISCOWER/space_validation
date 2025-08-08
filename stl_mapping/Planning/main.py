@@ -35,9 +35,10 @@ sp_robot = LinearFreeFlyer6DoF()
 euler_order = 'xyz'
 
 # STL Specification
-X0 = HyperRectangle(np.array([0.5, 0, 2.0]), np.array([0.6, 0.1, 2.1]))
-Xf = HyperRectangle(np.array([2.5, 1.0, 2.0]), np.array([2.6, 1.1, 2.1]))
-XA = HyperRectangle(np.array([2.5, -1.0, 2.0,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, 2.1,  -np.pi/2+np.pi/8]))
+depth = 0.0
+X0 = HyperRectangle(np.array([0.5, 0, depth]), np.array([0.6, 0.1, depth+0.1]))
+Xf = HyperRectangle(np.array([2.5, 1.0, depth]), np.array([2.6, 1.1, depth+0.1]))
+XA = HyperRectangle(np.array([2.5, -1.0, depth,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, depth+0.1,  -np.pi/2+np.pi/8]))
 # later converted to polytopes for predicates of the form Ax \leq b: Polytope = (A,b)
 # XA = HyperRectangle(np.array([2.5, -1.0, 2.0]), np.array([2.6, -0.9, 2.1]))
 Obs = []
@@ -87,9 +88,12 @@ if True:
 
     # L1 actuation cost
     act_absu_vars = opt.addMVar((N-1,sp_robot.n_u))
+    act_absu_scaled_vars = opt.addMVar((N-1, sp_robot.n_u), lb=0, ub=np.inf)
     act_absu_var = opt.addVar(lb=0, ub=np.inf)
+    Q = np.array([1., 1., 1., 10., 10., 10.])
     opt.addConstrs((act_absu_vars[i, j] == gp.abs_(u_vars[i, j]) for i in range(N-1) for j in range(sp_robot.n_u)), name="act_abs")
-    opt.addConstr(act_absu_var == gp.quicksum([act_absu_vars[i, j] for i in range(N-1) for j in range(sp_robot.n_u)]), name="act_abs_sum")
+    opt.addConstrs((act_absu_scaled_vars[i, j] == Q[j]*act_absu_vars[i, j] for i in range(N-1) for j in range(sp_robot.n_u)), name="act_abs_scaled")
+    opt.addConstr(act_absu_var == gp.quicksum([act_absu_scaled_vars[i, j] for i in range(N-1) for j in range(sp_robot.n_u)]), name="act_abs_sum")
 
     # Final cost
     opt.addConstr(cost_var == 1*alpha_vars - 1000*spec.phi.rho + 0.01*act_absu_var) # quad_cost
@@ -122,6 +126,11 @@ else:
     alpha = data['alpha']
     dt = data['dt']
     t_sp = data['times']
+    
+# print(f"Euler angles: {np.rad2deg(x_ff[:, 5])}")
+
+plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
+                      path="stl_mapping/Planning/figures/atmos_trajectory_euler.png")
 
 #! Convert [p:ENU, e:FLU->ENU, v:ENU, w:FLU] to [p:ENU, q:FLU->ENU, v:ENU, w:FLU]
 x_ff_converted = np.zeros((x_ff.shape[0], x_ff.shape[1] + 1))

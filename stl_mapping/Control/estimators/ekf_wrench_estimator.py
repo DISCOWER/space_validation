@@ -81,5 +81,5 @@ class EKFWrenchEstimator:
 
         fd = self.x[6:9]
         td = self.x[9:12]
-        
-        return fd, td
+
+        return fd, td, self.P[6:12, 6:12]

@@ -9,7 +9,7 @@ from Utilities.get_reference_trajectory import get_reference_trajectory, Referen
         
 from nav_msgs.msg import Path
 from visualization_msgs.msg import Marker
-from geometry_msgs.msg import PoseStamped, WrenchStamped
+from geometry_msgs.msg import PoseStamped, WrenchStamped, TwistWithCovarianceStamped
 from std_msgs.msg import Bool
 from px4_msgs.msg import VehicleStatus, VehicleAttitude, VehicleAngularVelocity, VehicleLocalPosition
 from px4_msgs.msg import VehicleThrustSetpoint, VehicleTorqueSetpoint, OffboardControlMode, ActuatorMotors
@@ -58,6 +58,11 @@ class MPCNode(Node):
             VehicleAngularVelocity,
             'fmu/out/vehicle_angular_velocity',
             self.vehicle_angular_velocity_callback,
+            NORMAL_QOS)
+        self.local_position_sub_v1 = self.create_subscription(
+            VehicleLocalPosition,
+            'fmu/out/vehicle_local_position',
+            self.vehicle_local_position_callback,
             NORMAL_QOS)
         self.local_position_sub_v1 = self.create_subscription(
             VehicleLocalPosition,
@@ -119,19 +124,20 @@ class MPCNode(Node):
             "force_torque_cmd",
             10)
         self.disturbance_est_pub = self.create_publisher(
-            WrenchStamped,
+            TwistWithCovarianceStamped,
             'disturbance_estimate',
             10)
         
         self.get_logger().info("MPC publishers initialized successfully")
 
         # Disturbance variables
-        self.offset_free = False
+        self.offset_free = True
         self.F_cmd = np.zeros((3, 1))  # Force commanded
         self.T_cmd = np.zeros((3, 1))  # Torque commanded
         self.ekf_estimator = EKFWrenchEstimator(dt=0.05)
         self.fd_est = np.zeros(3)  # Estimated force disturbance
         self.td_est = np.zeros(3)  # Estimated torque disturbance
+        self.dist_cov = np.zeros((6, 6))  # Disturbance covariance matrix
 
         # Create the MPC solver and create timer callback to solve
         timer_period = 0.2 # seconds
@@ -236,17 +242,28 @@ class MPCNode(Node):
         else:
             self.get_logger().info("Received stop signal, stopping MPC computation.")
 
-    def publish_estimated_disturbance(self, fd_est, td_est):
-        wrench_msg = WrenchStamped()
+    def publish_estimated_disturbance(self, fd_est, td_est, dist_cov):
+        # wrench_msg = WrenchStamped()
+        # wrench_msg.header.stamp = self.get_clock().now().to_msg()
+        # wrench_msg.header.frame_id = 'map'
+
+        # wrench_msg.wrench.force.x = float(fd_est[0])
+        # wrench_msg.wrench.force.y = float(fd_est[1])
+        # wrench_msg.wrench.force.z = float(fd_est[2])
+        # wrench_msg.wrench.torque.x = float(td_est[0])
+        # wrench_msg.wrench.torque.y = float(td_est[1])
+        # wrench_msg.wrench.torque.z = float(td_est[2])
+        wrench_msg = TwistWithCovarianceStamped()
         wrench_msg.header.stamp = self.get_clock().now().to_msg()
         wrench_msg.header.frame_id = 'map'
 
-        wrench_msg.wrench.force.x = float(fd_est[0])
-        wrench_msg.wrench.force.y = float(fd_est[1])
-        wrench_msg.wrench.force.z = float(fd_est[2])
-        wrench_msg.wrench.torque.x = float(td_est[0])
-        wrench_msg.wrench.torque.y = float(td_est[1])
-        wrench_msg.wrench.torque.z = float(td_est[2])
+        wrench_msg.twist.twist.linear.x = float(fd_est[0])
+        wrench_msg.twist.twist.linear.y = float(fd_est[1])
+        wrench_msg.twist.twist.linear.z = float(fd_est[2])
+        wrench_msg.twist.twist.angular.x = float(td_est[0])
+        wrench_msg.twist.twist.angular.y = float(td_est[1])
+        wrench_msg.twist.twist.angular.z = float(td_est[2])
+        wrench_msg.twist.covariance = dist_cov.flatten().tolist() + [0.0] * (36 - len(dist_cov.flatten()))
 
         self.disturbance_est_pub.publish(wrench_msg)
 
@@ -262,8 +279,8 @@ class MPCNode(Node):
         u[3:6] /= T_scaling
 
         # ENU -> NED transformation
-        force_output_msg.xyz = [u[0]*0.5, -u[1]*0.5, -u[2]*0.5]
-        torque_output_msg.xyz = [u[3]*0.5, -u[4]*0.5, -u[5]*0.5]
+        force_output_msg.xyz = [u[0], -u[1], -u[2]]
+        torque_output_msg.xyz = [u[3], -u[4], -u[5]]
         # EKF in FLU frame so don't transform
         # self.F_app = u[:3]
         # self.T_app = u[3:6]
@@ -354,8 +371,8 @@ class MPCNode(Node):
                            self.vehicle_angular_velocity[0],
                            self.vehicle_angular_velocity[1],
                            self.vehicle_angular_velocity[2]]).reshape(13, 1)
-        self.fd_est, self.td_est = self.ekf_estimator.step(x0.flatten(), self.F_cmd.flatten(), self.T_cmd.flatten())
-        self.publish_estimated_disturbance(self.fd_est, self.td_est)
+        self.fd_est, self.td_est, self.dist_cov = self.ekf_estimator.step(x0.flatten(), self.F_cmd.flatten(), self.T_cmd.flatten())
+        self.publish_estimated_disturbance(self.fd_est, self.td_est, self.dist_cov)
 
     def cmdloop_callback(self):
         # self.get_logger().info("Command loop callback")

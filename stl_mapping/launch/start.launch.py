@@ -15,9 +15,9 @@ def generate_launch_description():
     # robots = ['pop']
     robot_name = 'snap'
     topics_to_record = []
-    topics_to_record.append(f'/{robot_name}/fmu/out/vehicle_local_position')
-    topics_to_record.append(f'/{robot_name}/odom')
-    topics_to_record.append(f'/{robot_name}/stl_mapping/entire_path')
+    # topics_to_record.append(f'/{robot_name}/fmu/out/vehicle_local_position')
+    # topics_to_record.append(f'/{robot_name}/odom')
+    # topics_to_record.append(f'/{robot_name}/stl_mapping/entire_path')
     # topics_to_record.append(f'/{robot_name}/stl_mapping/reference_path')
     # topics_to_record.append(f'/{robot_name}/stl_mapping/predicted_path')
     # topics_to_record.append(f'/{robot_name}/fmu/in/vehicle_rates_setpoint')
@@ -27,7 +27,7 @@ def generate_launch_description():
     # topics_to_record += ['/camera/camera/color/image_raw']
     
     # record all topics?
-    # topics_to_record = ['-a']
+    topics_to_record = ['-a']
 
     record_cmd = ['ros2','bag','record']+topics_to_record
 
