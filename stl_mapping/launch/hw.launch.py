@@ -18,7 +18,8 @@ def generate_launch_description():
     # topics for rviz
     ld.add_action(Node(
             package='px4_offboard',
-            namespace='snap',
+            # namespace='snap',
+            namespace='itrl_rov_1',
             executable='visualizer',
             name='visualizer_0'
     )),

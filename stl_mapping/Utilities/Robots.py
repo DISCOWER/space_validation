@@ -170,7 +170,11 @@ class LinearFreeFlyer6DoF(Robot):
             prog.addConstr(items.x_vars[i, 11] <= np.pi/8, f"r_upper_{i}")
 
 class FreeFlyer(Robot):
-    def __init__(self):
+    def __init__(self,
+                 dt=0.02,
+                 iX:cs.SX|cs.MX=cs.SX):
+        self.dt = dt
+        self.iX = iX
         # state: x = [p, q, v, w]
         # where q is a scalar first unit quaternion
         nx = 13
@@ -206,10 +210,10 @@ class FreeFlyer(Robot):
         
     def create_K(self):
         if not hasattr(self, '_K_sym'):
-            p = cs.SX.sym('p', 3)
-            q = cs.SX.sym('q', 4)
-            v = cs.SX.sym('v', 3)
-            w = cs.SX.sym('w', 3)
+            p = self.iX.sym('p', 3)
+            q = self.iX.sym('q', 4)
+            v = self.iX.sym('v', 3)
+            w = self.iX.sym('w', 3)
             self._K_sym = cs.Function('K', [p, q, v, w],
                 [
                     cs.pinv(self.calculate_gx(cs.vertcat(p, q, v, w))) @ self.calculate_cx(cs.vertcat(p, q, v, w))
@@ -225,10 +229,10 @@ class FreeFlyer(Robot):
 
     def create_U_effective(self):
         if not hasattr(self, '_U_effective_sym'):
-            p = cs.SX.sym('p', 3)
-            q = cs.SX.sym('q', 4)
-            v = cs.SX.sym('v', 3)
-            w = cs.SX.sym('w', 3)
+            p = self.iX.sym('p', 3)
+            q = self.iX.sym('q', 4)
+            v = self.iX.sym('v', 3)
+            w = self.iX.sym('w', 3)
             self._U_effective_sym = cs.Function('U_effective', [p, q, v, w],
                 [
                     self.U.lower_bounds - self._K_sym(p, q, v, w)@self.D.lower_bounds,
@@ -246,10 +250,10 @@ class FreeFlyer(Robot):
 
     def create_fx(self):
         if not hasattr(self, '_fx_sym'):
-            p = cs.SX.sym('p', 3)
-            q = cs.SX.sym('q', 4)
-            v = cs.SX.sym('v', 3)
-            w = cs.SX.sym('w', 3)
+            p = self.iX.sym('p', 3)
+            q = self.iX.sym('q', 4)
+            v = self.iX.sym('v', 3)
+            w = self.iX.sym('w', 3)
             w_cross = cs.vertcat(
                 cs.horzcat(0, -w[2], w[1]),
                 cs.horzcat(w[2], 0, -w[0]),
@@ -260,8 +264,8 @@ class FreeFlyer(Robot):
                     cs.blockcat([
                         [v],
                         [0.5 * quat_mult(q, cs.vertcat(0, w))],
-                        [cs.SX.zeros(3,)],
-                        [-cs.SX(np.linalg.inv(self.inertia)) @ cs.mtimes(w_cross, cs.mtimes(self.inertia, w))]
+                        [self.iX.zeros(3,)],
+                        [-self.iX(np.linalg.inv(self.inertia)) @ cs.mtimes(w_cross, cs.mtimes(self.inertia, w))]
                     ])
                 ]
             )
@@ -276,22 +280,22 @@ class FreeFlyer(Robot):
 
     def create_gx(self):
         if not hasattr(self, '_gx_sym'):
-            p = cs.SX.sym('p', 3)
-            q = cs.SX.sym('q', 4)
-            v = cs.SX.sym('v', 3)
-            w = cs.SX.sym('w', 3)
+            p = self.iX.sym('p', 3)
+            q = self.iX.sym('q', 4)
+            v = self.iX.sym('v', 3)
+            w = self.iX.sym('w', 3)
             self._gx_sym = cs.Function('gx', [p, q, v, w],
                 [
                     cs.blockcat([
-                        [cs.SX.zeros((3, 6))],
-                        [cs.SX.zeros((4, 6))],
+                        [self.iX.zeros((3, 6))],
+                        [self.iX.zeros((4, 6))],
                         [cs.horzcat(
                             q_to_rot_mat_cs(q) / self.mass,
-                            cs.SX.zeros((3, 3))
+                            self.iX.zeros((3, 3))
                         )],
                         [cs.horzcat(
-                            cs.SX.zeros((3, 3)),
-                            cs.SX(np.linalg.inv(self.inertia))
+                            self.iX.zeros((3, 3)),
+                            self.iX(np.linalg.inv(self.inertia))
                         )]
                     ])
                 ]
@@ -306,12 +310,12 @@ class FreeFlyer(Robot):
 
     def create_cx(self):
         if not hasattr(self, '_cx_sym'):
-            p = cs.SX.sym('p', 3)
-            q = cs.SX.sym('q', 4)
-            v = cs.SX.sym('v', 3)
-            w = cs.SX.sym('w', 3)
-            cx = cs.SX.zeros((13,6))
-            cx[6:12, :] = cs.SX.eye(6)
+            p = self.iX.sym('p', 3)
+            q = self.iX.sym('q', 4)
+            v = self.iX.sym('v', 3)
+            w = self.iX.sym('w', 3)
+            cx = self.iX.zeros((13,6))
+            cx[6:12, :] = self.iX.eye(6)
             self._cx_sym = cs.Function('cx', [p, q, v, w],
                 [
                     cx

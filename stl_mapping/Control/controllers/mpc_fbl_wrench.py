@@ -31,8 +31,8 @@
 #
 ############################################################################
 
-__author__ = "Elias Krantz"
-__contact__ = "eliaskra@kth.se"
+__author__ = "Elias Krantz & Joris Verhagen"
+__contact__ = "eliaskra@kth.se & jorisv@kth.se"
 
 import numpy as np
 import os
@@ -41,9 +41,12 @@ import casadi as ca
 from acados_template import AcadosOcp, AcadosOcpSolver
 from ..models.atmos_wrench import atmos_model_wrench
 from ..models.bluerov_wrench import bluerov_model_wrench
+from Utilities.rotations import x_uw_to_x_ff, x_uw_to_x_ff_cs, x_ff_to_x_uw_cs
+from Utilities.Robots import FreeFlyer
+from Utilities.smarc_modelling.src.smarc_modelling.vehicles import BlueROV
 
-class MpcWrench():
-    def __init__(self, model_name:str='atmos'):
+class MpcFBLWrench():
+    def __init__(self, alpha:float=1.0):
         # Define the controller parameters
         self.dt = 0.2               # MPC time step [s]
         self.Nx = 30                # Prediction horizon, states             
@@ -58,6 +61,9 @@ class MpcWrench():
             1e0, 1e0, 1e0]) 
         self.P = 10 * self.Q        # Terminal state weighting matrix
         
+        # Feedback linearization parameters
+        self.alpha = alpha
+
         # Bounds
         self.lbx = np.array([0+0.25, -1.58+0.25, 0.0, -0.5, -0.5, -3])
         self.ubx = np.array([4.1-0.25, 1.74-0.25, 3.0, 0.5, 0.5, 3])
@@ -68,8 +74,33 @@ class MpcWrench():
         self.idx_slack = np.array([0, 1, 2, 3, 4, 5]) # Indexes of slack variables
 
         # Create the OCP
-        self.model_name = model_name
         self.solver = self.setup()
+
+    def fbl_uw_to_ff(self, x_uw:ca.SX, u:ca.SX|np.ndarray):
+        x_sp = x_uw_to_x_ff_cs(x_uw, normalize_quat=True)
+
+        fx_uw = self.uw_robot.calculate_fx(x_uw)
+        gx_uw = self.uw_robot.calculate_gx(x_uw)
+        dx_uw = fx_uw + gx_uw @ u
+        dx_uw_sp = x_uw_to_x_ff_cs(dx_uw, normalize_quat=False, q_rel=x_uw[3:7])
+
+        fx_sp = self.sp_robot.calculate_fx(x_sp)
+        gx_sp = self.sp_robot.calculate_gx(x_sp)
+        u_fbl = ca.mtimes(ca.pinv(gx_sp), dx_uw_sp - fx_sp)
+        return u_fbl
+    
+    def fbl_ff_to_uw(self, x_sp:np.ndarray, u:np.ndarray):
+        x_uw = x_uw_to_x_ff(x_sp, normalize_quat=True)
+
+        fx_sp = self.sp_robot.calculate_fx(x_sp)
+        gx_sp = self.sp_robot.calculate_gx(x_sp)
+        dx_sp = fx_sp + gx_sp @ u
+        dx_sp_uw = x_ff_to_x_uw_cs(dx_sp, normalize_quat=False, q_rel=x_sp[3:7])
+
+        fx_uw = self.uw_robot.calculate_fx(x_uw)
+        gx_uw = self.uw_robot.calculate_gx(x_uw)
+        u_fbl = ca.mtimes(ca.pinv(gx_uw), dx_sp_uw - fx_uw)
+        return u_fbl
 
     def setup(self):
         # create ocp object to formulate the OCP
@@ -84,16 +115,11 @@ class MpcWrench():
         ocp.code_export_directory = codegen_dir
 
         # Define the model
-        if self.model_name == 'atmos':
-            print("Using Atmos model")
-            model = atmos_model_wrench()
-        elif self.model_name == 'bluerov':
-            print("Using BlueROV model")
-            model = bluerov_model_wrench()
-        else:
-            raise ValueError(f"Model {self.model_name} not recognized. Use 'atmos' or 'bluerov'.")
+        model = atmos_model_wrench()
         ocp.model = model
-
+        self.sp_robot = FreeFlyer(iX=ca.SX)
+        self.uw_robot = BlueROV(iX=ca.SX)
+        
         # Set dimensions
         nx = model.x.size()[0]
         nu = model.u.size()[0]
@@ -155,9 +181,19 @@ class MpcWrench():
         ocp.constraints.x0[3] = 1  # Initial quaternion
 
         # Feedback linearization constraints
-        # TODO: how to implement nonlinear inequality constraints?
-        # model.con_h_expr 
-
+        # TODO: validate this
+        ocp.model.con_h_expr = ca.vertcat(
+            model.u - self.fbl(model.x, self.uw_robot.calculate_U_effective()[1]),
+            model.u - self.fbl(model.x, self.uw_robot.calculate_U_effective()[0])
+        )
+        ocp.constraints.lh = np.vstack(
+            np.full(self.sp_robot.n_u, -1e9),
+            np.full(self.sp_robot.n_u, 0)
+        )
+        ocp.constraints.uh = np.vstack(
+            np.full(self.sp_robot.n_u, 0),
+            np.full(self.sp_robot.n_u, 1e9)
+        )
 
         # Set up the constraints for the other agents
         # ocp.constraints.lh = np.full(0, -1e9)   # lower bounds on con_h_expr
@@ -219,5 +255,14 @@ class MpcWrench():
         for i in range(self.Nx):
             x_pred[i,:] = self.solver.get(i, "x")
         x_pred[self.Nx,:] = self.solver.get(self.Nx, "x")
-        
-        return u_opt, x_pred
+
+        # Convert the computed control input, which is the one that would be applied to
+        # the freeflyer, to the one that needs to be applied to the underwater vehicle 
+        x_uw = np.ndarray((self.Nx+1, self.nx))
+        u_uw = np.ndarray((self.Nx, self.nu))
+        for i in range(self.Nx):
+            x_uw[i,:] = x_ff_to_x_uw_cs(x_pred[i,:], normalize_quat=False)
+            u_uw[i,:] = self.fbl_ff_to_uw(x_pred[i,:], u_opt[i,:])
+        x_uw[self.Nx,:] = x_ff_to_x_uw_cs(x_pred[self.Nx,:], normalize_quat=False)
+
+        return u_uw, x_uw
