@@ -20,11 +20,12 @@ from Utilities.rotations import x_ff_to_x_uw, x_uw_to_x_ff
 from Utilities.stl import Pred, Spec, quant_parse_operator, OptProbItems
 from Utilities.plotting import plot_planning_results
 from Utilities.smarc_modelling.src.smarc_modelling.vehicles.BlueROV import BlueROV 
+from Planning.bezier_fitting import bezier_fitting
 
 # hyperparameters
-N = 30     # number of time steps
-dt = 1.5    # time step size
-t0 = 0      # initial time
+N = 30          # number of time steps
+dt = 1.5        # time step size
+t0 = 0          # initial time
 tf = (N-1)*dt   # final time
 
 bigM = 1e4
@@ -52,7 +53,7 @@ phi = Pred("AND", preds=[
 spec = Spec(phi, t0, tf)
 
 # Initial Motion planner on Linear Model
-if True:
+if False:
     opt = gp.Model("prob1")
     x_vars = opt.addMVar((N, sp_robot.n_x), lb=-np.inf, ub=np.inf, name="X")
     u_vars = opt.addMVar((N-1, sp_robot.n_u), lb=-np.inf, ub=np.inf, name="U")
@@ -128,11 +129,11 @@ else:
     t_sp = data['times']
     print(f"alpha from linear STL planner: {alpha}")
     
-    
+
 plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
                       path="stl_mapping/Planning/figures/atmos_linear_trajectory_euler.png")
 
-np.savez('stl_mapping/Planning/solutions/atmos_linear_solution.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
+np.savez('stl_mapping/Planning/solutions/atmos_linear_solution_euler_inertial.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
 # np.savetxt("x_ff.csv", x_ff, delimiter=',', fmt="%.4f")
 
 #! Convert [p:ENU, e:FLU->ENU, v:ENU, w:FLU] to [p:ENU, q:FLU->ENU, v:FLU, w:FLU]
@@ -159,15 +160,14 @@ u_ff = u_ff_converted
 plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
                       path="stl_mapping/Planning/figures/atmos_linear_trajectory.png")
 
-np.savez('stl_mapping/Planning/solutions/atmos_nonlinear_solution.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
-
+np.savez('stl_mapping/Planning/solutions/atmos_linear_solution_quat_body.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
 
 #TODO: this is a valid conversion (Lin to non-lin) if the system (with zero roll) is differentially flat?
 #TODO: this means that this linear decoupling is valid, and x_ff and u_ff are valid for the nonlinear space robot
 #TODO: CHECK THIS!
 sp_robot_nl = FreeFlyer()
 x_ff_nl = np.zeros((x_ff.shape[0], x_ff.shape[1]))
-u_ff_nl = np.zeros((u_ff.shape[0], u_ff.shape[1]))
+u_ff_nl = u_ff
 x_ff_i = copy.deepcopy(x_ff[0, :])
 x_ff_nl[0, :] = x_ff_i
 for i in range(x_ff.shape[0]-1):
@@ -179,6 +179,9 @@ for i in range(x_ff.shape[0]-1):
 plot_planning_results(sp_robot_nl, t_sp, x_ff_nl, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
                       path="stl_mapping/Planning/figures/atmos_nonlinear_trajectory.png")
 
+np.savez('stl_mapping/Planning/solutions/atmos_nonlinear_solution.npz', x=x_ff_nl, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
+data = np.load('stl_mapping/Planning/solutions/atmos_nonlinear_solution.npz')
+bezier_fitting(data,'atmos')
 
 #TODO: Feedback linearization test
 #TODO: we test feedback linearization controller for the underwater robot to behave like a free flyer
@@ -325,9 +328,11 @@ else:
 # print(f"This should be the same as the solution to Prob 1")
 # print(f"Replanned dt_uw: {dt_uw} (was {dt}) which is {(dt_uw)/dt*100}%")
 
-# save the trajectory
-np.savez('stl_mapping/Planning/solutions/bluerov_nonlinear_solution.npz', x=x_uw, u=u_uw, dt=dt_uw, alpha=alpha, times=t_uw)
-
 # plot the trajectory
 plot_planning_results(uw_robot, t_uw, x_uw, u_uw, X0, Xf, [XA], Obs, alpha=alpha,
                       path="stl_mapping/Planning/figures/bluerov_nonlinear_trajectory.png")
+
+# save the trajectory
+np.savez('stl_mapping/Planning/solutions/bluerov_nonlinear_solution.npz', x=x_uw, u=u_uw, dt=dt_uw, alpha=alpha, times=t_uw)
+data = np.load('stl_mapping/Planning/solutions/bluerov_nonlinear_solution.npz')
+bezier_fitting(data, 'bluerov')
