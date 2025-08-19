@@ -40,13 +40,13 @@ X0 = HyperRectangle(np.array([0.5, 0, depth]), np.array([0.6, 0.1, depth+0.1]))
 Xf = HyperRectangle(np.array([2.5, 1.0, depth]), np.array([2.6, 1.1, depth+0.1]))
 XA = HyperRectangle(np.array([2.5, -1.0, depth,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, depth+0.1,  -np.pi/2+np.pi/8]))
 # later converted to polytopes for predicates of the form Ax \leq b: Polytope = (A,b)
-# XA = HyperRectangle(np.array([2.5, -1.0, 2.0]), np.array([2.6, -0.9, 2.1]))
+# XA = HyperRectangle(np.array([2.5, -1.0, depth]), np.array([2.6, -0.9, depth+0.1]))
 Obs = []
 World = HyperRectangle(np.array([0, -1.5, -10, -10]), np.array([4, 1.5, 10, 10]))
 phi = Pred("AND", preds=[
     Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)], dims=[0,1,2])]),
     Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1,2])]),
-    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2,5])]),
+    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2, 5])]),
     Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)], dims=[0,1,6,7])]),
 ])
 spec = Spec(phi, t0, tf)
@@ -120,62 +120,72 @@ if True:
     np.savez('stl_mapping/Planning/solutions/atmos_solution_lin.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
 else:
     # or load instead
-    data = np.load('stl_mapping/Planning/solutions/atmos_solution_lin.npz')
-    x_ff = data['x_ff']
-    u_ff = data['u_ff']
+    data = np.load('stl_mapping/Planning/solutions/atmos_linear_solution.npz')
+    x_ff = data['x']
+    u_ff = data['u']
     alpha = data['alpha']
     dt = data['dt']
     t_sp = data['times']
+    print(f"alpha from linear STL planner: {alpha}")
     
-# print(f"Euler angles: {np.rad2deg(x_ff[:, 5])}")
-
+    
 plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
-                      path="stl_mapping/Planning/figures/atmos_trajectory_euler.png")
+                      path="stl_mapping/Planning/figures/atmos_linear_trajectory_euler.png")
 
-#! Convert [p:ENU, e:FLU->ENU, v:ENU, w:FLU] to [p:ENU, q:FLU->ENU, v:ENU, w:FLU]
+np.savez('stl_mapping/Planning/solutions/atmos_linear_solution.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
+# np.savetxt("x_ff.csv", x_ff, delimiter=',', fmt="%.4f")
+
+#! Convert [p:ENU, e:FLU->ENU, v:ENU, w:FLU] to [p:ENU, q:FLU->ENU, v:FLU, w:FLU]
 x_ff_converted = np.zeros((x_ff.shape[0], x_ff.shape[1] + 1))
 for i in range(x_ff.shape[0]):
-    x_ff_converted[i, :3] = x_ff[i, :3]
+    x_ff_converted[i,0:3] = x_ff[i,0:3]
     x_ff_converted[i,3:7] = euler_to_quat_np(x_ff[i, 3:6], order=euler_order)
-    x_ff_converted[i,7:10] = x_ff[i, 6:9]
+    q = R.from_quat(x_ff_converted[i, 3:7], scalar_first=True)
+    x_ff_converted[i,7:10] = q.inv().apply(x_ff[i, 6:9])
+    # x_ff_converted[i,7:10] = x_ff[i, 6:9]
     x_ff_converted[i,10:13] = x_ff[i, 9:12] #enu_to_flu(x_ff[i, 9:12], x_ff_converted[i, 3:7])
 x_ff = x_ff_converted
+
 #! Convert [F: ENU, tau: FLU] to [F: FLU, tau:FLU]
 u_ff_converted = np.zeros_like(u_ff)
 for i in range(u_ff.shape[0]):
     q = R.from_quat(x_ff[i, 3:7], scalar_first=True)
-    u_ff_converted[i, :] = np.hstack((q.inv().apply(u_ff[i, 0:3]), u_ff[i, 3:6]))  # convert u from ENU to body FLU body frame
+    u_ff_converted[i, :] = np.hstack((q.inv().apply(u_ff[i, 0:3]),# + sp_robot.mass*np.cross(x_ff_converted[i, 10:13], x_ff_converted[i, 7:10]), 
+                                      q.inv().apply(u_ff[i, 3:6])))
+    # u_ff_converted[i, :] = u_ff[i, :]  # keep the angular velocities in FLU
 u_ff = u_ff_converted
 
 # plot the trajectory
 plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
-                      path="stl_mapping/Planning/figures/atmos_trajectory.png")
+                      path="stl_mapping/Planning/figures/atmos_linear_trajectory.png")
 
-np.savez('stl_mapping/Planning/solutions/atmos_solution.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
-
-#TODO: 1. this is a valid conversion (Lin to non-lin) if the system (with zero roll) is differentially flat?
-#TODO:    this means that this linear decoupling is valid, and x_ff and u_ff are valid for the nonlinear space robot
-#TODO:    CHECK THIS!
-# sp_robot_nl = FreeFlyer()
-# x_ff_nl = np.zeros((x_ff.shape[0], x_ff.shape[1]))
-# u_ff_nl = np.zeros((u_ff.shape[0], u_ff.shape[1]))
-# x_ff_i = copy.deepcopy(x_ff[0, :])
-# x_ff_nl[0, :] = x_ff_i
-# for i in range(x_ff.shape[0]-1):
-#     x_ff_i = sp_robot_nl.step(x_ff_i, u_ff[i, :], dt)
-#     x_ff_i[3:7] /= np.linalg.norm(x_ff_i[3:7])  # normalize quaternion
-#     x_ff_nl[i+1, :] = x_ff_i
-# plot_planning_results(sp_robot_nl, t_sp, x_ff_nl, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
-#                       path="stl_mapping/Planning/figures/atmos_trajectory_as_ff.png")
+np.savez('stl_mapping/Planning/solutions/atmos_nonlinear_solution.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
 
 
-# feedback linearization controller for the underwater robot to behave like a free flyer
+#TODO: this is a valid conversion (Lin to non-lin) if the system (with zero roll) is differentially flat?
+#TODO: this means that this linear decoupling is valid, and x_ff and u_ff are valid for the nonlinear space robot
+#TODO: CHECK THIS!
+sp_robot_nl = FreeFlyer()
+x_ff_nl = np.zeros((x_ff.shape[0], x_ff.shape[1]))
+u_ff_nl = np.zeros((u_ff.shape[0], u_ff.shape[1]))
+x_ff_i = copy.deepcopy(x_ff[0, :])
+x_ff_nl[0, :] = x_ff_i
+for i in range(x_ff.shape[0]-1):
+    # q = R.from_quat(x_ff_nl[i, 3:7], scalar_first=True)
+    u_ff_i = u_ff[i, :]  # convert u from body FLU to ENU frame
+    x_ff_i = sp_robot_nl.step(x_ff_i, u_ff_i, dt)
+    x_ff_i[3:7] /= np.linalg.norm(x_ff_i[3:7])  # normalize quaternion
+    x_ff_nl[i+1, :] = x_ff_i
+plot_planning_results(sp_robot_nl, t_sp, x_ff_nl, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
+                      path="stl_mapping/Planning/figures/atmos_nonlinear_trajectory.png")
+
+
+#TODO: Feedback linearization test
+#TODO: we test feedback linearization controller for the underwater robot to behave like a free flyer
 uw_robot = BlueROV()
 sp_robot_nl = FreeFlyer()
 
-#TODO: 1. fix the BlueRov model such that it behaves equal to David's model (yaw and pitch seem wrong)
-#TODO: 2. fix frame conversions for feedback linearization (below)
-def u_fbl(x_sp, u_sp):
+def u_fbl(x, u):
     '''
     Feedback linearization control for the underwater robot
     Args:
@@ -184,51 +194,44 @@ def u_fbl(x_sp, u_sp):
     Returns:
         u_fbl: control input for the space robot in ENU body frame
     '''
-    fx_sp = sp_robot_nl.calculate_fx(x_sp)
-    gx_sp = sp_robot_nl.calculate_gx(x_sp)
-    dx_sp = fx_sp + gx_sp@u_sp
+    fx_sp = sp_robot_nl.calculate_fx(x)
+    gx_sp = sp_robot_nl.calculate_gx(x)
+    dx_sp = fx_sp + gx_sp@u
 
-    #! Now [dp: ENU, dq:FLfU->ENU, dv: ENU, dw:FLU] to [dp: NED, dq:FRD->NED, dv:FRD, dw:FRD] 
-    dp, dq, dv, dw = dx_sp[:3], dx_sp[3:7], dx_sp[7:10], dx_sp[10:13]
-    dp_ned = np.array([dp[1], dp[0], -dp[2]])
-    dq_ned = 1/np.sqrt(2) * np.array([dq[0] + dq[3], dq[1] + dq[2], dq[1] - dq[2], dq[0] - dq[3]])
-    dv_flu = R.from_quat(x_sp[3:7], scalar_first=True).inv().apply(dv)
-    dv_frd = np.array([dv_flu[0], -dv_flu[1], -dv_flu[2]])
-    dw_frd = np.array([dw[0], -dw[1], -dw[2]])
-    dx_sp_ned = np.concatenate((dp_ned, dq_ned, dv_frd, dw_frd))
+    # convert dx_sp velocity derivative from inertial frame to body frame
+    # dx_sp[7:10] = R.from_quat(x[3:7], scalar_first=True).apply(dx_sp[7:10])
 
-    x_uw = x_ff_to_x_uw(x_sp)
+    fx_uw = uw_robot.calculate_fx(x)
+    gx_uw = uw_robot.calculate_gx(x)
+    u_fbl = np.linalg.pinv(gx_uw)@(dx_sp - fx_uw)
 
-    fx_uw = uw_robot.calculate_fx(x_uw)
-    gx_uw = uw_robot.calculate_gx(x_uw)
-    u_fbl = np.linalg.pinv(gx_uw)@(dx_sp_ned - fx_uw)
+    # convert u_fbl from body frame to inertial frame
+    # u_fbl[:3] = R.from_quat(x[3:7], scalar_first=True).apply(u_fbl[:3])
     # print(f"u: {u}, u_fbl: {u_fbl}")
     return u_fbl
 
 
 x_ff_i = copy.deepcopy(x_ff[0, :])
-x_uw_i = x_ff_to_x_uw(x_ff_i)
 
 x_uw_fbl_sp = np.zeros((N, sp_robot_nl.n_x))
-x_uw_fbl_sp[0, :] = x_uw_i
+x_uw_fbl_sp[0, :] = x_ff_i
 u_uw_fbl_sp = np.zeros((N, sp_robot_nl.n_u))
 for i in range(N-1):
-    x_ff_i = x_uw_to_x_ff(x_uw_i)
-
     u_uw = u_fbl(x_ff_i, u_ff[i, :])
-    x_uw_i = uw_robot.step(x_uw_i, u_uw, dt)
-    x_uw_i[3:7] /= np.linalg.norm(x_uw_i[3:7])
+    x_ff_i = uw_robot.step(x_ff_i, u_uw, dt)
+    x_ff_i[3:7] /= np.linalg.norm(x_ff_i[3:7])
+
     # save state and control
-    x_uw_fbl_sp[i+1, :] = x_uw_i
+    x_uw_fbl_sp[i+1, :] = x_ff_i
     u_uw_fbl_sp[i, :] = u_uw
 
 
 # save the trajectory
-np.savez('stl_mapping/Planning/solutions/bluerov_solution_fbl.npz', x=x_uw_fbl_sp, u=u_uw_fbl_sp, dt=dt, alpha=alpha, times=t_sp)
+np.savez('stl_mapping/Planning/solutions/bluerov_nonlinear_solution_fbl.npz', x=x_uw_fbl_sp, u=u_uw_fbl_sp, dt=dt, alpha=alpha, times=t_sp)
 
 # plot the trajectory
 plot_planning_results(uw_robot, t_sp, x_uw_fbl_sp, u_uw_fbl_sp, X0, Xf, [XA], Obs, alpha=alpha,
-                      path="stl_mapping/Planning/figures/atmos_trajectory_as_bluerov.png")
+                      path="stl_mapping/Planning/figures/bluerov_nonlinear_trajectory_fbl.png")
 
 # Analysis of alpha
 u_max = np.max(np.abs(u_uw_fbl_sp), axis=0)
@@ -237,23 +240,7 @@ print(f"This is lower because BlueROV is faster than free flyer")
 print(f"U should become {np.max(u_max)/alpha} for same alpha (was {uw_robot.U.upper_bounds[0]}) which is {(np.max(u_max)/alpha)/uw_robot.U.upper_bounds[0]*100}%")
 
 
-
-
-
-
-
-
-
-
-# uw_robot = BlueROV(iX=cs.SX)
-# # call compute_K a bunch of times with different states to check what the values are
-# for i in range(1):
-#     print(f"D: {uw_robot.D.lower_bounds}")
-#     print(f"U: {uw_robot.U.lower_bounds}")
-#     # print(f"U: {uw_robot.U}")
-#     print(f"gx: {uw_robot.calculate_gx(np.random.rand(13))}")
-
-#     print(f"K: {uw_robot.calculate_K(np.random.rand(13))}")
+# exit()
 
 #TODO: now we either solve the time-scaling of trajectory and control input
 #TODO: or we solve the optimization problem to make alpha equal, we need to figure out what is warranted
@@ -261,7 +248,6 @@ print(f"U should become {np.max(u_max)/alpha} for same alpha (was {uw_robot.U.up
 #TODO: - control bound scaling? (only valid for faster systems, but still, is it valid?)
 #TODO: - trajectory optimization? (this should be valid, but perhaps dirtier than warranted)
 uw_robot = BlueROV(iX=cs.MX)
-sp_robot_nl = FreeFlyer()
 if True:
     # gradient-based optimization with casadi
     ocp = cs.Opti()
@@ -294,18 +280,22 @@ if True:
     n_equal = 7 # first n_equal states: [p,q]
     for i in range(N):
         # ocp.subject_to(x_vars[0:n_equal,i] == x_uw_fbl_sp[i,0:n_equal])
-        ocp.subject_to(x_vars[0:n_equal,i] <= x_uw_fbl_sp[i,0:n_equal] + delta* np.ones(n_equal))
-        ocp.subject_to(x_vars[0:n_equal,i] >= x_uw_fbl_sp[i,0:n_equal] - delta* np.ones(n_equal))
+        ocp.subject_to(x_vars[0:n_equal,i] <= x_uw_fbl_sp[i,0:n_equal] + delta * np.ones(n_equal))
+        ocp.subject_to(x_vars[0:n_equal,i] >= x_uw_fbl_sp[i,0:n_equal] - delta * np.ones(n_equal))
 
     # objective
-    cost_var = dt_vars + 1e5 * delta
+    quad_u_var = 0
+    Q = np.array([1., 1., 1., 10., 10., 10.])
+    for i in range(N):
+        quad_u_var += cs.mtimes(u_vars[:,i].T, Q * u_vars[:,i])
+    cost_var = dt_vars + 1e3 * delta + 1e-4 * quad_u_var
     ocp.minimize(cost_var)
     opts = {'ipopt.print_level': 0, 'print_time': 0, 'ipopt.sb': 'yes',
-            'verbose':False, 'ipopt.tol': 1e-6, 'ipopt.max_iter': 1000}
+            'verbose':False, 'ipopt.tol': 1e-4, 'ipopt.max_iter': 1000}
     ocp.solver('ipopt',opts)
 
     try:
-        print(f"Solving optimization problem...")
+        print(f"\n\nSolving nl bluerov optimization problem...")
         sol = ocp.solve()
         x_uw = sol.value(x_vars).T
         u_uw = sol.value(u_vars).T
@@ -336,8 +326,8 @@ else:
 # print(f"Replanned dt_uw: {dt_uw} (was {dt}) which is {(dt_uw)/dt*100}%")
 
 # save the trajectory
-np.savez('stl_mapping/Planning/solutions/bluerov_solution.npz', x=x_uw, u=u_uw, dt=dt_uw, alpha=alpha, times=t_uw)
+np.savez('stl_mapping/Planning/solutions/bluerov_nonlinear_solution.npz', x=x_uw, u=u_uw, dt=dt_uw, alpha=alpha, times=t_uw)
 
 # plot the trajectory
 plot_planning_results(uw_robot, t_uw, x_uw, u_uw, X0, Xf, [XA], Obs, alpha=alpha,
-                      path="stl_mapping/Planning/figures/bluerov_trajectory.png")
+                      path="stl_mapping/Planning/figures/bluerov_nonlinear_trajectory.png")

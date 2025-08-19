@@ -74,7 +74,7 @@ def quat_to_euler_np(q, order='zyz'):
     Convert quaternion (qw, qx, qy, qz) to Euler angles (roll, pitch, yaw).
     Angles are in radians.
     """
-    r = R.from_quat(q)
+    r = R.from_quat(q,scalar_first=True)
     euler_angles = r.as_euler(order, degrees=False)  # returns (roll, pitch, yaw)
     return euler_angles
 

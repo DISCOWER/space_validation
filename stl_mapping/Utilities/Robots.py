@@ -199,13 +199,14 @@ class FreeFlyer(Robot):
 
         # TODO: deal with the fact that K and D are not of same dimension
         max_floor_force = (36*self.mass)/1000
-        max_floor_torque = 0.01 #?
         self.D = HyperRectangle(
-            np.array(3*[-max_floor_force] + 3*[-max_floor_torque]),
-            np.array(3*[max_floor_force] + 3*[max_floor_torque])
+            np.array(3*[-max_floor_force]),
+            np.array(3*[max_floor_force])
         )
         self.create_K()
         self.create_U_effective()
+        U_effective = self.calculate_U_effective(self.x)
+        print(f"U_effective: {U_effective.center[:,0].T}, {U_effective.lower_bounds[:,0].T}, {U_effective.upper_bounds[:,0].T}")
 
         
     def create_K(self):
@@ -222,7 +223,7 @@ class FreeFlyer(Robot):
     def calculate_K(self, x):
         p, q, v, w = x[0:3], x[3:7], x[7:10], x[10:13]
         if isinstance(p, np.ndarray):
-            return np.array(self._K_sym(p, q, v, w)).reshape((self.n_u, self.n_x))
+            return np.array(self._K_sym(p, q, v, w))
         else:
             return self._K_sym(p, q, v, w)
 
@@ -246,6 +247,28 @@ class FreeFlyer(Robot):
             return HyperRectangle(np.array(lb), np.array(ub))
         else:
             return HyperRectangle(lb, ub)
+        
+
+    def create_dynamics(self):
+        if not hasattr(self, '_dynamics_sym'):
+            p = self.iX.sym('p', 3)
+            q = self.iX.sym('q', 4)
+            v = self.iX.sym('v', 3)
+            w = self.iX.sym('w', 3)
+            u = self.iX.sym('u', 6)
+            self._dynamics_sym = cs.Function('dynamics', [p, q, v, w, u],
+                [
+                    self.calculate_fx(cs.vertcat(p, q, v, w)) + self.calculate_gx(cs.vertcat(p, q, v, w)) @ u
+                ]
+            )
+    def calculate_dynamics(self, x, u):
+        p, q, v, w = x[0:3], x[3:7], x[7:10], x[10:13]
+        if not hasattr(self, '_dynamics_sym'):
+            self.create_dynamics()
+        if isinstance(x, np.ndarray):
+            return np.array(self._dynamics_sym(p,q,v,w,u)).reshape((self.n_x,))
+        else:
+            return self._dynamics_sym(p,q,v,w,u)
 
 
     def create_fx(self):
@@ -263,8 +286,10 @@ class FreeFlyer(Robot):
                 [
                     cs.blockcat([
                         [v],
+                        # [q_to_rot_mat_cs(q) @ v],
                         [0.5 * quat_mult(q, cs.vertcat(0, w))],
                         [self.iX.zeros(3,)],
+                        # [-w_cross @ v],
                         [-self.iX(np.linalg.inv(self.inertia)) @ cs.mtimes(w_cross, cs.mtimes(self.inertia, w))]
                     ])
                 ]
@@ -290,6 +315,7 @@ class FreeFlyer(Robot):
                         [self.iX.zeros((3, 6))],
                         [self.iX.zeros((4, 6))],
                         [cs.horzcat(
+                            # self.iX.eye(3) / self.mass,
                             q_to_rot_mat_cs(q) / self.mass,
                             self.iX.zeros((3, 3))
                         )],
@@ -303,7 +329,7 @@ class FreeFlyer(Robot):
     def calculate_gx(self, x):
         p, q, v, w = x[0:3], x[3:7], x[7:10], x[10:13]
         if isinstance(p, np.ndarray):
-            return np.array(self._gx_sym(p, q, v, w)).reshape((self.n_x, self.n_u))
+            return np.array(self._gx_sym(p, q, v, w))
         else:
             return self._gx_sym(p, q, v, w)
         
@@ -314,8 +340,8 @@ class FreeFlyer(Robot):
             q = self.iX.sym('q', 4)
             v = self.iX.sym('v', 3)
             w = self.iX.sym('w', 3)
-            cx = self.iX.zeros((13,6))
-            cx[6:12, :] = self.iX.eye(6)
+            cx = self.iX.zeros((13,3))
+            cx[7:10, 0:3] = self.iX.eye(3)/self.mass
             self._cx_sym = cs.Function('cx', [p, q, v, w],
                 [
                     cx
@@ -324,6 +350,6 @@ class FreeFlyer(Robot):
     def calculate_cx(self, x):
         p, q, v, w = x[0:3], x[3:7], x[7:10], x[10:13]
         if isinstance(p, np.ndarray):
-            return np.array(self._cx_sym(p, q, v, w)).reshape((self.n_u, self.n_x))
+            return np.array(self._cx_sym(p, q, v, w))
         else:
             return self._cx_sym(p, q, v, w)

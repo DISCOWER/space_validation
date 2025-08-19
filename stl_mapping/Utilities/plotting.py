@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from Utilities.rotations import euler_to_quat_np
+from Utilities.rotations import euler_to_quat_np, quat_to_euler_np
 
 def plot_planning_results(robot, t, x, u, 
                           X0=None, Xf=None, ROIs=None, Obs=None, alpha=1.0,
@@ -35,6 +35,11 @@ def plot_planning_results(robot, t, x, u,
     v = x[:, v_idxs]
     w = x[:, w_idxs]
 
+    if q.shape[1] == 4:  # If quaternion representation
+        heading = quat_to_euler_np(q, order='xyz')[:, 2]
+    else:  # If Euler angles
+        heading = q[:, 2]  # Assuming z-axis is up
+
     # plot the trajectory
     if in_axs is None:
         fig = plt.figure(figsize=(15, 5))
@@ -49,7 +54,9 @@ def plot_planning_results(robot, t, x, u,
         ax_p, ax_v, ax_q, ax_w, ax_f, ax_t = in_axs
 
     ax_p.plot(p[:, 0], p[:, 1], 'g-')
-    ax_p.plot(p[:, 0], p[:, 1], 'go')
+    # ax_p.plot(p[:, 0], p[:, 1], 'go')
+    if heading is not None:
+        ax_p.quiver(p[:, 0], p[:, 1], np.cos(heading), np.sin(heading), color='r', scale=10)
     if X0 is not None:
         X0.plot(ax_p, color='green', alpha=0.5)
     if Xf is not None:
@@ -63,9 +70,12 @@ def plot_planning_results(robot, t, x, u,
     ax_p.set_ylabel('Y (m)')
     ax_p.grid()
 
-    ax_v.plot(t, v[:, 0], label='dx')
-    ax_v.plot(t, v[:, 1], label='dy')
-    ax_v.plot(t, v[:, 2], label='dz')
+    ax_v.plot(t, v[:, 0], 'r-',label='dx')
+    ax_v.plot(t, v[:, 0], 'ro')
+    ax_v.plot(t, v[:, 1], 'g-', label='dy')
+    ax_v.plot(t, v[:, 1], 'go')
+    ax_v.plot(t, v[:, 2], 'b-', label='dz')
+    ax_v.plot(t, v[:, 2], 'bo')
     ax_v.set_xlabel('Time (s)')
     ax_v.set_ylabel('Velocity (m/s)')
     ax_v.legend()
@@ -102,6 +112,11 @@ def plot_planning_results(robot, t, x, u,
         ax_f.axhline(alpha*robot.U_effective.upper_bounds[0], color='b', linestyle='--')
         ax_f.axhline(robot.U_effective.lower_bounds[0], color='r', linestyle=':')#, label="U_effective_lb")
         ax_f.axhline(robot.U_effective.upper_bounds[0], color='r', linestyle=':')
+    if hasattr(robot, '_U_effective_sym'):
+        ax_f.axhline(alpha*robot.calculate_U_effective(np.zeros((13,))).lower_bounds[0], color='b', linestyle='--')
+        ax_f.axhline(alpha*robot.calculate_U_effective(np.zeros((13,))).upper_bounds[0], color='b', linestyle='--')
+        ax_f.axhline(robot.calculate_U_effective(np.zeros((13,))).lower_bounds[0], color='r', linestyle=':')
+        ax_f.axhline(robot.calculate_U_effective(np.zeros((13,))).upper_bounds[0], color='r', linestyle=':')
     ax_f.set_xlabel('Time (s)')
     ax_f.set_ylabel('Control input (N)')
     ax_f.legend()

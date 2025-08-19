@@ -15,13 +15,14 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
 from Utilities.smarc_modelling.src.smarc_modelling.lib import *
 from Utilities.smarc_modelling.src.smarc_modelling.vehicles.BlueROV import BlueROV
-
+from Utilities.Robots import FreeFlyer
 matplotlib.use('TkAgg')  # or 'Qt5Agg', depending on what you have installed
 
 # Initial conditions
 eta0 = np.zeros(7)
-eta0[2] = 0
-eta0[3] = 1.0  # Initial quaternion (no rotation) 
+# eta0[3] = 1/np.sqrt(2)  # Initial quaternion (no rotation) 
+# eta0[6] = 1/np.sqrt(2)
+eta0[3:7] = np.array([0.9239, 0, 0, 0.3827])
 nu0 = np.zeros(6)  # Zero initial velocities
 x0 = np.concatenate([eta0, nu0])
 
@@ -39,7 +40,8 @@ T = np.array([
 ])
 
 # Create SAM instance
-blueROV = BlueROV(dt)
+robot = BlueROV(dt)
+# robot = FreeFlyer(dt)
 
 class Sol():
     """
@@ -61,13 +63,13 @@ def rk4(x, u, dt, fun):
     return x_t
 
 # FIXME: consider removing the dynamics wrapper and just call the dynamics straight away.
-def run_simulation(t_span, x0, dt, blueROV:BlueROV):
+def run_simulation(t_span, x0, dt, robot:BlueROV):
     """
     Run BlueROV simulation using RK4.
     """
     u = np.zeros(6)
     u[0] = 20  # force in x-direction
-    u[1] = 50 # force in y-direction
+    u[1] = 0 # force in y-direction
     # u[2] = -10 # force in z-direction
     #u[3] = -1 # torque around x-axis
     #u[4] = -1 # torque around the y-axis
@@ -98,7 +100,7 @@ def run_simulation(t_span, x0, dt, blueROV:BlueROV):
 
             x_NED = np.concatenate((pos_ned, quat_ned, data[7:nx,i]))
 
-            x_new_NED = rk4(x_NED, u_NED, dt, blueROV.calculate_dynamics)
+            x_new_NED = rk4(x_NED, u_NED, dt, robot.calculate_dynamics)
             pos_enu, quat_enu = ned_to_enu(x_new_NED[:3], x_new_NED[3:7])
             data[:3,i+1] = pos_enu
             data[3:7,i+1] = quat_enu
@@ -109,7 +111,7 @@ def run_simulation(t_span, x0, dt, blueROV:BlueROV):
                 print("You provide x0 and u in NED (default)")
                 print("You get x and u in NED (default)")
                 frame_message_printed = True
-            data[:nx,i+1] = rk4(data[:nx,i], u, dt, blueROV.calculate_dynamics)
+            data[:nx,i+1] = rk4(data[:nx,i], u, dt, robot.calculate_dynamics)
             data[nx:,i+1] = u
     sol = Sol(t_eval,data)
     print(f" Simulation complete!")
@@ -160,8 +162,8 @@ def plot_results(sol):
     _, axs = plt.subplots(6, 3, figsize=(12, 10))
 
     # Position plots
-    axs[0,0].plot(sol.t, sol.y[1], label='x')
-    axs[0,1].plot(sol.t, sol.y[0], label='y')
+    axs[0,0].plot(sol.t, sol.y[0], label='x')
+    axs[0,1].plot(sol.t, sol.y[1], label='y')
     axs[0,2].plot(sol.t, -sol.y[2], label='z')
     axs[0,0].set_ylabel('x Position [m]')
     axs[0,1].set_ylabel('y Position [m]')
@@ -271,7 +273,7 @@ def plot_trajectory(sol, numDataPoints, generate_gif=False, filename="3d.gif", F
 
 
 # Run simulation and plot results
-sol = run_simulation(t_span, x0, dt, blueROV)
+sol = run_simulation(t_span, x0, dt, robot)
 plot_results(sol)
-plot_trajectory(sol, 50, True, "stl_mapping/Planning/figures/3d.gif", 10)
+# plot_trajectory(sol, 50, True, "stl_mapping/Planning/figures/3d.gif", 10)
 plt.show()

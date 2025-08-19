@@ -48,20 +48,38 @@ class MpcWrench():
         self.dt = 0.2               # MPC time step [s]
         self.Nx = 30                # Prediction horizon, states             
         self.Nu = 30                # Prediction horizon, inputs
+
+        #! ATMOS weights
+        # self.Q = np.diag([          # State weighting matrix
+        #     1e0, 1e0, 1e0,
+        #     1e2,
+        #     3e1, 3e1, 3e1,  
+        #     3e1, 3e1, 3e1])             
+        # self.R = 0.1*np.diag([          # State weighting matrix
+        #     1e0, 1e0, 1e0,
+        #     1e0, 1e0, 1e0]) 
+        # self.P = 10 * self.Q        # Terminal state weighting matrix
+        
+        #! BlueROV weights
         self.Q = np.diag([          # State weighting matrix
             1e0, 1e0, 1e0,
             1e2,
             3e1, 3e1, 3e1,  
             3e1, 3e1, 3e1])             
-        self.R = 0.1*np.diag([          # State weighting matrix
+        self.R = 2*np.diag([          # State weighting matrix
             1e0, 1e0, 1e0,
             1e0, 1e0, 1e0]) 
         self.P = 10 * self.Q        # Terminal state weighting matrix
         
-        # Bounds
-        self.lbx = np.array([0+0.25, -1.58+0.25, -0.5, -0.5, -3])
-        self.ubx = np.array([4.1-0.25, 1.74-0.25, 0.5, 0.5, 3])
-        self.idxbx = np.array([0, 1, 7, 8, 12]) # Indexes of states that are bounded
+        #! ATMOS Bounds
+        # self.lbx = np.array([0+0.25, -1.58+0.25, -0.5, -0.5, -3])
+        # self.ubx = np.array([4.1-0.25, 1.74-0.25, 0.5, 0.5, 3])
+        # self.idxbx = np.array([0, 1, 7, 8, 12]) # Indexes of states that are bounded
+
+        #! BlueROV Bounds
+        self.lbx = np.array([0.5 -2, 0,  -1, -1, -1])
+        self.ubx = np.array([8.5, 2, 2.5, 1,  1,  1])
+        self.idxbx = np.array([0, 1, 2, 7, 8, 9]) # Indexes of states that are bounded
 
         # Weight on slack varibles
         self.W_slack = np.array([1e4]*len(self.idxbx))

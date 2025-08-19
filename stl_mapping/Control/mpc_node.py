@@ -18,21 +18,17 @@ from Control.controllers.mpc_wrench import MpcWrench
 from Control.estimators.ekf_wrench_estimator import EKFWrenchEstimator
 from Utilities.rotations import quat_to_euler_np, q_to_rot_mat_np
 
-# The PX4 uses normalized wrench input. If NORMALIZED_WRENCH is True, the control
-# input has to be normalized. I will at some point do a PR to the PX4 to
-# support non-normalized wrench input.
-NORMALIZED_WRENCH = True  # Use normalized wrench for control input
-F_thruster = 1.4  # Thrust force per motor
-r_thruster = 0.12  # Distance from center to thruster in meters
-F_scaling = 2 * F_thruster if NORMALIZED_WRENCH else 1.0
-T_scaling = 4 * r_thruster * F_thruster if NORMALIZED_WRENCH else 1.0
-
 class MPCNode(Node):
     def __init__(self):
         super().__init__('mpc_node')
         self.get_logger().info("Initializing MPC Node")
 
         self.model_name = self.declare_parameter('model_name', 'atmos').value
+        self.x_offset = self.declare_parameter('x_offset', 0.0).value
+        self.y_offset = self.declare_parameter('y_offset', 0.0).value
+        self.z_offset = self.declare_parameter('z_offset', 0.0).value
+        self.offset = np.array([self.x_offset, self.y_offset, self.z_offset])
+        self.rate = self.declare_parameter('rate', 5.0).value
 
         self.mpc = MpcWrench(model_name=self.model_name)
         self.control = np.zeros((self.mpc.nu, 1))
@@ -92,10 +88,6 @@ class MPCNode(Node):
             'fmu/in/vehicle_torque_setpoint', 
             NORMAL_QOS)
         self.publisher_thrust_setpoint = self.create_publisher(
-            VehicleThrustSetpoint, 
-            'fmu/in/vehicle_thrust_setpoint', 
-            NORMAL_QOS)
-        self.publisher_thrust_setpoint = self.create_publisher(
             VehicleThrustSetpoint,
             'fmu/in/vehicle_thrust_setpoint',
             NORMAL_QOS)
@@ -131,7 +123,7 @@ class MPCNode(Node):
         self.get_logger().info("MPC publishers initialized successfully")
 
         # Disturbance variables
-        self.offset_free = True
+        self.offset_free = False
         self.F_cmd = np.zeros((3, 1))  # Force commanded
         self.T_cmd = np.zeros((3, 1))  # Torque commanded
         self.ekf_estimator = EKFWrenchEstimator(dt=0.05)
@@ -139,8 +131,21 @@ class MPCNode(Node):
         self.td_est = np.zeros(3)  # Estimated torque disturbance
         self.dist_cov = np.zeros((6, 6))  # Disturbance covariance matrix
 
+        # The PX4 uses normalized wrench input. If NORMALIZED_WRENCH is True, the control
+        # input has to be normalized. I will at some point do a PR to the PX4 to
+        # support non-normalized wrench input.
+        NORMALIZED_WRENCH = True  # Use normalized wrench for control input
+        self.F_thruster = 1.4  # Thrust force per motor
+        self.r_thruster = 0.12  # Distance from center to thruster in meters
+        if self.model_name == "atmos":
+            self.F_scaling = 2 * self.F_thruster if NORMALIZED_WRENCH else 1.0
+            self.T_scaling = 4 * self.r_thruster * self.F_thruster if NORMALIZED_WRENCH else 1.0
+        else:
+            self.F_scaling = np.array([85, 85, 120])
+            self.T_scaling = np.array([26, 14, 22])
+
         # Create the MPC solver and create timer callback to solve
-        timer_period = 0.2 # seconds
+        timer_period = 1.0/self.rate # seconds
         self.timer = self.create_timer(timer_period, self.cmdloop_callback)
 
         timer_period_offboard = 0.1 # seconds
@@ -180,26 +185,36 @@ class MPCNode(Node):
         self.get_logger().info("MPC Node initialized successfully")
 
     def vehicle_attitude_callback(self, msg):
-            # NED-> ENU transformation
-            # Receives quaternion in NED frame as (qw, qx, qy, qz)
-            q_enu = 1/np.sqrt(2) * np.array([msg.q[0] + msg.q[3], msg.q[1] + msg.q[2], msg.q[1] - msg.q[2], msg.q[0] - msg.q[3]])
-            q_enu /= np.linalg.norm(q_enu)
-            self.vehicle_attitude = q_enu.astype(float)
+            if self.model_name == "atmos":
+                # NED-> ENU transformation
+                # Receives quaternion in NED frame as (qw, qx, qy, qz)
+                q_enu = 1/np.sqrt(2) * np.array([msg.q[0] + msg.q[3], msg.q[1] + msg.q[2], msg.q[1] - msg.q[2], msg.q[0] - msg.q[3]])
+                q_enu /= np.linalg.norm(q_enu)
+                self.vehicle_attitude = q_enu.astype(float)
+            else:
+                self.vehicle_attitude = np.array([msg.q[0], msg.q[1], msg.q[2], msg.q[3]])
 
     def vehicle_local_position_callback(self, msg):
-        # NED-> ENU transformation
-        self.vehicle_local_position[0] = msg.y
-        self.vehicle_local_position[1] = msg.x
-        self.vehicle_local_position[2] = -msg.z
-        self.vehicle_local_velocity[0] = msg.vy
-        self.vehicle_local_velocity[1] = msg.vx
-        self.vehicle_local_velocity[2] = -msg.vz
+        if self.model_name == "atmos":
+            # NED-> ENU transformation
+            self.vehicle_local_position[0] = msg.y
+            self.vehicle_local_position[1] = msg.x
+            self.vehicle_local_position[2] = -msg.z
+            self.vehicle_local_velocity[0] = msg.vy
+            self.vehicle_local_velocity[1] = msg.vx
+            self.vehicle_local_velocity[2] = -msg.vz
+        else:
+            self.vehicle_local_position = np.array([msg.x, msg.y, msg.z])
+            self.vehicle_local_velocity = np.array([msg.vx, msg.vy, msg.vz])
 
     def vehicle_angular_velocity_callback(self, msg):
-        # NED-> ENU transformation
-        self.vehicle_angular_velocity[0] = msg.xyz[0]
-        self.vehicle_angular_velocity[1] = -msg.xyz[1]
-        self.vehicle_angular_velocity[2] = -msg.xyz[2]
+        if self.model_name == "atmos":
+            # NED-> ENU transformation
+            self.vehicle_angular_velocity[0] = msg.xyz[0]
+            self.vehicle_angular_velocity[1] = -msg.xyz[1]
+            self.vehicle_angular_velocity[2] = -msg.xyz[2]
+        else:
+            self.vehicle_angular_velocity = np.array([msg.xyz[0], msg.xyz[1], msg.xyz[2]])
 
     def vehicle_status_callback(self, msg):
         # print("NAV_STATUS: ", msg.nav_state)
@@ -207,12 +222,12 @@ class MPCNode(Node):
         self.nav_state = msg.nav_state
 
     def actuator_motors_callback(self, msg: ActuatorMotors):
-        B_F = F_thruster * np.array([
+        B_F = self.F_thruster * np.array([
             [1., -1., 1., -1., 0., 0., 0., 0.],
             [0., 0., 0., 0., -1., 1., -1., 1.],
             [0., 0., 0., 0., 0., 0., 0., 0.]
             ])
-        B_T = F_thruster * r_thruster * np.array([
+        B_T = self.F_thruster * self.r_thruster * np.array([
             [0., 0., 0., 0., 0., 0., 0., 0.],
             [0., 0., 0., 0., 0., 0., 0., 0.],
             [-1., 1., 1., -1., -1., 1., 1., -1.]
@@ -275,15 +290,21 @@ class MPCNode(Node):
         torque_output_msg.timestamp = int(Clock().now().nanoseconds / 1000)
 
         # Scaling
-        u[0:3] /= F_scaling
-        u[3:6] /= T_scaling
+        u[0:3] /= self.F_scaling
+        u[3:6] /= self.T_scaling
 
-        # ENU -> NED transformation
-        force_output_msg.xyz = [u[0], -u[1], -u[2]]
-        torque_output_msg.xyz = [u[3], -u[4], -u[5]]
+        if self.model_name == "atmos":
+            # ENU -> NED transformation
+            force_output_msg.xyz = [u[0], -u[1], -u[2]]
+            torque_output_msg.xyz = [u[3], -u[4], -u[5]]
+        else:
+            force_output_msg.xyz = [u[0], u[1], u[2]]
+            torque_output_msg.xyz = [u[3], u[4], u[5]]
         # EKF in FLU frame so don't transform
         # self.F_app = u[:3]
         # self.T_app = u[3:6]
+        self.get_logger().info(f"Applied force: {force_output_msg.xyz}")
+        self.get_logger().info(f"Applied torque: {torque_output_msg.xyz}")
 
         self.publisher_thrust_setpoint.publish(force_output_msg)
         self.publisher_torque_setpoint.publish(torque_output_msg)
@@ -379,18 +400,18 @@ class MPCNode(Node):
         t = time.time()
 
         x0 = np.array([self.vehicle_local_position[0],
-                           self.vehicle_local_position[1],
-                           self.vehicle_local_position[2],
-                           self.vehicle_attitude[0],
-                           self.vehicle_attitude[1],
-                           self.vehicle_attitude[2],
-                           self.vehicle_attitude[3],
-                           self.vehicle_local_velocity[0],
-                           self.vehicle_local_velocity[1],
-                           self.vehicle_local_velocity[2],
-                           self.vehicle_angular_velocity[0],
-                           self.vehicle_angular_velocity[1],
-                           self.vehicle_angular_velocity[2]]).reshape(13, 1)
+                       self.vehicle_local_position[1],
+                       self.vehicle_local_position[2],
+                       self.vehicle_attitude[0],
+                       self.vehicle_attitude[1],
+                       self.vehicle_attitude[2],
+                       self.vehicle_attitude[3],
+                       self.vehicle_local_velocity[0],
+                       self.vehicle_local_velocity[1],
+                       self.vehicle_local_velocity[2],
+                       self.vehicle_angular_velocity[0],
+                       self.vehicle_angular_velocity[1],
+                       self.vehicle_angular_velocity[2]]).reshape(13, 1)
 
         if not self.started:
             # self.get_logger().info("Mission not started, using constant reference (t=0)")
@@ -415,20 +436,22 @@ class MPCNode(Node):
             #                           0., 0., 0., 1.,
             #                           0., 0., 0.,
             #                           0., 0., 0.]).reshape(13,)
-            x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='zyx')
+            x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
 
         x_ref = np.vstack((x_ref, np.repeat(u_ref, x_ref.shape[1], axis=1)))  # Append u_ref to x_ref
+        x_ref[:3, :] += self.offset.reshape(3, 1)
 
-        self.get_logger().info(f"euler: {quat_to_euler_np(x_ref[3:7, 0], order='zyx')}")
-        self.get_logger().info(f"x_ref: {x_ref[:, 0].flatten()}")
-        # self.get_logger().info(f"x0: {x0.flatten()}")
+        # self.get_logger().info(f"euler: {quat_to_euler_np(x_ref[3:7, 0], order='xyz')}")
+        # self.get_logger().info(f"x_ref: {x_ref[:3, 0].flatten()}")
+        # self.get_logger().info(f"p: {x0[:3,0]}")
+        # self.get_logger().info(f"v: {x0[7:10,0]}")
 
         # Get control input
         if self.offset_free:
             self.control, x_pred = self.mpc.get_input(x0, x_ref, fd=self.fd_est, td=self.td_est)
         else:
             self.control, x_pred = self.mpc.get_input(x0, x_ref)
-        # print(f"Control: {self.control.flatten()}")
+        print(f"Control: {self.control.flatten()}")
 
         # quat_error = (x_pred[0, 6:10] @ x_ref[6:10, 0])**2
         # self.get_logger().warning(f"quat_error: {1-quat_error}")
