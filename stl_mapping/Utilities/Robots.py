@@ -205,8 +205,8 @@ class FreeFlyer(Robot):
         )
         self.create_K()
         self.create_U_effective()
-        U_effective = self.calculate_U_effective(self.x)
-        print(f"U_effective: {U_effective.center[:,0].T}, {U_effective.lower_bounds[:,0].T}, {U_effective.upper_bounds[:,0].T}")
+        # U_effective = self.calculate_U_effective(self.x)
+        # print(f"U_effective: {U_effective.center[:,0].T}, {U_effective.lower_bounds[:,0].T}, {U_effective.upper_bounds[:,0].T}")
 
         
     def create_K(self):

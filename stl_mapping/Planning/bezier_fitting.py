@@ -9,6 +9,7 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
 from Utilities.beziers import eval_bezier
 
+
 def bezier_fitting(data, model_name):
     x = data['x']
     u = data['u']
@@ -131,6 +132,8 @@ def bezier_fitting(data, model_name):
     axs[3].set_xlabel('ax')
     axs[3].set_ylabel('ay')
     plt.savefig(f'stl_mapping/Planning/figures/{model_name}_solution_bezier.png',dpi=300)
+
+
 
 if __name__ == "__main__":
     model_name = 'atmos' # Change to 'atmos' or 'bluerov if needed

@@ -33,7 +33,7 @@ def get_reference_trajectory(t:float, trajectory:ReferenceTrajectory, order:str=
     dq_val = (dq_val[1] - dq_val[0]) / (ds*trajectory.dt)
     # dq_val = np.zeros((3,))   # This for slow-moving tests
 
-    print(f"q_val: {quat_to_euler_np(q_val, order=order)}")
+    # print(f"q_val: {quat_to_euler_np(q_val, order=order)}")
     # print(f"dq_val: {dq_val}")
     return np.concatenate((p, q_val, v, dq_val))
 
