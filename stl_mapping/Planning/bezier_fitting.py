@@ -67,7 +67,7 @@ def bezier_fitting(data, model_name):
 
     q_sols = [np.array([x[i, 3:7], x[i+1, 3:7]]) for i in range(N-1)]
     q_sols = np.array(q_sols)
-    print(f"q_sols: {q_sols}")
+    # print(f"q_sols: {q_sols}")
 
     np.savez(f'stl_mapping/Planning/solutions/{model_name}_solution_bezier.npz',
             r=r_sols, dr=dr_sols, ddr=ddr_sols, q=q_sols, dt=dt, alpha=alpha, times=times)
@@ -78,7 +78,7 @@ def bezier_fitting(data, model_name):
     ddr_vals = [eval_bezier(ddr_vars[i].value) for i in range(N-1)]
 
     # Print the results
-    print(f"Optimal cost: {prob.value}")
+    # print(f"Optimal cost: {prob.value}")
 
     # Plot the results
     fig, axs = plt.subplots(1,4, figsize=(20, 10))
