@@ -21,7 +21,7 @@ def bezier_fitting(data, model_name):
     n = 3
 
     # create d-th order Bezier curve from variables
-    d = 4
+    d = 3
 
     constraints = []
     cost = 0
@@ -38,26 +38,46 @@ def bezier_fitting(data, model_name):
         for c in range(d-1):
             constraints += [ddr_vars[i][:,c] == (d-1)*(dr_vars[i][:,c+1] - dr_vars[i][:,c])]
 
+    # continuity constraints
+    for i in range(N-2):
+        constraints += [r_vars[i][:,-1] == r_vars[i+1][:,0]]
+        constraints += [dr_vars[i][:,-1] == dr_vars[i+1][:,0]]
+        constraints += [ddr_vars[i][:,-1] == ddr_vars[i+1][:,0]]
+
+    delta_r, delta_dr = cp.Variable(1), cp.Variable(1)
+    constraints += [delta_r >= 0, delta_dr >= 0]
+    add_slack = True
     # end-point position constraints
     for i in range(N-1):
-        constraints += [r_vars[i][:,0] == x[i,0:3]]
-        constraints += [r_vars[i][:,-1] == x[i+1,0:3]]
+        if add_slack:
+            constraints += [r_vars[i][:,0] <= x[i,0:3] + delta_r]
+            constraints += [r_vars[i][:,0] >= x[i,0:3] - delta_r]
+            constraints += [r_vars[i][:,-1] <= x[i+1,0:3] + delta_dr]
+            constraints += [r_vars[i][:,-1] >= x[i+1,0:3] - delta_dr]
+        else:
+            constraints += [r_vars[i][:,0] == x[i,0:3]]
+            constraints += [r_vars[i][:,-1] == x[i+1,0:3]]
 
     # end-point velocity constraints
     for i in range(N-1):
-        # the trajectories for the nonlinear models have the velocities in the body frame,
-        # so we need to convert this to the inertial frame for smooth interpolation of position
-        q = R.from_quat(x[i, 3:7],scalar_first=True).as_matrix()
-        constraints += [dr_vars[i][:,0] == x[i,7:10]]
-        q = R.from_quat(x[i+1, 3:7],scalar_first=True).as_matrix()
-        constraints += [dr_vars[i][:,-1] == x[i+1,7:10]]
+        if add_slack:
+            constraints += [dr_vars[i][:,0] <= x[i,7:10]*dt + delta_dr]
+            constraints += [dr_vars[i][:,0] >= x[i,7:10]*dt - delta_dr]
+            constraints += [dr_vars[i][:,-1] <= x[i+1,7:10]*dt + delta_dr]
+            constraints += [dr_vars[i][:,-1] >= x[i+1,7:10]*dt - delta_dr]
+        else:
+            constraints += [dr_vars[i][:,0] == dt*x[i,7:10]]
+            constraints += [dr_vars[i][:,-1] == dt*x[i+1,7:10]]
 
     # cost
     for i in range(N-1):
         cost += cp.sum_squares(ddr_vars[i])
+    if add_slack:
+        cost += 1000*delta_r + 1000*delta_dr
 
     prob = cp.Problem(cp.Minimize(cost), constraints)
-    prob.solve(solver=cp.CVXOPT)
+    # prob.solve(solver=cp.CVXOPT)
+    prob.solve(solver=cp.OSQP)
 
     # Gather the results and save
     r_sols = [r_vars[i].value for i in range(N-1)]
@@ -107,12 +127,12 @@ def bezier_fitting(data, model_name):
 
     for i in range(N-1):
         i_time = np.linspace(i*dt, (i+1)*dt, r_vals[i].shape[1])
-        axs[2].plot(i_time, dr_vals[i][0, :], 'b', label=f'Bezier {i}')
-        axs[2].plot(i_time, dr_vals[i][1, :], 'r')
+        axs[2].plot(i_time, dr_vals[i][0, :]/dt, 'b', label=f'Bezier {i}')
+        axs[2].plot(i_time, dr_vals[i][1, :]/dt, 'r')
         # plot the control points
         i_time = np.linspace(i*dt, (i+1)*dt, dr_vars[i].shape[1])
-        axs[2].plot(i_time, dr_vars[i].value[0, :], 'ko')
-        axs[2].plot(i_time, dr_vars[i].value[1, :], 'ko')
+        axs[2].plot(i_time, dr_vars[i].value[0, :]/dt, 'ko')
+        axs[2].plot(i_time, dr_vars[i].value[1, :]/dt, 'ko')
         # plot the reference trajectory
         axs[2].plot(times,x[:, 7], 'bo--', label='Reference vx')
         axs[2].plot(times,x[:, 8], 'ro--', label='Reference vy')
@@ -136,6 +156,6 @@ def bezier_fitting(data, model_name):
 
 
 if __name__ == "__main__":
-    model_name = 'atmos' # Change to 'atmos' or 'bluerov if needed
+    model_name = 'bluerov' # Change to 'atmos' or 'bluerov if needed
     data = np.load(f'stl_mapping/Planning/solutions/{model_name}_nonlinear_solution.npz')
     bezier_fitting(data, model_name)
