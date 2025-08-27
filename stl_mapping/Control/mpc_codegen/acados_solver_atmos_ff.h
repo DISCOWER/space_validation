@@ -61,9 +61,9 @@
 #define ATMOS_FF_NG     0
 #define ATMOS_FF_NBXN   0
 #define ATMOS_FF_NGN    0
-#define ATMOS_FF_NY0    16
-#define ATMOS_FF_NY     16
-#define ATMOS_FF_NYN    10
+#define ATMOS_FF_NY0    19
+#define ATMOS_FF_NY     19
+#define ATMOS_FF_NYN    13
 #define ATMOS_FF_N      30
 #define ATMOS_FF_NH     0
 #define ATMOS_FF_NHN    0

@@ -38,6 +38,7 @@ __contact__ = "eliaskra@kth.se"
 import casadi as ca
 import numpy as np
 from acados_template import AcadosModel
+from Utilities.Robots import FreeFlyer
 
 def get_rotMat(q):
     rotMat = ca.vertcat(
@@ -88,25 +89,28 @@ def atmos_model_wrench():
 
     model.p = ca.vertcat(x_ref, u_ref, fd, td)
     
-    rotMat = get_rotMat(q)
-    w_cross = ca.vertcat(
-        ca.horzcat(0, -w[2], w[1]),
-        ca.horzcat(w[2], 0, -w[0]),
-        ca.horzcat(-w[1], w[0], 0)
-    )
+    # rotMat = get_rotMat(q)
+    # w_cross = ca.vertcat(
+    #     ca.horzcat(0, -w[2], w[1]),
+    #     ca.horzcat(w[2], 0, -w[0]),
+    #     ca.horzcat(-w[1], w[0], 0)
+    # )
 
-    F = ca.vertcat(u[0], u[1], u[2])
-    T = ca.vertcat(u[3], u[4], u[5])
+    # F = ca.vertcat(u[0], u[1], u[2])
+    # T = ca.vertcat(u[3], u[4], u[5])
 
-    pdot = v
-    qdot = quat_derivative(q, w)
-    vdot = mass_inv * ca.mtimes(rotMat, F) + fd * mass_inv
-    wdot = ca.mtimes(inertia_inv, (T + td - ca.mtimes(w_cross, ca.mtimes(inertia, w))))
+    # pdot = v
+    # qdot = quat_derivative(q, w)
+    # vdot = mass_inv * ca.mtimes(rotMat, F) + fd * mass_inv
+    # wdot = ca.mtimes(inertia_inv, (T + td - ca.mtimes(w_cross, ca.mtimes(inertia, w))))
 
-    xdot = ca.vertcat(pdot, qdot, vdot, wdot)
+    # xdot = ca.vertcat(pdot, qdot, vdot, wdot)
+
+    atmos = FreeFlyer(iX=ca.MX)
+    model.f_expl_expr = atmos.calculate_disturbed_dynamics(x, u, fd, td)
 
     # Assign dynamics and controls
-    model.f_expl_expr = xdot
+    # model.f_expl_expr = xdot
     model.x = x
     model.u = u
 

@@ -39,17 +39,17 @@ euler_order = 'xyz'
 depth = 0.0
 X0 = HyperRectangle(np.array([0.5, 0, depth]), np.array([0.6, 0.1, depth+0.1]))
 Xf = HyperRectangle(np.array([2.5, 1.0, depth]), np.array([2.6, 1.1, depth+0.1]))
-# XA = HyperRectangle(np.array([2.5, -1.0, depth,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, depth+0.1,  -np.pi/2+np.pi/8]))
+XA = HyperRectangle(np.array([2.5, -1.0, depth,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, depth+0.1,  -np.pi/2+np.pi/8]))
 # XA = HyperRectangle(np.array([2.5, -1.0, depth,  -np.pi/2-np.pi/8, -np.pi/2-np.pi/8]), 
 #                     np.array([2.6, -0.9, depth+0.1,  -np.pi/2+np.pi/8, -np.pi/2+np.pi/8]))
 # later converted to polytopes for predicates of the form Ax \leq b: Polytope = (A,b)
-XA = HyperRectangle(np.array([2.5, -1.0, depth]), np.array([2.6, -0.9, depth+0.1]))
+# XA = HyperRectangle(np.array([2.5, -1.0, depth]), np.array([2.6, -0.9, depth+0.1]))
 Obs = []
 World = HyperRectangle(np.array([0, -1.5, -10, -10]), np.array([4, 1.5, 10, 10]))
 phi = Pred("AND", preds=[
     Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)], dims=[0,1,2])]),
     Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1,2])]),
-    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2])]),
+    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2, 5])]),
     Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)], dims=[0,1,6,7])]),
 ])
 spec = Spec(phi, t0, tf)
@@ -75,8 +75,8 @@ if True:
     sp_robot.add_state_constraints(opt, items)
 
     # initial orientation and velocity constraints
-    opt.addConstr(x_vars[0, 3::] == np.array([0, 0, np.pi/2, 0, 0, 0, 0, 0, 0]))#np.zeros(sp_robot.n_x - 3))
-    opt.addConstr(x_vars[-1, 3::] == np.array([0, 0, np.pi/2, 0, 0, 0, 0, 0, 0]))#np.zeros(sp_robot.n_x - 3))
+    opt.addConstr(x_vars[0, 3::] == np.array([0, 0, 0, 0, 0, 0, 0, 0, 0]))#np.zeros(sp_robot.n_x - 3))
+    opt.addConstr(x_vars[-1, 3::] == np.array([0, 0, 0, 0, 0, 0, 0, 0, 0]))#np.zeros(sp_robot.n_x - 3))
 
     X = [var for var in opt.getVars() if "X" in var.VarName]
     quant_parse_operator(opt, spec.phi, items)
@@ -185,6 +185,52 @@ np.savez('stl_mapping/Planning/solutions/atmos_nonlinear_solution.npz', x=x_ff_n
 data = np.load('stl_mapping/Planning/solutions/atmos_nonlinear_solution.npz')
 bezier_fitting(data,'atmos')
 
+if True:
+    ocp = cs.Opti()
+    x_vars = ocp.variable(13, N)
+    u_vars = ocp.variable(6, N-1)
+    delta = ocp.variable(1)
+
+    ocp.set_initial(x_vars, x_ff.T)
+    ocp.set_initial(u_vars, u_ff.T)
+
+    for i in range(N-1):
+        ocp.subject_to(u_vars[:,i] >= sp_robot_nl.U.lower_bounds)
+        ocp.subject_to(u_vars[:,i] <= sp_robot_nl.U.upper_bounds)
+    
+    for i in range(N-1):
+        ocp.subject_to(x_vars[:,i+1] == sp_robot_nl.step(x_vars[:,i], u_vars[:,i], dt))
+
+    n_equal = 13
+    for i in range(N):
+        ocp.subject_to(x_vars[0:n_equal,i] <= x_ff[i,0:n_equal] + delta*np.ones(n_equal))
+        ocp.subject_to(x_vars[0:n_equal,i] >= x_ff[i,0:n_equal] - delta*np.ones(n_equal))
+    # ocp.subject_to(x_vars[n_equal:,0] == x_ff[0,n_equal:])
+    # ocp.subject_to(x_vars[n_equal:,N-1] == x_ff[N-1,n_equal:])
+
+
+    quad_u_var = 0
+    Q = np.diag([1., 1., 1., 10., 10., 10.])
+    for i in range(N-1):
+        quad_u_var += cs.mtimes(u_vars[:,i].T, Q @ u_vars[:,i])
+    ocp.minimize(quad_u_var + 1e6*delta)
+    opts = {'ipopt.print_level': 0, 'print_time': 0, 'ipopt.sb': 'yes',
+            'verbose':False, 'ipopt.tol': 1e-4, 'ipopt.max_iter': 1000}
+    ocp.solver('ipopt',opts)
+
+    try:
+        print(f"\n\nSolving nl atmos optimization problem...")
+        sol = ocp.solve()
+        x_ff_nl = sol.value(x_vars).T
+        u_ff_nl = sol.value(u_vars).T
+        t_ff_nl = np.linspace(0, (N-1)*dt, N)
+        print(f"delta: {sol.value(delta)}")
+    except Exception as e:
+        print(f"Solution not found: {e}")
+
+plot_planning_results(sp_robot_nl, t_ff_nl, x_ff_nl, u_ff_nl, X0, Xf, [XA], Obs, alpha=alpha,
+                      path="stl_mapping/Planning/figures/atmos_opt_nonlinear_trajectory.png")
+
 #TODO: Feedback linearization test
 #TODO: we test feedback linearization controller for the underwater robot to behave like a free flyer
 uw_robot = BlueROV()
@@ -216,13 +262,13 @@ def u_fbl(x, u):
     return u_fbl
 
 
-x_ff_i = copy.deepcopy(x_ff[0, :])
+x_ff_i = copy.deepcopy(x_ff_nl[0, :])
 
 x_uw_fbl_sp = np.zeros((N, sp_robot_nl.n_x))
 x_uw_fbl_sp[0, :] = x_ff_i
 u_uw_fbl_sp = np.zeros((N, sp_robot_nl.n_u))
 for i in range(N-1):
-    u_uw = u_fbl(x_ff_i, u_ff[i, :])
+    u_uw = u_fbl(x_ff_i, u_ff_nl[i, :])
     x_ff_i = uw_robot.step(x_ff_i, u_uw, dt)
     x_ff_i[3:7] /= np.linalg.norm(x_ff_i[3:7])
 
@@ -243,8 +289,6 @@ u_max = np.max(np.abs(u_uw_fbl_sp), axis=0)
 print(f"\nAlpha if u_fbl(x_sp,u_sp) applied to BlueROV directly: {np.max(u_max/uw_robot.U.upper_bounds)} (was {alpha} for ff)")
 print(f"This is lower because BlueROV is faster than free flyer")
 print(f"U should become {np.max(u_max)/alpha} for same alpha (was {uw_robot.U.upper_bounds[0]}) which is {(np.max(u_max)/alpha)/uw_robot.U.upper_bounds[0]*100}%")
-
-
 # exit()
 
 #TODO: now we either solve the time-scaling of trajectory and control input
@@ -311,7 +355,6 @@ if True:
         # print(f"Solution found")
     except Exception as e:
         print(f"Solution not found: {e}")
-        print(e)
         x_uw = np.zeros_like(x_ff)
         u_uw = np.zeros_like(u_ff)
         t_uw = np.linspace(0, (N-1)*dt, N)

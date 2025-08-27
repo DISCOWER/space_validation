@@ -61,9 +61,9 @@
 #define BLUEROV_NG     0
 #define BLUEROV_NBXN   0
 #define BLUEROV_NGN    0
-#define BLUEROV_NY0    16
-#define BLUEROV_NY     16
-#define BLUEROV_NYN    10
+#define BLUEROV_NY0    19
+#define BLUEROV_NY     19
+#define BLUEROV_NYN    13
 #define BLUEROV_N      30
 #define BLUEROV_NH     0
 #define BLUEROV_NHN    0

@@ -79,7 +79,10 @@ if __name__ == "__main__":
     plt.ion()
     fig, axs = plt.subplots(1, 4, figsize=(15, 6))
 
-    mpc = MpcWrench(model_name='bluerov')
+    robot_name = 'atmos'
+    # robot_name = 'bluerov'
+
+    mpc = MpcWrench(model_name=robot_name)
     dt = mpc.dt
     t = 0.
     N = mpc.Nx
@@ -88,7 +91,7 @@ if __name__ == "__main__":
     #                1/np.sqrt(2), 0., 0., 1/np.sqrt(2), 
     #                0., 0., 0., 
     #                0., 0., 0.])
-    x0 = np.array([4.15603828,  0.34546202,  1.64542937, 
+    x0 = np.array([3, 0, 1.5, 
                 #    1, 0, 0, 0,
                 #    1/np.sqrt(2), 0., 0., 1/np.sqrt(2), 
                    -0.74473321,  0.00509102,  0.01644424, -0.66714031,  
@@ -108,9 +111,11 @@ if __name__ == "__main__":
     #                  0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  0.00000000e+00])
     x_ref = np.repeat(x_ref, mpc.Nx).reshape(13+6, mpc.Nx)
 
-    real_robot = BlueROV(iX=cs.SX)
-    # real_robot = FreeFlyer(iX=cs.SX)
-    
+    if robot_name == 'bluerov':
+        real_robot = BlueROV(iX=cs.SX)
+    elif robot_name == 'atmos':
+        real_robot = FreeFlyer(iX=cs.SX)
+
     for i in range(100):
         u_sol, x_sol = mpc.get_input(x0, x_ref)
         u_sol = np.repeat(u_sol, 2).reshape(6,2)

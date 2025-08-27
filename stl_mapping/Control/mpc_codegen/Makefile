@@ -35,38 +35,38 @@
 # model
 MODEL_SRC=
 
-MODEL_SRC+= bluerov_model/bluerov_expl_ode_fun.c
-MODEL_SRC+= bluerov_model/bluerov_expl_vde_forw.c
-MODEL_SRC+= bluerov_model/bluerov_expl_vde_adj.c
+MODEL_SRC+= atmos_ff_model/atmos_ff_expl_ode_fun.c
+MODEL_SRC+= atmos_ff_model/atmos_ff_expl_vde_forw.c
+MODEL_SRC+= atmos_ff_model/atmos_ff_expl_vde_adj.c
 
 MODEL_OBJ := $(MODEL_SRC:.c=.o)
 # optimal control problem - mostly CasADi exports
 OCP_SRC=
 
 
-OCP_SRC+= bluerov_cost/bluerov_cost_y_0_fun.c
-OCP_SRC+= bluerov_cost/bluerov_cost_y_0_fun_jac_ut_xt.c
-OCP_SRC+= bluerov_cost/bluerov_cost_y_0_hess.c
-OCP_SRC+= bluerov_cost/bluerov_cost_y_fun.c
-OCP_SRC+= bluerov_cost/bluerov_cost_y_fun_jac_ut_xt.c
-OCP_SRC+= bluerov_cost/bluerov_cost_y_hess.c
-OCP_SRC+= bluerov_cost/bluerov_cost_y_e_fun.c
-OCP_SRC+= bluerov_cost/bluerov_cost_y_e_fun_jac_ut_xt.c
-OCP_SRC+= bluerov_cost/bluerov_cost_y_e_hess.c
+OCP_SRC+= atmos_ff_cost/atmos_ff_cost_y_0_fun.c
+OCP_SRC+= atmos_ff_cost/atmos_ff_cost_y_0_fun_jac_ut_xt.c
+OCP_SRC+= atmos_ff_cost/atmos_ff_cost_y_0_hess.c
+OCP_SRC+= atmos_ff_cost/atmos_ff_cost_y_fun.c
+OCP_SRC+= atmos_ff_cost/atmos_ff_cost_y_fun_jac_ut_xt.c
+OCP_SRC+= atmos_ff_cost/atmos_ff_cost_y_hess.c
+OCP_SRC+= atmos_ff_cost/atmos_ff_cost_y_e_fun.c
+OCP_SRC+= atmos_ff_cost/atmos_ff_cost_y_e_fun_jac_ut_xt.c
+OCP_SRC+= atmos_ff_cost/atmos_ff_cost_y_e_hess.c
 
-OCP_SRC+= acados_solver_bluerov.c
+OCP_SRC+= acados_solver_atmos_ff.c
 
 OCP_OBJ := $(OCP_SRC:.c=.o)
 # for sim solver
-SIM_SRC= acados_sim_solver_bluerov.c
+SIM_SRC= acados_sim_solver_atmos_ff.c
 SIM_OBJ := $(SIM_SRC:.c=.o)
 
 # for target example_sim
-EX_SIM_SRC= main_sim_bluerov.c
+EX_SIM_SRC= main_sim_atmos_ff.c
 EX_SIM_OBJ := $(EX_SIM_SRC:.c=.o)
 EX_SIM_EXE := $(EX_SIM_SRC:.c=)
 # for target example
-EX_SRC= main_bluerov.c
+EX_SRC= main_atmos_ff.c
 EX_OBJ := $(EX_SRC:.c=.o)
 EX_EXE := $(EX_SRC:.c=)
 
@@ -108,8 +108,8 @@ LDLIBS+= -lm
 LDLIBS+= 
 
 # libraries
-LIBACADOS_SOLVER=libacados_solver_bluerov.so
-LIBACADOS_OCP_SOLVER=libacados_ocp_solver_bluerov.so
+LIBACADOS_SOLVER=libacados_solver_atmos_ff.so
+LIBACADOS_OCP_SOLVER=libacados_ocp_solver_atmos_ff.so
 LIBACADOS_SIM_SOLVER=lib$(SIM_SRC:.c=.so)
 
 # virtual targets
@@ -159,7 +159,7 @@ ocp_cython: ocp_cython_o
 	-o acados_ocp_solver_pyx.so \
 	-Wl,-rpath=$(LIB_PATH) \
 	acados_ocp_solver_pyx.o \
-	$(abspath .)/libacados_ocp_solver_bluerov.so \
+	$(abspath .)/libacados_ocp_solver_atmos_ff.so \
 	$(LDFLAGS) $(LDLIBS)
 
 
@@ -187,7 +187,7 @@ sim_cython: sim_cython_o
 	-o acados_sim_solver_pyx.so \
 	-Wl,-rpath=$(LIB_PATH) \
 	acados_sim_solver_pyx.o \
-	$(abspath .)/libacados_sim_solver_bluerov.so \
+	$(abspath .)/libacados_sim_solver_atmos_ff.so \
 	$(LDFLAGS) $(LDLIBS)
 
 clean:
@@ -199,13 +199,13 @@ clean_ocp_shared_lib:
 	$(RM) $(OCP_OBJ)
 
 clean_ocp_cython:
-	$(RM) libacados_ocp_solver_bluerov.so
-	$(RM) acados_solver_bluerov.o
+	$(RM) libacados_ocp_solver_atmos_ff.so
+	$(RM) acados_solver_atmos_ff.o
 	$(RM) acados_ocp_solver_pyx.so
 	$(RM) acados_ocp_solver_pyx.o
 
 clean_sim_cython:
-	$(RM) libacados_sim_solver_bluerov.so
-	$(RM) acados_sim_solver_bluerov.o
+	$(RM) libacados_sim_solver_atmos_ff.so
+	$(RM) acados_sim_solver_atmos_ff.o
 	$(RM) acados_sim_solver_pyx.so
 	$(RM) acados_sim_solver_pyx.o

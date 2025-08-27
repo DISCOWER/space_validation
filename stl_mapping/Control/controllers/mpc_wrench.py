@@ -77,7 +77,7 @@ class MpcWrench(Node):
         #     3e1, 3e1, 3e1])   
         self.Q = np.diag([          # State weighting matrix
             1e2, 1e2, 1e2,
-            5e1,
+            5e1, 5e1, 5e1, 5e1,
             3e0, 3e0, 3e0,  
             3e0, 3e0, 3e0])          
         self.R = 0.1*np.diag([          # State weighting matrix
@@ -156,11 +156,24 @@ class MpcWrench(Node):
         ocp.cost.W_e = block_diag(self.P)
 
         # quat_error = ca.fabs(model.x[6:10].T @ x_ref[6:10])
-        quat_error = (model.x[3:7].T @ x_ref[3:7])**2
-        # quat_error = ca.fmax(0, ca.fmin(1, quat_error))
+        q1 = x_ref[3:7]
+        q2 = model.x[3:7]
+        # Sice unit quaternion, quaternion inverse is equal to its conjugate
+        q_conj = ca.vertcat(q2[0], -q2[1], -q2[2], -q2[3])
+        q2 = q_conj/ca.norm_2(q2)
+        
+        # q_error = q1 @ q2^-1
+        q_w = q1[0] * q2[0] - q1[1] * q2[1] - q1[2] * q2[2] - q1[3] * q2[3]
+        q_x = q1[0] * q2[1] + q1[1] * q2[0] + q1[2] * q2[3] - q1[3] * q2[2]
+        q_y = q1[0] * q2[2] - q1[1] * q2[3] + q1[2] * q2[0] + q1[3] * q2[1]
+        q_z = q1[0] * q2[3] + q1[1] * q2[2] - q1[2] * q2[1] + q1[3] * q2[0]
+
+        q_error = ca.vertcat(q_w, q_x, q_y, q_z)
+        q_error = ca.if_else(q_w < 0, -q_error, q_error)
+
         ocp.model.cost_y_expr = ca.vertcat(
             model.x[0:3] - x_ref[0:3],   # Position error
-            quat_error,
+            q_error,
             model.x[7:10] - x_ref[7:10],   # Velocity error
             model.x[10:13] - x_ref[10:13],  # Angular velocity error
             model.u - u_ref, # Control error
@@ -168,7 +181,7 @@ class MpcWrench(Node):
         # Terminal cost 
         ocp.model.cost_y_expr_e = ca.vertcat(
             model.x[0:3] - x_ref[0:3],
-            quat_error,
+            q_error,
             model.x[7:10] - x_ref[7:10],
             model.x[10:13] - x_ref[10:13],
         )
@@ -190,19 +203,12 @@ class MpcWrench(Node):
         ocp.constraints.x0 = np.zeros(nx)  # Initial state
         ocp.constraints.x0[3] = 1  # Initial quaternion
 
-        # # Set up the constraints for the other agents
-        # ocp.constraints.lh = np.full(0, -1e9)   # lower bounds on con_h_expr
-        # ocp.constraints.uh = np.zeros(0)  # no upper bounds (one-sided constraint)  
-        # ocp.constraints.idxsh = self.idx_slack  # index of slack variables corresponding to con_h_expr
-        # ocp.constraints.lh_e = ocp.constraints.lh
-        # ocp.constraints.uh_e = ocp.constraints.uh
-        # ocp.constraints.idxsh_e = ocp.constraints.idxsh 
-
         # Set the prediction horizon
         ocp.solver_options.N_horizon = self.Nx
         ocp.solver_options.tf = self.dt * self.Nx
 
         # Set the solver options
+        # These settings work on both bluerov and atmos model
         useRTI = True
         if useRTI:
             ocp.solver_options.nlp_solver_type = "SQP_RTI"
@@ -233,9 +239,6 @@ class MpcWrench(Node):
         self.get_logger().info("\n\n")
         self.get_logger().info(f"x0: {x0[0:7].flatten()}")
         self.get_logger().info(f"xref: {x_ref[0:7,0].flatten()}")
-        # print("\n\n")
-        # print(f"x0: {x0.flatten()}")
-        # print(f"xref: {x_ref[:,0].flatten()}")
 
         # Update reference
         if x_ref.ndim == 1:
@@ -252,15 +255,12 @@ class MpcWrench(Node):
 
         status = self.solver.solve()
         u_opt = self.solver.get(0, 'u')
-        # print(f"Solver status: {status}")
         if status != 0:
             self.get_logger().info(f"Solver failed: {status}")
-            # print(f"Solver failed: {status}")
             self.solver.reset()
             status = self.solver.solve()
             if status != 0:
                 self.get_logger().info("Solver failed again. Using previous solution.")
-                # print("Solver failed again. Using previous solution.")
                 u_opt =  self.solver.get(1, 'u')
         
         # get solution
