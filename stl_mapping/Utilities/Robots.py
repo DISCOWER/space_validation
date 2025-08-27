@@ -289,7 +289,7 @@ class FreeFlyer(Robot):
                         # [q_to_rot_mat_cs(q) @ v],
                         [0.5 * quat_mult(q, cs.vertcat(0, w))],
                         [self.iX.zeros(3,)],
-                        # [-w_cross @ v],
+                        # [self.iX.zeros(3,)]
                         [-self.iX(np.linalg.inv(self.inertia)) @ cs.mtimes(w_cross, cs.mtimes(self.inertia, w))]
                     ])
                 ]

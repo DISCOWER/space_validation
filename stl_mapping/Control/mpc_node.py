@@ -141,8 +141,9 @@ class MPCNode(Node):
             self.F_scaling = 2 * self.F_thruster if NORMALIZED_WRENCH else 1.0
             self.T_scaling = 4 * self.r_thruster * self.F_thruster if NORMALIZED_WRENCH else 1.0
         else:
-            self.F_scaling = np.array([85, 85, 120])
-            self.T_scaling = np.array([26, 14, 22])
+            act_scaling = 1.0
+            self.F_scaling = np.array([85, 85, 120]) / act_scaling
+            self.T_scaling = np.array([26, 14, 22]) / act_scaling
 
         # Create the MPC solver and create timer callback to solve
         timer_period = 1.0/self.rate # seconds
@@ -185,14 +186,14 @@ class MPCNode(Node):
         self.get_logger().info("MPC Node initialized successfully")
 
     def vehicle_attitude_callback(self, msg):
-            if self.model_name == "atmos":
-                # NED-> ENU transformation
-                # Receives quaternion in NED frame as (qw, qx, qy, qz)
-                q_enu = 1/np.sqrt(2) * np.array([msg.q[0] + msg.q[3], msg.q[1] + msg.q[2], msg.q[1] - msg.q[2], msg.q[0] - msg.q[3]])
-                q_enu /= np.linalg.norm(q_enu)
-                self.vehicle_attitude = q_enu.astype(float)
-            else:
-                self.vehicle_attitude = np.array([msg.q[0], msg.q[1], msg.q[2], msg.q[3]])
+        if self.model_name == "atmos":
+            # NED-> ENU transformation
+            # Receives quaternion in NED frame as (qw, qx, qy, qz)
+            q_enu = 1/np.sqrt(2) * np.array([msg.q[0] + msg.q[3], msg.q[1] + msg.q[2], msg.q[1] - msg.q[2], msg.q[0] - msg.q[3]])
+            q_enu /= np.linalg.norm(q_enu)
+            self.vehicle_attitude = q_enu.astype(float)
+        else:
+            self.vehicle_attitude = np.array([msg.q[0], msg.q[1], msg.q[2], msg.q[3]], dtype=float)
 
     def vehicle_local_position_callback(self, msg):
         if self.model_name == "atmos":
@@ -308,6 +309,10 @@ class MPCNode(Node):
 
         self.publisher_thrust_setpoint.publish(force_output_msg)
         self.publisher_torque_setpoint.publish(torque_output_msg)
+        # force_output_msg.xyz = [0.0, 0.0, 0.0]
+        # torque_output_msg.xyz = [0.0, 0.0, 0.0]
+        # self.publisher_thrust_setpoint.publish(force_output_msg)
+        # self.publisher_torque_setpoint.publish(torque_output_msg)
 
     def publish_offboard_mode(self):
         # self.get_logger().info("Publishing offboard mode")
@@ -380,18 +385,18 @@ class MPCNode(Node):
 
     def disturbance_estimation_callback(self):
         x0 = np.array([self.vehicle_local_position[0],
-                           self.vehicle_local_position[1],
-                           self.vehicle_local_position[2],
-                           self.vehicle_attitude[0],
-                           self.vehicle_attitude[1],
-                           self.vehicle_attitude[2],
-                           self.vehicle_attitude[3],
-                           self.vehicle_local_velocity[0],
-                           self.vehicle_local_velocity[1],
-                           self.vehicle_local_velocity[2],
-                           self.vehicle_angular_velocity[0],
-                           self.vehicle_angular_velocity[1],
-                           self.vehicle_angular_velocity[2]]).reshape(13, 1)
+                        self.vehicle_local_position[1],
+                        self.vehicle_local_position[2],
+                        self.vehicle_attitude[0],
+                        self.vehicle_attitude[1],
+                        self.vehicle_attitude[2],
+                        self.vehicle_attitude[3],
+                        self.vehicle_local_velocity[0],
+                        self.vehicle_local_velocity[1],
+                        self.vehicle_local_velocity[2],
+                        self.vehicle_angular_velocity[0],
+                        self.vehicle_angular_velocity[1],
+                        self.vehicle_angular_velocity[2]]).reshape(13, 1)
         self.fd_est, self.td_est, self.dist_cov = self.ekf_estimator.step(x0.flatten(), self.F_cmd.flatten(), self.T_cmd.flatten())
         self.publish_estimated_disturbance(self.fd_est, self.td_est, self.dist_cov)
 
@@ -433,7 +438,7 @@ class MPCNode(Node):
         x_ref = np.zeros((13, self.mpc.Nx + 1))  # Initialize reference trajectory
         for idx, ti in enumerate(times):
             # x_ref[:, idx] = np.array([1., 0., 0.,
-            #                           0., 0., 0., 1.,
+            #                           1., 0., 0., 0.,
             #                           0., 0., 0.,
             #                           0., 0., 0.]).reshape(13,)
             x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
@@ -443,7 +448,8 @@ class MPCNode(Node):
 
         # self.get_logger().info(f"euler: {quat_to_euler_np(x_ref[3:7, 0], order='xyz')}")
         # self.get_logger().info(f"x_ref: {x_ref[:3, 0].flatten()}")
-        # self.get_logger().info(f"p: {x0[:3,0]}")
+        # self.get_logger().info(f"p: {x0[:3,0].flatten()}")
+        # self.get_logger().info(f"p_ref: {x_ref[:3, 0].flatten()}")
         # self.get_logger().info(f"v: {x0[7:10,0]}")
 
         # Get control input
@@ -451,7 +457,7 @@ class MPCNode(Node):
             self.control, x_pred = self.mpc.get_input(x0, x_ref, fd=self.fd_est, td=self.td_est)
         else:
             self.control, x_pred = self.mpc.get_input(x0, x_ref)
-        print(f"Control: {self.control.flatten()}")
+        self.get_logger().info(f"Control: {self.control.flatten()}")
 
         # quat_error = (x_pred[0, 6:10] @ x_ref[6:10, 0])**2
         # self.get_logger().warning(f"quat_error: {1-quat_error}")

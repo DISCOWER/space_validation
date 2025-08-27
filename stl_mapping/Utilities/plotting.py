@@ -53,33 +53,38 @@ def plot_planning_results(robot, t, x, u,
     else: 
         ax_p, ax_v, ax_q, ax_w, ax_f, ax_t = in_axs
 
-    ax_p.plot(p[:, 0], p[:, 1], 'g-')
-    # ax_p.plot(p[:, 0], p[:, 1], 'go')
-    if heading is not None:
-        ax_p.quiver(p[:, 0], p[:, 1], np.cos(heading), np.sin(heading), color='r', scale=10)
-    if X0 is not None:
-        X0.plot(ax_p, color='green', alpha=0.5)
-    if Xf is not None:
-        Xf.plot(ax_p, color='green', alpha=0.5)
-    if ROIs is not None:
-        [roi.plot(ax_p, color='blue', alpha=0.5) for roi in ROIs]
-    if Obs is not None:
-        [obs.plot(ax_p, color='red', alpha=0.5) for obs in Obs]
-    ax_p.set_aspect('equal', adjustable='box')
-    ax_p.set_xlabel('X (m)')
-    ax_p.set_ylabel('Y (m)')
-    ax_p.grid()
+    if False:
+        ax_p = fig.add_subplot(gs[:,0], projection='3d')
+        ax_p.set_box_aspect([1,1,1])  # Aspect ratio is 1:1:1
+        ax_p.plot(p[:, 0], p[:, 1], p[:, 2], 'g-')
+    else:
+        ax_p.plot(p[:, 0], p[:, 1], 'g-')
+        # ax_p.plot(p[:, 0], p[:, 1], 'go')
+        if heading is not None:
+            ax_p.quiver(p[:, 0], p[:, 1], np.cos(heading), np.sin(heading), color='r', scale=10)
+        if X0 is not None:
+            X0.plot(ax_p, color='green', alpha=0.5)
+        if Xf is not None:
+            Xf.plot(ax_p, color='green', alpha=0.5)
+        if ROIs is not None:
+            [roi.plot(ax_p, color='blue', alpha=0.5) for roi in ROIs]
+        if Obs is not None:
+            [obs.plot(ax_p, color='red', alpha=0.5) for obs in Obs]
+        ax_p.set_aspect('equal', adjustable='box')
+        ax_p.set_xlabel('X (m)')
+        ax_p.set_ylabel('Y (m)')
+        ax_p.grid()
 
-    ax_v.plot(t, v[:, 0], 'r-',label='dx')
-    ax_v.plot(t, v[:, 0], 'ro')
-    ax_v.plot(t, v[:, 1], 'g-', label='dy')
-    ax_v.plot(t, v[:, 1], 'go')
-    ax_v.plot(t, v[:, 2], 'b-', label='dz')
-    ax_v.plot(t, v[:, 2], 'bo')
-    ax_v.set_xlabel('Time (s)')
-    ax_v.set_ylabel('Velocity (m/s)')
-    ax_v.legend()
-    ax_v.grid()
+        ax_v.plot(t, v[:, 0], 'r-',label='dx')
+        ax_v.plot(t, v[:, 0], 'ro')
+        ax_v.plot(t, v[:, 1], 'g-', label='dy')
+        ax_v.plot(t, v[:, 1], 'go')
+        ax_v.plot(t, v[:, 2], 'b-', label='dz')
+        ax_v.plot(t, v[:, 2], 'bo')
+        ax_v.set_xlabel('Time (s)')
+        ax_v.set_ylabel('Velocity (m/s)')
+        ax_v.legend()
+        ax_v.grid()
 
     ax_q.plot(t, q[:, 0], 'r', label='q0')
     ax_q.plot(t, q[:, 1], 'g', label='q1')
@@ -125,6 +130,16 @@ def plot_planning_results(robot, t, x, u,
     ax_t.plot(t[:u.shape[0]], u[:,3], label='u4')
     ax_t.plot(t[:u.shape[0]], u[:,4], label='u5')
     ax_t.plot(t[:u.shape[0]], u[:,5], label='u6')
+    ax_t.axhline(robot.U.lower_bounds[3], color='g', linestyle='-.')#, label="U_lb")
+    ax_t.axhline(robot.U.upper_bounds[3], color='g', linestyle='-.')
+    if hasattr(robot, 'U_effective'):
+        ax_t.axhline(alpha*robot.U_effective.lower_bounds[3], color='b', linestyle='--')#, label="alpha*U_effective_lb")
+        ax_t.axhline(alpha*robot.U_effective.upper_bounds[3], color='b', linestyle='--')
+    if hasattr(robot, '_U_effective_sym'):
+        ax_t.axhline(alpha*robot.calculate_U_effective(np.zeros((13,))).lower_bounds[3], color='b', linestyle='--')
+        ax_t.axhline(alpha*robot.calculate_U_effective(np.zeros((13,))).upper_bounds[3], color='b', linestyle='--')
+        ax_t.axhline(robot.calculate_U_effective(np.zeros((13,))).lower_bounds[3], color='r', linestyle=':')
+        ax_t.axhline(robot.calculate_U_effective(np.zeros((13,))).upper_bounds[3], color='r', linestyle=':')
     ax_t.set_xlabel('Time (s)')
     ax_t.set_ylabel('Torque input (Nm)')
     ax_t.legend()

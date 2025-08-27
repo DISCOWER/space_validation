@@ -23,6 +23,15 @@ Panels:
         - /Camera1/Topic1
         - /Marker14
         - /Marker15
+        - /Marker16
+        - /Marker17
+        - /Camera2
+        - /Pose4
+        - /Path13
+        - /Path14
+        - /InteractiveMarkers4
+        - /Path15
+        - /Pose5
       Splitter Ratio: 0.5
     Tree Height: 521
   - Class: rviz_common/Selection
@@ -769,6 +778,7 @@ Visualization Manager:
         Value: /camera/camera/color/image_raw
       Value: true
       Visibility:
+        "": true
         Camera: true
         Grid: true
         Image: true
@@ -779,18 +789,6 @@ Visualization Manager:
         TF: true
         Value: true
       Zoom Factor: 1
-
-
-
-
-
-
-
-
-
-
-
-
     - Class: rviz_default_plugins/Marker
       Enabled: false
       Name: Marker
@@ -805,8 +803,8 @@ Visualization Manager:
         Value: /px4_visualizer/vehicle_radius
       Value: false
     - Alpha: 1
-      Axes Length: 0.05000000074505806
-      Axes Radius: 0.004999999888241291
+      Axes Length: 0.25
+      Axes Radius: 0.03999999910593033
       Class: rviz_default_plugins/Pose
       Color: 255; 25; 0
       Enabled: true
@@ -822,7 +820,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /px4_visualizer/vehicle_pose
+        Value: /itrl_rov_1/px4_visualizer/vehicle_pose
       Value: true
     - Class: rviz_default_plugins/Marker
       Enabled: false
@@ -863,7 +861,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /px4_visualizer/vehicle_path
+        Value: /itrl_rov_1/px4_visualizer/vehicle_path
       Value: true
     - Alpha: 1
       Buffer Length: 1
@@ -891,7 +889,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /stl_mapping/predicted_path
+        Value: /itrl_rov_1/stl_mapping/predicted_path
       Value: true
     - Class: rviz_default_plugins/InteractiveMarkers
       Enable Transparency: true
@@ -928,7 +926,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /stl_mapping/reference_path
+        Value: /itrl_rov_1/stl_mapping/reference_path
       Value: true
     - Class: rviz_default_plugins/Marker
       Enabled: false
@@ -943,7 +941,26 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /px4_visualizer/vehicle_radius
       Value: false
-
+    - Alpha: 1
+      Axes Length: 1
+      Axes Radius: 0.10000000149011612
+      Class: rviz_default_plugins/Pose
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.15000000596046448
+      Head Radius: 0.05000000074505806
+      Name: Pose
+      Shaft Length: 0.4000000059604645
+      Shaft Radius: 0.02500000037252903
+      Shape: Arrow
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /itrl_rov_1/stl_mapping/reference_point
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 0; 0; 0
@@ -990,7 +1007,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 0.14776286482810974
+      Distance: 5.7013421058654785
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -1005,10 +1022,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.1497970819473267
+      Pitch: 1.2347970008850098
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 6.110422611236572
+      Yaw: 4.020400524139404
     Saved: ~
 Window Geometry:
   Camera:

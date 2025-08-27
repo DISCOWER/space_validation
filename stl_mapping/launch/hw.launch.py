@@ -13,7 +13,7 @@ import os
 def generate_launch_description():
     """Launch Gazebo with two freeflyers running PX4 communicating over ROS 2."""
     model_arg = DeclareLaunchArgument('model', default_value="bluerov")
-    namespace_arg = DeclareLaunchArgument('namespace', default_value="")
+    namespace_arg = DeclareLaunchArgument('namespace', default_value="itrl_rov_1")
     model = LaunchConfiguration('model')
     namespace = LaunchConfiguration('namespace')
 
@@ -42,7 +42,6 @@ def generate_launch_description():
 #                 # arguments=['0', '0', '2.5', '0', '0.4349655', '0', '0.9', 'world', 'camera_link'] # camera 1
 #                 arguments=['2', '1.9', '2.3', '0.3010647', '0.3013046', '-0.6395013', '0.6400107', 'world', 'camera_link'] # camera 2
 #         )),
-
 
     # Rviz while loading a config file (valid for all three spacecrafts)
     ld.add_action(Node(

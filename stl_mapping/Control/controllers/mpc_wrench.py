@@ -35,17 +35,26 @@ __author__ = "Elias Krantz"
 __contact__ = "eliaskra@kth.se"
 
 import numpy as np
-import os
+import os, sys
 from scipy.linalg import block_diag
 import casadi as ca
 from acados_template import AcadosOcp, AcadosOcpSolver
-from ..models.atmos_wrench import atmos_model_wrench
-from ..models.bluerov_wrench import bluerov_model_wrench
 
-class MpcWrench():
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, parent_dir)
+from models.atmos_wrench import atmos_model_wrench
+from models.bluerov_wrench import bluerov_model_wrench
+from rclpy.node import Node
+
+import rclpy
+rclpy.init()
+
+class MpcWrench(Node):
     def __init__(self, model_name:str='atmos'):
+        super().__init__('mpc_wrench')
+
         # Define the controller parameters
-        self.dt = 0.2               # MPC time step [s]
+        self.dt = 0.1               # MPC time step [s]
         self.Nx = 30                # Prediction horizon, states             
         self.Nu = 30                # Prediction horizon, inputs
 
@@ -61,12 +70,17 @@ class MpcWrench():
         # self.P = 10 * self.Q        # Terminal state weighting matrix
         
         #! BlueROV weights
+        # self.Q = np.diag([          # State weighting matrix
+        #     1e0, 1e0, 1e0,
+        #     1e2,
+        #     3e1, 3e1, 3e1,  
+        #     3e1, 3e1, 3e1])   
         self.Q = np.diag([          # State weighting matrix
-            1e0, 1e0, 1e0,
-            1e2,
-            3e1, 3e1, 3e1,  
-            3e1, 3e1, 3e1])             
-        self.R = 2*np.diag([          # State weighting matrix
+            1e2, 1e2, 1e2,
+            5e1,
+            3e0, 3e0, 3e0,  
+            3e0, 3e0, 3e0])          
+        self.R = 0.1*np.diag([          # State weighting matrix
             1e0, 1e0, 1e0,
             1e0, 1e0, 1e0]) 
         self.P = 10 * self.Q        # Terminal state weighting matrix
@@ -77,13 +91,13 @@ class MpcWrench():
         # self.idxbx = np.array([0, 1, 7, 8, 12]) # Indexes of states that are bounded
 
         #! BlueROV Bounds
-        self.lbx = np.array([0.5 -2, 0,  -1, -1, -1])
+        self.lbx = np.array([0.5, -2, 0,  -1, -1, -1])
         self.ubx = np.array([8.5, 2, 2.5, 1,  1,  1])
         self.idxbx = np.array([0, 1, 2, 7, 8, 9]) # Indexes of states that are bounded
 
         # Weight on slack varibles
         self.W_slack = np.array([1e4]*len(self.idxbx))
-        self.idx_slack = np.array([0, 1, 2, 3, 4]) # Indexes of slack variables
+        self.idx_slack = np.array([0, 1, 2, 3, 4, 5]) # Indexes of slack variables
 
         # Create the OCP
         self.model_name = model_name
@@ -176,7 +190,7 @@ class MpcWrench():
         ocp.constraints.x0 = np.zeros(nx)  # Initial state
         ocp.constraints.x0[3] = 1  # Initial quaternion
 
-        # Set up the constraints for the other agents
+        # # Set up the constraints for the other agents
         # ocp.constraints.lh = np.full(0, -1e9)   # lower bounds on con_h_expr
         # ocp.constraints.uh = np.zeros(0)  # no upper bounds (one-sided constraint)  
         # ocp.constraints.idxsh = self.idx_slack  # index of slack variables corresponding to con_h_expr
@@ -196,7 +210,16 @@ class MpcWrench():
         else:
             ocp.solver_options.nlp_solver_type = "SQP"
         ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM' # PARTIAL_CONDENSING_HPIPM, FULL_CONDENSING_HPIPM,
+        ocp.solver_options.hpipm_mode = 'ROBUST'
+        ocp.solver_options.integrator_type = 'ERK' # 'ERK', 'DISCRETE', 'IRK'
+        ocp.solver_options.sim_method_newton_iter = 2
         ocp.solver_options.hessian_approx = 'GAUSS_NEWTON' # 'GAUSS_NEWTON', 'EXACT'
+
+        ocp.solver_options.tol    = 1e-6       # NLP tolerance. 1e-6 is default for tolerances
+        ocp.solver_options.qp_tol = 1e-6       # QP tolerance
+        ocp.solver_options.globalization = 'MERIT_BACKTRACKING'
+        ocp.solver_options.regularize_method = 'NO_REGULARIZE'
+
         ocp.solver_options.print_level = 0
 
         ocp_solver = AcadosOcpSolver(ocp, json_file=json_path)
@@ -204,9 +227,15 @@ class MpcWrench():
 
     def get_input(self, x0, x_ref, fd=np.zeros(3), td=np.zeros(3)):
         # Properly set x0, i.e. constrain it to x0
-        print("trying to set initial state")
         self.solver.set(0, "lbx", x0.flatten())
         self.solver.set(0, "ubx", x0.flatten())
+
+        self.get_logger().info("\n\n")
+        self.get_logger().info(f"x0: {x0[0:7].flatten()}")
+        self.get_logger().info(f"xref: {x_ref[0:7,0].flatten()}")
+        # print("\n\n")
+        # print(f"x0: {x0.flatten()}")
+        # print(f"xref: {x_ref[:,0].flatten()}")
 
         # Update reference
         if x_ref.ndim == 1:
@@ -223,12 +252,15 @@ class MpcWrench():
 
         status = self.solver.solve()
         u_opt = self.solver.get(0, 'u')
+        # print(f"Solver status: {status}")
         if status != 0:
-            print("Solver failed. Retrying with warm-start reset.")
+            self.get_logger().info(f"Solver failed: {status}")
+            # print(f"Solver failed: {status}")
             self.solver.reset()
             status = self.solver.solve()
             if status != 0:
-                print("Solver failed again. Using previous solution.")
+                self.get_logger().info("Solver failed again. Using previous solution.")
+                # print("Solver failed again. Using previous solution.")
                 u_opt =  self.solver.get(1, 'u')
         
         # get solution
@@ -236,5 +268,7 @@ class MpcWrench():
         for i in range(self.Nx):
             x_pred[i,:] = self.solver.get(i, "x")
         x_pred[self.Nx,:] = self.solver.get(self.Nx, "x")
-        
+
+        self.get_logger().info(f"Cost: {self.solver.get_cost()}")
+
         return u_opt, x_pred

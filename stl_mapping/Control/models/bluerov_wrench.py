@@ -3,8 +3,9 @@ __author__ = "Joris Verhagen"
 __contact__ = "jorisv@kth.se"
 
 import casadi as cs
+import numpy as np
 from acados_template import AcadosModel
-from Utilities.smarc_modelling.src.smarc_modelling.vehicles import BlueROV
+from Utilities.smarc_modelling.src.smarc_modelling.vehicles.BlueROV import BlueROV
 
 
 def bluerov_model_wrench():
@@ -30,15 +31,14 @@ def bluerov_model_wrench():
 
     model.p = cs.vertcat(x_ref, u_ref, fd, td)
 
-    # Assign dynamics and controls
     bluerov = BlueROV(iX=cs.MX)
     model.f_expl_expr = bluerov.calculate_disturbed_dynamics(x, u, fd, td)
     model.x = x
     model.u = u
 
     # limits
-    model.u_min = bluerov.U.lower_bound
-    model.u_max = bluerov.U.upper_bound
+    model.u_min = bluerov.U.lower_bounds
+    model.u_max = bluerov.U.upper_bounds
 
     return model
 

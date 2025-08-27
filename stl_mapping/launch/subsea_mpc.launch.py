@@ -13,7 +13,7 @@ import os
 def generate_launch_description():
     """Launch Gazebo with two freeflyers running PX4 communicating over ROS 2."""
     model_arg = DeclareLaunchArgument("model", default_value="bluerov")
-    namespace_arg = DeclareLaunchArgument("namespace", default_value="")
+    namespace_arg = DeclareLaunchArgument("namespace", default_value="itrl_rov_1")
     model = LaunchConfiguration("model")
     namespace = LaunchConfiguration("namespace")
 
@@ -26,8 +26,9 @@ def generate_launch_description():
             namespace=namespace,
             executable='mpc_node',
             name='mpc_node_0',
-            parameters=[{'x_offset': 4.0, 'y_offset': 0.0, 'z_offset': 2.0},
-                        {'rate': 20.0}]
+            parameters=[{'x_offset': 3.0, 'y_offset': 0.5, 'z_offset': 1.5},
+                        {'rate': 20.0},
+                        {'model_name': model}]
     ))
 
     return ld
