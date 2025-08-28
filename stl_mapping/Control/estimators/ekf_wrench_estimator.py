@@ -1,9 +1,12 @@
 import numpy as np
+from Utilities.Robots import FreeFlyer
 
 class EKFWrenchEstimator:
-    def __init__(self, dt= 0.1):
-        self.mass = 16.8 #(16.8: empty, 17.8: full)  # kg
-        self.inertia = np.diag([0.315] * 3)
+    def __init__(self, dt:float = 0.1, robot: FreeFlyer = None):
+        self.robot = robot if robot is not None else FreeFlyer()
+
+        self.mass = self.robot.mass
+        self.inertia = self.robot.inertia
         self.inertia_inv = np.linalg.inv(self.inertia)
 
         self.dt = dt
@@ -42,6 +45,13 @@ class EKFWrenchEstimator:
 
         a_lin = F_tot / self.mass
         a_ang = self.inertia_inv @ (T_tot - np.cross(w, self.inertia @ w))
+
+        # #! If we want to use the robot model directly
+        # x = self.x[0:13]
+        # u = np.vstack((F_cmd, T_cmd))
+        # dx = self.robot.calculate_disturbed_dynamics(x,u,fd,td)
+        # a_lin = dx[7:10]
+        # a_ang = dx[10:13]
 
         # Euler integration
         v_new = v + a_lin * self.dt

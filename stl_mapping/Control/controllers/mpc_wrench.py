@@ -155,7 +155,6 @@ class MpcWrench(Node):
         ocp.cost.W = block_diag(self.Q, self.R)
         ocp.cost.W_e = block_diag(self.P)
 
-        # quat_error = ca.fabs(model.x[6:10].T @ x_ref[6:10])
         q1 = x_ref[3:7]
         q2 = model.x[3:7]
         # Sice unit quaternion, quaternion inverse is equal to its conjugate
@@ -170,6 +169,10 @@ class MpcWrench(Node):
 
         q_error = ca.vertcat(q_w, q_x, q_y, q_z)
         q_error = ca.if_else(q_w < 0, -q_error, q_error)
+
+        #! old
+        # q_error = ca.fabs(model.x[6:10].T @ x_ref[6:10])
+        # q_error = (model.x[3:7].T @ x_ref[3:7])**2
 
         ocp.model.cost_y_expr = ca.vertcat(
             model.x[0:3] - x_ref[0:3],   # Position error

@@ -1413,7 +1413,7 @@
         "dyn_impl_dae_fun": null,
         "dyn_impl_dae_fun_jac": null,
         "dyn_impl_dae_jac": null,
-        "f_expl_expr": "disturbed_dynamics(p, q, v, w, u, fd, td){0}",
+        "f_expl_expr": "vertcat(v, (0.5*vertcat((((-(q[1]*w[0]))-(q[2]*w[1]))-(q[3]*w[2])), (((q[0]*w[0])+(q[2]*w[2]))-(q[3]*w[1])), (((q[0]*w[1])-(q[1]*w[2]))+(q[3]*w[0])), (((q[0]*w[2])+(q[1]*w[1]))-(q[2]*w[0])))), ((0.0595238*mac(horzcat(horzcat(((1-(2.*sq(q[2])))-(2.*sq(q[3]))), (2.*((q[1]*q[2])-(q[0]*q[3]))), (2.*((q[1]*q[3])+(q[0]*q[2]))))', horzcat((2.*((q[1]*q[2])+(q[0]*q[3]))), ((1-(2.*sq(q[1])))-(2.*sq(q[3]))), (2.*((q[2]*q[3])-(q[0]*q[1]))))', horzcat((2.*((q[1]*q[3])-(q[0]*q[2]))), (2.*((q[2]*q[3])+(q[0]*q[1]))), ((1-(2.*sq(q[1])))-(2.*sq(q[2]))))')',vertcat(u[0], u[1], u[2]),zeros(3x1)))+(0.0595238*fd)), mac(\n[[3.1746, 0, 0], \n [0, 3.1746, 0], \n [0, 0, 3.1746]],((vertcat(u[3], u[4], u[5])+td)-mac(horzcat(horzcat(0, (-w[2]), w[1])', horzcat(w[2], 0, (-w[0]))', horzcat((-w[1]), w[0], 0)')',mac(\n[[0.315, 0, 0], \n [0, 0.315, 0], \n [0, 0, 0.315]],w,zeros(3x1)),zeros(3x1))),zeros(3x1)))",
         "f_impl_expr": [],
         "gnsf_nontrivial_f_LO": 1,
         "gnsf_purely_linear": 0,

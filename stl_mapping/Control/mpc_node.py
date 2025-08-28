@@ -185,6 +185,9 @@ class MPCNode(Node):
         self.t0 = np.inf
         self.get_logger().info("MPC Node initialized successfully")
 
+        # Publish the entire path
+        times = np.linspace(0, self.reference.r.shape[0]*self.reference.dt, 250)
+
     def vehicle_attitude_callback(self, msg):
         if self.model_name == "atmos":
             # NED-> ENU transformation

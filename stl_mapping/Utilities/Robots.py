@@ -112,11 +112,9 @@ class LinearFreeFlyer6DoF(Robot):
                                     [0, 0, 0, 0, 1/self.inertia[1,1], 0],
                                     [0, 0, 0, 0, 0, 1/self.inertia[2,2]]])
         
-        self.C = np.zeros((12, 3))
+        self.C = np.zeros((12, 6))
         # TODO: deal with positive and negative values here
-        self.C[6:9, :] = np.array([[1/20, 0, 0],
-                                   [0, 1/20, 0],
-                                   [0, 0, 1/20]])
+        self.C[6:12, 0:6] = np.diag([1/20]*6)
         self.K = np.linalg.pinv(self.B)@self.C #compute_K(self.B, self.C)
 
         # Define the control input bounds
@@ -129,7 +127,10 @@ class LinearFreeFlyer6DoF(Robot):
             np.array([scale_thrust*max_thrust]*3 + [scale_torque*max_torque]*3)
         )
         max_floor_force = (36*self.mass)/1000
-        self.D = HyperRectangle(np.array(3*[-max_floor_force]),np.array(3*[max_floor_force]))
+        self.D = HyperRectangle(
+            np.array(3*[-max_floor_force] + 3*[0]),
+            np.array(3*[max_floor_force] + 3*[0])
+        )
 
         # self.U_effective = minkowski_difference(self.U, self.K@self.D)
         # TODO: deal with the fact that K and D are not of same dimension
@@ -310,15 +311,15 @@ class FreeFlyer(Robot):
             self._fx_sym = cs.Function('fx', [p, q, v, w],
                 [
                     cs.blockcat([
-                        # [v],
-                        # [0.5 * quat_mult(q, cs.vertcat(0, w))],
-                        # [self.iX.zeros(3,)],
-                        # [-self.iX(np.linalg.inv(self.inertia)) @ cs.mtimes(w_cross, cs.mtimes(self.inertia, w))]
-                        #! Test
-                        [q_to_rot_mat_cs(q) @ v],
+                        [v],
                         [0.5 * quat_mult(q, cs.vertcat(0, w))],
                         [self.iX.zeros(3,)],
                         [-self.iX(np.linalg.inv(self.inertia)) @ cs.mtimes(w_cross, cs.mtimes(self.inertia, w))]
+                        # #! Test
+                        # [q_to_rot_mat_cs(q) @ v],
+                        # [0.5 * quat_mult(q, cs.vertcat(0, w))],
+                        # [self.iX.zeros(3,)],
+                        # [-self.iX(np.linalg.inv(self.inertia)) @ cs.mtimes(w_cross, cs.mtimes(self.inertia, w))]
                     ])
                 ]
             )
@@ -340,28 +341,28 @@ class FreeFlyer(Robot):
             self._gx_sym = cs.Function('gx', [p, q, v, w],
                 [
                     cs.blockcat([
-                        # [self.iX.zeros((3, 6))],
-                        # [self.iX.zeros((4, 6))],
-                        # [cs.horzcat(
-                        #     q_to_rot_mat_cs(q) / self.mass,
-                        #     self.iX.zeros((3, 3))
-                        # )],
-                        # [cs.horzcat(
-                        #     self.iX.zeros((3, 3)),
-                        #     self.iX(np.linalg.inv(self.inertia))
-                        # )]
-
-                        #! Test
                         [self.iX.zeros((3, 6))],
                         [self.iX.zeros((4, 6))],
                         [cs.horzcat(
-                            self.iX(np.linalg.inv(np.diag([self.mass]*3))),
+                            q_to_rot_mat_cs(q) / self.mass,
                             self.iX.zeros((3, 3))
                         )],
                         [cs.horzcat(
                             self.iX.zeros((3, 3)),
                             self.iX(np.linalg.inv(self.inertia))
                         )]
+
+                        # #! Test
+                        # [self.iX.zeros((3, 6))],
+                        # [self.iX.zeros((4, 6))],
+                        # [cs.horzcat(
+                        #     self.iX(np.linalg.inv(np.diag([self.mass]*3))),
+                        #     self.iX.zeros((3, 3))
+                        # )],
+                        # [cs.horzcat(
+                        #     self.iX.zeros((3, 3)),
+                        #     self.iX(np.linalg.inv(self.inertia))
+                        # )]
                     ])
                 ]
             )
