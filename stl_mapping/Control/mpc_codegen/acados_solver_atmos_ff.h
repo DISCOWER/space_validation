@@ -43,7 +43,7 @@
 #define ATMOS_FF_NP_GLOBAL     0
 #define ATMOS_FF_NBX    6
 #define ATMOS_FF_NBX0   13
-#define ATMOS_FF_NBU    6
+#define ATMOS_FF_NBU    0
 #define ATMOS_FF_NSBX   6
 #define ATMOS_FF_NSBU   0
 #define ATMOS_FF_NSH    0
@@ -65,9 +65,9 @@
 #define ATMOS_FF_NY     19
 #define ATMOS_FF_NYN    13
 #define ATMOS_FF_N      30
-#define ATMOS_FF_NH     0
+#define ATMOS_FF_NH     6
 #define ATMOS_FF_NHN    0
-#define ATMOS_FF_NH0    0
+#define ATMOS_FF_NH0    6
 #define ATMOS_FF_NPHI0  0
 #define ATMOS_FF_NPHI   0
 #define ATMOS_FF_NPHIN  0
@@ -122,7 +122,15 @@ typedef struct atmos_ff_solver_capsule
 
 
     // constraints
+    external_function_external_param_casadi *nl_constr_h_fun_jac;
+    external_function_external_param_casadi *nl_constr_h_fun;
 
+
+
+
+
+    external_function_external_param_casadi nl_constr_h_0_fun_jac;
+    external_function_external_param_casadi nl_constr_h_0_fun;
 
 
 

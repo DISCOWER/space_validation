@@ -23,7 +23,7 @@ from Utilities.smarc_modelling.src.smarc_modelling.vehicles.BlueROV import BlueR
 from Planning.bezier_fitting import bezier_fitting
 
 # hyperparameters
-N = 30          # number of time steps
+N = 40          # number of time steps
 dt = 1.5        # time step size
 t0 = 0          # initial time
 tf = (N-1)*dt   # final time
@@ -35,27 +35,70 @@ sp_robot = LinearFreeFlyer6DoF()
 
 euler_order = 'xyz'
 
-# STL Specification
-depth = 0.0
-X0 = HyperRectangle(np.array([0.5, 0, depth]), np.array([0.6, 0.1, depth+0.1]))
-Xf = HyperRectangle(np.array([2.5, 1.0, depth]), np.array([2.6, 1.1, depth+0.1]))
-XA = HyperRectangle(np.array([2.5, -1.0, depth,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, depth+0.1,  -np.pi/2+np.pi/8]))
-XA = HyperRectangle(np.array([2.5, -1.0, depth,  -np.pi/2-np.pi/8, -np.pi/2-np.pi/8]), 
-                    np.array([2.6, -0.9, depth+0.1,  -np.pi/2+np.pi/8, -np.pi/2+np.pi/8]))
-# later converted to polytopes for predicates of the form Ax \leq b: Polytope = (A,b)
-# XA = HyperRectangle(np.array([2.5, -1.0, depth]), np.array([2.6, -0.9, depth+0.1]))
-Obs = []
-World = HyperRectangle(np.array([0, -1.5, -10, -10]), np.array([4, 1.5, 10, 10]))
-phi = Pred("AND", preds=[
-    Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)], dims=[0,1,2])]),
-    Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1,2])]),
-    Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2, 3, 5])]),
-    Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)], dims=[0,1,6,7])]),
-])
-spec = Spec(phi, t0, tf)
+### STL Specification
+# scenario = 'toy-example'
+scenario = 'paper3D'
+
+if scenario == 'toy-example':
+    D3 = False
+    depth = 0.0
+    X0 = HyperRectangle(np.array([0.5, 0, depth]), np.array([0.6, 0.1, depth+0.1]))
+    Xf = HyperRectangle(np.array([2.5, 1.0, depth]), np.array([2.6, 1.1, depth+0.1]))
+    XA = HyperRectangle(np.array([2.5, -1.0, depth,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, depth+0.1,  -np.pi/2+np.pi/8]))
+    # XA = HyperRectangle(np.array([2.5, -1.0, depth,  -np.pi/2-np.pi/8, -np.pi/2-np.pi/8]), 
+    #                     np.array([2.6, -0.9, depth+0.1,  -np.pi/2+np.pi/8, -np.pi/2+np.pi/8]))
+    # later converted to polytopes for predicates of the form Ax \leq b: Polytope = (A,b)
+    # XA = HyperRectangle(np.array([2.5, -1.0, depth]), np.array([2.6, -0.9, depth+0.1]))
+
+    Obs = []
+    RoIs = [XA]
+
+    World = HyperRectangle(np.array([0, -1.5, -10, -10]), np.array([4, 1.5, 10, 10]))
+    phi = Pred("AND", preds=[
+        Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)], dims=[0,1,2])]),
+        Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1,2])]),
+        Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2, 5])]),
+        Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)], dims=[0,1,6,7])]),
+    ])
+    spec = Spec(phi, t0, tf)
+elif scenario == 'paper3D':
+    D3 = True
+    X0 = HyperRectangle(center=np.array([1.0, 0, 1.5]), size=np.array([0.5, 0.5, 0.5]))
+    Xf = HyperRectangle(center=np.array([1.0, 0, 1.5]), size=np.array([0.5, 0.5, 0.5]))
+
+    # Three observation tasks, each having two possible views around the Obstacle.
+    Obs1 = HyperRectangle(center=np.array([4.0, 0, 1.5]),                   size=np.array([1.0, 1.5, 0.5]))
+    XA1 = HyperRectangle(center=np.array([3.0, 0, 1.5, 0, 0]),              size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    XA2 = HyperRectangle(center=np.array([5.0, 0, 1.5, 0, -np.pi]),         size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    XB1 = HyperRectangle(center=np.array([4.0, -1.25, 1.5, 0, np.pi/2]),    size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    XB2 = HyperRectangle(center=np.array([4.0, 1.25, 1.5, 0, -np.pi/2]),    size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    XC1 = HyperRectangle(center=np.array([4.0, 0, 2.25, np.pi/2, 0]),      size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    XC2 = HyperRectangle(center=np.array([4.0, 0, 0.75, -np.pi/2, 0]),       size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+
+    Obs = [Obs1]
+    RoIs = [XA2, XB1, XB2, XC1, XC2]
+
+    phi = Pred("AND", preds=[
+        Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)], dims=[0,1,2])]),
+        Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1,2])]),
+        Pred("G", [t0,tf], preds= [Pred("NEG", preds= [Pred("MU", preds=[Polytope(Obs1)], dims=[0,1,2])] )] ),
+        Pred("OR", preds=[
+            # Pred("G", [10,12], preds=[Pred("MU", preds=[Polytope(XA1)], dims=[0,1,2, 4,5])]),
+            Pred("G", [20,25], preds=[Pred("MU", preds=[Polytope(XA2)], dims=[0,1,2, 4,5])])
+        ]),
+        Pred("OR", preds=[
+            # Pred("F", [30,35], preds=[Pred("MU", preds=[Polytope(XB1)], dims=[0,1,2, 4,5])]),
+            Pred("F", [30,35], preds=[Pred("MU", preds=[Polytope(XB2)], dims=[0,1,2, 4,5])])
+        ]),
+        Pred("OR", preds=[
+            # Pred("F", [35,40], preds=[Pred("MU", preds=[Polytope(XC1)], dims=[0,1,2, 4,5])]),
+            Pred("F", [35,40], preds=[Pred("MU", preds=[Polytope(XC2)], dims=[0,1,2, 4,5])])
+        ])
+    ])
+    spec = Spec(phi, t0, tf)
 
 # Initial Motion planner on Linear Model
-if True:
+if False:
     opt = gp.Model("prob1")
     x_vars = opt.addMVar((N, sp_robot.n_x), lb=-np.inf, ub=np.inf, name="X")
     u_vars = opt.addMVar((N-1, sp_robot.n_u), lb=-np.inf, ub=np.inf, name="U")
@@ -70,8 +113,10 @@ if True:
         # opt.addConstrs((u_vars[i, j] >= alpha_vars*sp_robot.U_effective.lower_bounds[j] for j in range(sp_robot.n_u)))
         # opt.addConstrs((u_vars[i, j] <= alpha_vars*sp_robot.U_effective.upper_bounds[j] for j in range(sp_robot.n_u)))
         try:
-            opt.addConstrs((u_vars[i, j] >= sp_robot.U.lower_bounds[j] + alpha_vars*sum(abs(sp_robot.K[j,:])*sp_robot.D.lower_bounds) for j in range(sp_robot.n_u)))
-            opt.addConstrs((u_vars[i, j] <= sp_robot.U.upper_bounds[j] - alpha_vars*sum(abs(sp_robot.K[j,:])*sp_robot.D.upper_bounds) for j in range(sp_robot.n_u)))
+            opt.addConstrs((u_vars[i, j] >= sp_robot.calculate_U_effective(np.zeros((13,)), alpha_vars).lower_bounds[j] for j in range(sp_robot.n_u)))
+            opt.addConstrs((u_vars[i, j] <= sp_robot.calculate_U_effective(np.zeros((13,)), alpha_vars).upper_bounds[j] for j in range(sp_robot.n_u)))
+            # opt.addConstrs((u_vars[i, j] >= sp_robot.U.lower_bounds[j] - alpha_vars*sum(abs(sp_robot.K[j,:])*sp_robot.D.lower_bounds) for j in range(sp_robot.n_u)))
+            # opt.addConstrs((u_vars[i, j] <= sp_robot.U.upper_bounds[j] + alpha_vars*sum(abs(sp_robot.K[j,:])*sp_robot.D.upper_bounds) for j in range(sp_robot.n_u)))
         except Exception as e:
             print(f"Error adding constraints for u_vars at time step {i}: {e}")
 
@@ -105,7 +150,7 @@ if True:
     opt.addConstr(act_absu_var == gp.quicksum([act_absu_scaled_vars[i, j] for i in range(N-1) for j in range(sp_robot.n_u)]), name="act_abs_sum")
 
     # Final cost
-    opt.addConstr(cost_var == -1*alpha_vars - 1000*spec.phi.rho + 0.01*act_absu_var)# - act_quadu_var)
+    opt.addConstr(cost_var == -1*alpha_vars - 10000*spec.phi.rho + 0.01*act_absu_var)# - act_quadu_var)
     opt.setObjective(cost_var, gp.GRB.MINIMIZE)
     opt.setParam('OutputFlag', 0)  # Suppress Gurobi output
     opt.optimize()
@@ -129,17 +174,19 @@ else:
     data = np.load('stl_mapping/Planning/solutions/atmos_linear_solution.npz')
     x_ff = data['x']
     u_ff = data['u']
-    alpha = data['alpha']
+    alpha = float(data['alpha'])
     dt = data['dt']
     t_sp = data['times']
     print(f"alpha from linear STL planner: {alpha}")
     
 
-plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
+plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, RoIs, Obs, alpha=alpha, D3=D3, plot=True,
                       path="stl_mapping/Planning/figures/atmos_linear_trajectory_euler.png")
 
 np.savez('stl_mapping/Planning/solutions/atmos_linear_solution_euler_inertial.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
 # np.savetxt("x_ff.csv", x_ff, delimiter=',', fmt="%.4f")
+
+# exit()
 
 #! Convert [p:ENU, e:FLU->ENU, v:ENU, w:FLU] to [p:ENU, q:FLU->ENU, v:FLU, w:FLU]
 x_ff_converted = np.zeros((x_ff.shape[0], x_ff.shape[1] + 1))
@@ -162,7 +209,7 @@ for i in range(u_ff.shape[0]):
 u_ff = u_ff_converted
 
 # plot the trajectory
-plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
+plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, RoIs, Obs, alpha=alpha, D3=D3,
                       path="stl_mapping/Planning/figures/atmos_linear_trajectory.png")
 
 np.savez('stl_mapping/Planning/solutions/atmos_linear_solution_quat_body.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
@@ -181,38 +228,43 @@ sp_robot_nl = FreeFlyer()
 #     x_ff_i = sp_robot_nl.step(x_ff_i, u_ff_i, dt)
 #     x_ff_i[3:7] /= np.linalg.norm(x_ff_i[3:7])  # normalize quaternion
 #     x_ff_nl[i+1, :] = x_ff_i
-# plot_planning_results(sp_robot_nl, t_sp, x_ff_nl, u_ff, X0, Xf, [XA], Obs, alpha=alpha,
+# plot_planning_results(sp_robot_nl, t_sp, x_ff_nl, u_ff, X0, Xf, RoIs, Obs, alpha=alpha,
 #                       path="stl_mapping/Planning/figures/atmos_nonlinear_trajectory.png")
+
 
 if True:
     ocp = cs.Opti()
     x_vars = ocp.variable(13, N)
     u_vars = ocp.variable(6, N-1)
     delta = ocp.variable(1)
+    alpha_var = ocp.variable(1)
+    ocp.set_initial(alpha_var, alpha)
 
     ocp.set_initial(x_vars, x_ff.T)
     ocp.set_initial(u_vars, u_ff.T)
 
     for i in range(N-1):
-        ocp.subject_to(u_vars[:,i] >= sp_robot_nl.U.lower_bounds)
-        ocp.subject_to(u_vars[:,i] <= sp_robot_nl.U.upper_bounds)
-    
+        # ocp.subject_to(u_vars[:,i] >= sp_robot_nl.U.lower_bounds)
+        # ocp.subject_to(u_vars[:,i] <= sp_robot_nl.U.upper_bounds)
+        ocp.subject_to(u_vars[:,i] >= sp_robot_nl.calculate_U_effective(np.zeros((13,1)),alpha).lower_bounds)
+        ocp.subject_to(u_vars[:,i] <= sp_robot_nl.calculate_U_effective(np.zeros((13,1)),alpha).upper_bounds)
+
     for i in range(N-1):
-        ocp.subject_to(x_vars[:,i+1] == sp_robot_nl.step(x_vars[:,i], u_vars[:,i], dt))
+        ocp.subject_to(x_vars[:,i+1] == sp_robot_nl.step(x_vars[:,i], u_vars[:,i], dt, normalize=True))
 
     n_equal = 13
     for i in range(N):
         ocp.subject_to(x_vars[0:n_equal,i] <= x_ff[i,0:n_equal] + delta*np.ones(n_equal))
         ocp.subject_to(x_vars[0:n_equal,i] >= x_ff[i,0:n_equal] - delta*np.ones(n_equal))
-    ocp.subject_to(x_vars[7:,0] == x_ff[0,7:])
-    ocp.subject_to(x_vars[7:,N-1] == x_ff[N-1,7:])
+    # ocp.subject_to(x_vars[:7,0] == x_ff[0,:7])
+    # ocp.subject_to(x_vars[:7,N-1] == x_ff[N-1,:7])
 
 
     quad_u_var = 0
     Q = np.diag([1., 1., 1., 10., 10., 10.])
     for i in range(N-1):
         quad_u_var += cs.mtimes(u_vars[:,i].T, Q @ u_vars[:,i])
-    ocp.minimize(quad_u_var + 1e6*delta)
+    ocp.minimize(quad_u_var + 1e8*delta)
     opts = {'ipopt.print_level': 0, 'print_time': 0, 'ipopt.sb': 'yes',
             'verbose':False, 'ipopt.tol': 1e-4, 'ipopt.max_iter': 1000}
     ocp.solver('ipopt',opts)
@@ -227,7 +279,7 @@ if True:
     except Exception as e:
         print(f"Solution not found: {e}")
 
-plot_planning_results(sp_robot_nl, t_ff_nl, x_ff_nl, u_ff_nl, X0, Xf, [XA], Obs, alpha=alpha,
+plot_planning_results(sp_robot_nl, t_ff_nl, x_ff_nl, u_ff_nl, X0, Xf, RoIs, Obs, alpha=alpha, D3=D3,
                       path="stl_mapping/Planning/figures/atmos_opt_nonlinear_trajectory.png")
 
 np.savez('stl_mapping/Planning/solutions/atmos_nonlinear_solution.npz', x=x_ff_nl, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
@@ -278,7 +330,7 @@ for i in range(N-1):
 np.savez('stl_mapping/Planning/solutions/bluerov_nonlinear_solution_fbl.npz', x=x_uw_fbl_sp, u=u_uw_fbl_sp, dt=dt, alpha=alpha, times=t_sp)
 
 # plot the trajectory
-plot_planning_results(uw_robot, t_sp, x_uw_fbl_sp, u_uw_fbl_sp, X0, Xf, [XA], Obs, alpha=alpha,
+plot_planning_results(uw_robot, t_sp, x_uw_fbl_sp, u_uw_fbl_sp, X0, Xf, RoIs, Obs, alpha=alpha, D3=D3,
                       path="stl_mapping/Planning/figures/bluerov_nonlinear_trajectory_fbl.png")
 
 # Analysis of alpha
@@ -306,36 +358,40 @@ if True:
     ocp.set_initial(u_vars, u_uw_fbl_sp.T)
     ocp.set_initial(dt_vars, 0.5)
 
-    ocp.subject_to(0.1 <= dt_vars)
+    ocp.subject_to(0.1 <= dt_vars+0.2)
     ocp.subject_to(dt_vars <= dt)
     ocp.subject_to(delta >= 0)
 
     for i in range(N):
+        ocp.subject_to(u_vars[:,i] >= uw_robot.calculate_U_effective(np.zeros((13,1)),alpha).lower_bounds)
+        ocp.subject_to(u_vars[:,i] <= uw_robot.calculate_U_effective(np.zeros((13,1)),alpha).upper_bounds)
+
         # ocp.subject_to(u_vars[:,i] >= alpha * uw_robot.calculate_U_effective(x_vars[:,i]).lower_bounds)
         # ocp.subject_to(u_vars[:,i] <= alpha * uw_robot.calculate_U_effective(x_vars[:,i]).upper_bounds)
-        for j in range(6):
-            ocp.subject_to(u_vars[j,i] >= uw_robot.U.lower_bounds[j] + alpha * uw_robot.calculate_sum_K_D(x_vars[:,i], uw_robot.D.lower_bounds)[j])
-            ocp.subject_to(u_vars[j,i] <= uw_robot.U.upper_bounds[j] + alpha * uw_robot.calculate_sum_K_D(x_vars[:,i], uw_robot.D.upper_bounds)[j])
+        # for j in range(6)
+        # for j in range(6):
+        #     ocp.subject_to(u_vars[j,i] >= uw_robot.U.lower_bounds[j] + alpha * uw_robot.calculate_sum_K_D(x_vars[:,i], uw_robot.D.lower_bounds)[j])
+        #     ocp.subject_to(u_vars[j,i] <= uw_robot.U.upper_bounds[j] + alpha * uw_robot.calculate_sum_K_D(x_vars[:,i], uw_robot.D.upper_bounds)[j])
 
     # constraints
     for i in range(N-1):
-        ocp.subject_to(x_vars[:,i+1] == uw_robot.step(x_vars[:,i], u_vars[:,i], dt_vars))
-    
+        ocp.subject_to(x_vars[:,i+1] == uw_robot.step(x_vars[:,i], u_vars[:,i], dt_vars, normalize=True))
+
     # enforce position equality with the free flyer
     n_equal = 7 # first n_equal states: [p,q]
     for i in range(N):
         # ocp.subject_to(x_vars[0:n_equal,i] == x_uw_fbl_sp[i,0:n_equal])
-        ocp.subject_to(x_vars[0:n_equal,i] <= x_uw_fbl_sp[i,0:n_equal] + delta * np.ones(n_equal))
-        ocp.subject_to(x_vars[0:n_equal,i] >= x_uw_fbl_sp[i,0:n_equal] - delta * np.ones(n_equal))
-    ocp.subject_to(x_vars[7:,0] == x_uw_fbl_sp[0,7:])
-    ocp.subject_to(x_vars[7:,-1] == x_uw_fbl_sp[-1,7:])
+        ocp.subject_to(x_vars[0:n_equal,i] <= x_ff[i,0:n_equal] + delta * np.ones(n_equal))
+        ocp.subject_to(x_vars[0:n_equal,i] >= x_ff[i,0:n_equal] - delta * np.ones(n_equal))
+    ocp.subject_to(x_vars[7:,0] == x_ff[0,7:])
+    ocp.subject_to(x_vars[7:,-1] == x_ff[-1,7:])
 
     # objective
     quad_u_var = 0
     Q = np.array([1., 1., 1., 10., 10., 10.])
     for i in range(N):
         quad_u_var += cs.mtimes(u_vars[:,i].T, Q * u_vars[:,i])
-    cost_var = dt_vars + 1e3 * delta + 1e-4 * quad_u_var
+    cost_var = 100*dt_vars + 1e3 * delta + 1e-4 * quad_u_var
     ocp.minimize(cost_var)
     opts = {'ipopt.print_level': 0, 'print_time': 0, 'ipopt.sb': 'yes',
             'verbose':False, 'ipopt.tol': 1e-4, 'ipopt.max_iter': 1000}
@@ -372,7 +428,7 @@ else:
 # print(f"Replanned dt_uw: {dt_uw} (was {dt}) which is {(dt_uw)/dt*100}%")
 
 # plot the trajectory
-plot_planning_results(uw_robot, t_uw, x_uw, u_uw, X0, Xf, [XA], Obs, alpha=alpha,
+plot_planning_results(uw_robot, t_uw, x_uw, u_uw, X0, Xf, RoIs, Obs, alpha=alpha, D3=D3,
                       path="stl_mapping/Planning/figures/bluerov_nonlinear_trajectory.png")
 
 # save the trajectory

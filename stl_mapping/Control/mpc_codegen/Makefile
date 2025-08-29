@@ -44,6 +44,10 @@ MODEL_OBJ := $(MODEL_SRC:.c=.o)
 OCP_SRC=
 
 
+OCP_SRC+= atmos_ff_constraints/atmos_ff_constr_h_0_fun_jac_uxt_zt.c
+OCP_SRC+= atmos_ff_constraints/atmos_ff_constr_h_0_fun.c
+OCP_SRC+= atmos_ff_constraints/atmos_ff_constr_h_fun_jac_uxt_zt.c
+OCP_SRC+= atmos_ff_constraints/atmos_ff_constr_h_fun.c
 OCP_SRC+= atmos_ff_cost/atmos_ff_cost_y_0_fun.c
 OCP_SRC+= atmos_ff_cost/atmos_ff_cost_y_0_fun_jac_ut_xt.c
 OCP_SRC+= atmos_ff_cost/atmos_ff_cost_y_0_hess.c

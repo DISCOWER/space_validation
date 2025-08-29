@@ -5,6 +5,8 @@ from scipy.spatial import ConvexHull
 import gurobipy as gp
 import casadi as cs
 
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+
 # check if B is in the column space of C
 # find a matrix K such that B = CK
 def exists_K(B, C, tol=1e-8):
@@ -25,15 +27,20 @@ def compute_K(B, C, tol=1e-8):
     
 
 class HyperRectangle():
-    def __init__(self, lower_bounds:np.ndarray, upper_bounds:np.ndarray):
-        self.lower_bounds = lower_bounds
-        self.upper_bounds = upper_bounds
-        # assert len(self.lower_bounds) == len(self.upper_bounds), "Lower and upper bounds must have the same length."
-        # assert np.all(self.lower_bounds <= self.upper_bounds), "Lower bounds must be less than or equal to upper bounds."
-        # self.dim = len(self.lower_bounds)
-        self.center = (self.lower_bounds + self.upper_bounds) / 2
-        self.size = self.upper_bounds - self.lower_bounds
-        # self.volume = np.prod(self.size)
+    def __init__(self, lower_bounds:np.ndarray=None, upper_bounds:np.ndarray=None,
+                 center:np.ndarray=None, size:np.ndarray=None):
+        if lower_bounds is None and upper_bounds is None:
+            assert center is not None and size is not None, "Center and size must be provided if bounds are not."
+            self.center = center
+            self.size = size
+            self.lower_bounds = center - size / 2
+            self.upper_bounds = center + size / 2
+        elif center is None and size is None:
+            assert lower_bounds is not None and upper_bounds is not None, "Lower and upper bounds must be provided if center and size are not."
+            self.lower_bounds = lower_bounds
+            self.upper_bounds = upper_bounds
+            self.center = (lower_bounds + upper_bounds) / 2
+            self.size = upper_bounds - lower_bounds
 
         # obtain the inequalities of the hyperrectangle in the form of Ax <= b
         self.A = np.array([[-1, 0],
@@ -64,7 +71,7 @@ class HyperRectangle():
         return new_lower_bounds
     
     def scalar_multiply(self, scalar:float):
-        assert isinstance(scalar, (int, float)), "Scalar must be a number."
+        assert isinstance(scalar, (int, float, gp.Var)), "Scalar must be a number."
         new_lower_bounds = self.lower_bounds * scalar
         new_upper_bounds = self.upper_bounds * scalar
         return HyperRectangle(new_lower_bounds, new_upper_bounds)
@@ -74,9 +81,34 @@ class HyperRectangle():
         return np.all(point >= self.lower_bounds) and np.all(point <= self.upper_bounds)
     
     def plot(self, ax:plt.Axes, color='blue', alpha=0.5):
-        rect = plt.Rectangle(self.lower_bounds[:2], self.size[0], self.size[1], 
-                             alpha=alpha, fc=color, lw=1, ec='black')
-        ax.add_patch(rect)
+        # check if ax is a 2D plot
+        if ax.name == "rectilinear":
+            rect = plt.Rectangle(self.lower_bounds[:2], self.size[0], self.size[1], 
+                                alpha=alpha, fc=color, lw=1, ec='black')
+            ax.add_patch(rect)
+        elif ax.name == "3d":
+            x, y, z = self.lower_bounds[0:3]
+            dx, dy, dz = self.size[0:3]
+            corners = np.array([
+                [x, y, z],
+                [x + dx, y, z],
+                [x + dx, y + dy, z],
+                [x, y + dy, z],
+                [x, y, z + dz],
+                [x + dx, y, z + dz],
+                [x + dx, y + dy, z + dz],
+                [x, y + dy, z + dz],
+            ])
+            faces = [
+                [corners[j] for j in [0, 1, 2, 3]],  # bottom
+                [corners[j] for j in [4, 5, 6, 7]],  # top
+                [corners[j] for j in [0, 1, 5, 4]],  # front
+                [corners[j] for j in [2, 3, 7, 6]],  # back
+                [corners[j] for j in [0, 3, 7, 4]],  # left
+                [corners[j] for j in [1, 2, 6, 5]],  # right
+            ]
+            box = Poly3DCollection(faces, alpha=alpha, color=color)
+            ax.add_collection3d(box)
 
 class Zonotope():
     def __init__(self, x=None, G=None, Gdiag=None):

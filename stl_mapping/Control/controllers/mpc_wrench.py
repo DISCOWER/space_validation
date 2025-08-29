@@ -46,12 +46,36 @@ from models.atmos_wrench import atmos_model_wrench
 from models.bluerov_wrench import bluerov_model_wrench
 from rclpy.node import Node
 
+from px4_msgs.msg import VehicleThrustSetpoint, VehicleTorqueSetpoint
+from Utilities.qos_profiles import NORMAL_QOS
+
 import rclpy
 rclpy.init()
 
 class MpcWrench(Node):
     def __init__(self, model_name:str='atmos'):
         super().__init__('mpc_wrench')
+        # Create two publishers for pre- and post-feedback equivalence control
+        self.publisher_pre_fbl_force_control = self.create_publisher(
+            VehicleThrustSetpoint,
+            '/stl_mapping/pre_fbl_force_setpoint',
+            NORMAL_QOS
+        )
+        self.publisher_pre_fbl_torque_control = self.create_publisher(
+            VehicleTorqueSetpoint,
+            '/stl_mapping/pre_fbl_torque_setpoint',
+            NORMAL_QOS
+        )
+        self.publisher_post_fbl_force_control = self.create_publisher(
+            VehicleThrustSetpoint,
+            '/stl_mapping/post_fbl_force_setpoint',
+            NORMAL_QOS
+        )
+        self.publisher_post_fbl_torque_control = self.create_publisher(
+            VehicleTorqueSetpoint,
+            '/stl_mapping/post_fbl_torque_setpoint',
+            NORMAL_QOS
+        )
 
         # Define the controller parameters
         self.dt = 0.1               # MPC time step [s]
@@ -59,31 +83,26 @@ class MpcWrench(Node):
         self.Nu = 30                # Prediction horizon, inputs
 
         #! ATMOS weights
-        # self.Q = np.diag([          # State weighting matrix
-        #     1e0, 1e0, 1e0,
-        #     1e2,
-        #     3e1, 3e1, 3e1,  
-        #     3e1, 3e1, 3e1])             
-        # self.R = 0.1*np.diag([          # State weighting matrix
-        #     1e0, 1e0, 1e0,
-        #     1e0, 1e0, 1e0]) 
-        # self.P = 10 * self.Q        # Terminal state weighting matrix
-        
-        #! BlueROV weights
-        # self.Q = np.diag([          # State weighting matrix
-        #     1e0, 1e0, 1e0,
-        #     1e2,
-        #     3e1, 3e1, 3e1,  
-        #     3e1, 3e1, 3e1])   
         self.Q = np.diag([          # State weighting matrix
             1e2, 1e2, 1e2,
             5e1, 5e1, 5e1, 5e1,
-            3e0, 3e0, 3e0,  
-            3e0, 3e0, 3e0])          
+            3e1, 3e1, 3e1,  
+            3e1, 3e1, 3e1])             
         self.R = 0.1*np.diag([          # State weighting matrix
             1e0, 1e0, 1e0,
             1e0, 1e0, 1e0]) 
         self.P = 10 * self.Q        # Terminal state weighting matrix
+        
+        # #! BlueROV weights
+        # self.Q = np.diag([          # State weighting matrix
+        #     1e2, 1e2, 1e2,
+        #     5e2, 5e2, 5e2, 5e2,
+        #     3e0, 3e0, 3e0,  
+        #     3e0, 3e0, 3e0])          
+        # self.R = 0.01*np.diag([          # State weighting matrix
+        #     1e0, 1e0, 1e0,
+        #     1e0, 1e0, 1e0]) 
+        # self.P = 10 * self.Q        # Terminal state weighting matrix
         
         #! ATMOS Bounds
         # self.lbx = np.array([0+0.25, -1.58+0.25, -0.5, -0.5, -3])
@@ -102,6 +121,30 @@ class MpcWrench(Node):
         # Create the OCP
         self.model_name = model_name
         self.solver = self.setup()
+
+    def publish_pre_fbl_messages(self, u_opt):
+        # Publish pre-feedback control messages
+        thrust_msg = VehicleThrustSetpoint()
+        thrust_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+        thrust_msg.xyz = [u_opt[0], u_opt[1], u_opt[2]]
+        self.publisher_pre_fbl_force_control.publish(thrust_msg)
+
+        torque_msg = VehicleTorqueSetpoint()
+        torque_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+        torque_msg.xyz = [u_opt[3], u_opt[4], u_opt[5]]
+        self.publisher_pre_fbl_torque_control.publish(torque_msg)
+
+    def publish_post_fbl_messages(self, u_opt):
+        # Publish post-feedback control messages
+        thrust_msg = VehicleThrustSetpoint()
+        thrust_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+        thrust_msg.xyz = [u_opt[0], u_opt[1], u_opt[2]]
+        self.publisher_post_fbl_force_control.publish(thrust_msg)
+
+        torque_msg = VehicleTorqueSetpoint()
+        torque_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+        torque_msg.xyz = [u_opt[3], u_opt[4], u_opt[5]]
+        self.publisher_post_fbl_torque_control.publish(torque_msg)
 
     def setup(self):
         # create ocp object to formulate the OCP
@@ -273,5 +316,10 @@ class MpcWrench(Node):
         x_pred[self.Nx,:] = self.solver.get(self.Nx, "x")
 
         self.get_logger().info(f"Cost: {self.solver.get_cost()}")
+
+        # publish the same pre and post fbl because we don't do any fbl
+        # but we keep things consistent for later analysis
+        self.publish_pre_fbl_messages(u_opt)
+        self.publish_post_fbl_messages(u_opt)
 
         return u_opt, x_pred

@@ -42,6 +42,7 @@
 #include "atmos_ff_model/atmos_ff_model.h"
 
 
+#include "atmos_ff_constraints/atmos_ff_constraints.h"
 #include "atmos_ff_cost/atmos_ff_cost.h"
 
 
@@ -340,6 +341,18 @@ void atmos_ff_acados_create_setup_functions(atmos_ff_solver_capsule* capsule)
 
 
     ext_fun_opts.external_workspace = true;
+    MAP_CASADI_FNC(nl_constr_h_0_fun_jac, atmos_ff_constr_h_0_fun_jac_uxt_zt);
+    MAP_CASADI_FNC(nl_constr_h_0_fun, atmos_ff_constr_h_0_fun);
+    // constraints.constr_type == "BGH" and dims.nh > 0
+    capsule->nl_constr_h_fun_jac = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*(N-1));
+    for (int i = 0; i < N-1; i++) {
+        MAP_CASADI_FNC(nl_constr_h_fun_jac[i], atmos_ff_constr_h_fun_jac_uxt_zt);
+    }
+    capsule->nl_constr_h_fun = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*(N-1));
+    for (int i = 0; i < N-1; i++) {
+        MAP_CASADI_FNC(nl_constr_h_fun[i], atmos_ff_constr_h_fun);
+    }
+
     // nonlinear least squares function
     MAP_CASADI_FNC(cost_y_0_fun, atmos_ff_cost_y_0_fun);
     MAP_CASADI_FNC(cost_y_0_fun_jac_ut_xt, atmos_ff_cost_y_0_fun_jac_ut_xt);
@@ -506,12 +519,12 @@ void atmos_ff_acados_setup_nlp_in(atmos_ff_solver_capsule* capsule, const int N,
     W_0[4+(NY0) * 4] = 50;
     W_0[5+(NY0) * 5] = 50;
     W_0[6+(NY0) * 6] = 50;
-    W_0[7+(NY0) * 7] = 3;
-    W_0[8+(NY0) * 8] = 3;
-    W_0[9+(NY0) * 9] = 3;
-    W_0[10+(NY0) * 10] = 3;
-    W_0[11+(NY0) * 11] = 3;
-    W_0[12+(NY0) * 12] = 3;
+    W_0[7+(NY0) * 7] = 30;
+    W_0[8+(NY0) * 8] = 30;
+    W_0[9+(NY0) * 9] = 30;
+    W_0[10+(NY0) * 10] = 30;
+    W_0[11+(NY0) * 11] = 30;
+    W_0[12+(NY0) * 12] = 30;
     W_0[13+(NY0) * 13] = 0.1;
     W_0[14+(NY0) * 14] = 0.1;
     W_0[15+(NY0) * 15] = 0.1;
@@ -538,12 +551,12 @@ void atmos_ff_acados_setup_nlp_in(atmos_ff_solver_capsule* capsule, const int N,
     W[4+(NY) * 4] = 50;
     W[5+(NY) * 5] = 50;
     W[6+(NY) * 6] = 50;
-    W[7+(NY) * 7] = 3;
-    W[8+(NY) * 8] = 3;
-    W[9+(NY) * 9] = 3;
-    W[10+(NY) * 10] = 3;
-    W[11+(NY) * 11] = 3;
-    W[12+(NY) * 12] = 3;
+    W[7+(NY) * 7] = 30;
+    W[8+(NY) * 8] = 30;
+    W[9+(NY) * 9] = 30;
+    W[10+(NY) * 10] = 30;
+    W[11+(NY) * 11] = 30;
+    W[12+(NY) * 12] = 30;
     W[13+(NY) * 13] = 0.1;
     W[14+(NY) * 14] = 0.1;
     W[15+(NY) * 15] = 0.1;
@@ -571,12 +584,12 @@ void atmos_ff_acados_setup_nlp_in(atmos_ff_solver_capsule* capsule, const int N,
     W_e[4+(NYN) * 4] = 500;
     W_e[5+(NYN) * 5] = 500;
     W_e[6+(NYN) * 6] = 500;
-    W_e[7+(NYN) * 7] = 30;
-    W_e[8+(NYN) * 8] = 30;
-    W_e[9+(NYN) * 9] = 30;
-    W_e[10+(NYN) * 10] = 30;
-    W_e[11+(NYN) * 11] = 30;
-    W_e[12+(NYN) * 12] = 30;
+    W_e[7+(NYN) * 7] = 300;
+    W_e[8+(NYN) * 8] = 300;
+    W_e[9+(NYN) * 9] = 300;
+    W_e[10+(NYN) * 10] = 300;
+    W_e[11+(NYN) * 11] = 300;
+    W_e[12+(NYN) * 12] = 300;
     ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, N, "W", W_e);
     free(W_e);
     ocp_nlp_cost_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, 0, "nls_y_fun", &capsule->cost_y_0_fun);
@@ -674,6 +687,31 @@ void atmos_ff_acados_setup_nlp_in(atmos_ff_solver_capsule* capsule, const int N,
 
 
 
+    // set up nonlinear constraints for last stage
+    double* luh_0 = calloc(2*NH0, sizeof(double));
+    double* lh_0 = luh_0;
+    double* uh_0 = luh_0 + NH0;
+    lh_0[0] = -10;
+    lh_0[1] = -10;
+    lh_0[2] = -10;
+    lh_0[3] = -10;
+    lh_0[4] = -10;
+    lh_0[5] = -10;
+    uh_0[0] = 10;
+    uh_0[1] = 10;
+    uh_0[2] = 10;
+    uh_0[3] = 10;
+    uh_0[4] = 10;
+    uh_0[5] = 10;
+
+    ocp_nlp_constraints_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, 0, "nl_constr_h_fun_jac", &capsule->nl_constr_h_0_fun_jac);
+    ocp_nlp_constraints_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, 0, "nl_constr_h_fun", &capsule->nl_constr_h_0_fun);
+    
+    ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, 0, "lh", lh_0);
+    ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, 0, "uh", uh_0);
+    
+    
+    free(luh_0);
 
 
 
@@ -706,38 +744,6 @@ void atmos_ff_acados_setup_nlp_in(atmos_ff_solver_capsule* capsule, const int N,
     }
     free(idxsbx);
     free(lusbx);
-    // u
-    int* idxbu = malloc(NBU * sizeof(int));
-    idxbu[0] = 0;
-    idxbu[1] = 1;
-    idxbu[2] = 2;
-    idxbu[3] = 3;
-    idxbu[4] = 4;
-    idxbu[5] = 5;
-    double* lubu = calloc(2*NBU, sizeof(double));
-    double* lbu = lubu;
-    double* ubu = lubu + NBU;
-    lbu[0] = -1.8666666666666665;
-    ubu[0] = 1.8666666666666665;
-    lbu[1] = -1.8666666666666665;
-    ubu[1] = 1.8666666666666665;
-    lbu[2] = -1.8666666666666665;
-    ubu[2] = 1.8666666666666665;
-    lbu[3] = -0.224;
-    ubu[3] = 0.224;
-    lbu[4] = -0.224;
-    ubu[4] = 0.224;
-    lbu[5] = -0.224;
-    ubu[5] = 0.224;
-
-    for (int i = 0; i < N; i++)
-    {
-        ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, i, "idxbu", idxbu);
-        ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, i, "lbu", lbu);
-        ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, i, "ubu", ubu);
-    }
-    free(idxbu);
-    free(lubu);
 
 
 
@@ -781,6 +787,36 @@ void atmos_ff_acados_setup_nlp_in(atmos_ff_solver_capsule* capsule, const int N,
 
 
 
+    // set up nonlinear constraints for stage 1 to N-1
+    double* luh = calloc(2*NH, sizeof(double));
+    double* lh = luh;
+    double* uh = luh + NH;
+    lh[0] = -10;
+    lh[1] = -10;
+    lh[2] = -10;
+    lh[3] = -10;
+    lh[4] = -10;
+    lh[5] = -10;
+    uh[0] = 10;
+    uh[1] = 10;
+    uh[2] = 10;
+    uh[3] = 10;
+    uh[4] = 10;
+    uh[5] = 10;
+
+    for (int i = 1; i < N; i++)
+    {
+        ocp_nlp_constraints_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, i, "nl_constr_h_fun_jac",
+                                      &capsule->nl_constr_h_fun_jac[i-1]);
+        ocp_nlp_constraints_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, i, "nl_constr_h_fun",
+                                      &capsule->nl_constr_h_fun[i-1]);
+        
+        ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, i, "lh", lh);
+        ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, i, "uh", uh);
+        
+        
+    }
+    free(luh);
 
 
 
@@ -1201,6 +1237,15 @@ int atmos_ff_acados_free(atmos_ff_solver_capsule* capsule)
     external_function_external_param_casadi_free(&capsule->cost_y_e_fun_jac_ut_xt);
 
     // constraints
+    for (int i = 0; i < N-1; i++)
+    {
+        external_function_external_param_casadi_free(&capsule->nl_constr_h_fun_jac[i]);
+        external_function_external_param_casadi_free(&capsule->nl_constr_h_fun[i]);
+    }
+    free(capsule->nl_constr_h_fun_jac);
+    free(capsule->nl_constr_h_fun);
+    external_function_external_param_casadi_free(&capsule->nl_constr_h_0_fun_jac);
+    external_function_external_param_casadi_free(&capsule->nl_constr_h_0_fun);
 
 
 

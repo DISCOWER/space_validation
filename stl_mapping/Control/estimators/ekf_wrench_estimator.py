@@ -1,15 +1,37 @@
 import numpy as np
+import casadi as cs
 from Utilities.Robots import FreeFlyer
+from Utilities.smarc_modelling.src.smarc_modelling.vehicles.BlueROV import BlueROV
+from scipy.spatial.transform import Rotation as R
 
 class EKFWrenchEstimator:
-    def __init__(self, dt:float = 0.1, robot: FreeFlyer = None):
-        self.robot = robot if robot is not None else FreeFlyer()
+    def __init__(self, dt:float = 0.1, robot_name:str = 'atmos'):
+        if robot_name == 'atmos':
+            self.robot = FreeFlyer()
+        elif robot_name == 'bluerov':
+            self.robot = BlueROV()
+        else:
+            raise ValueError(f"Unknown robot name: {robot_name}")
+        self.dt = dt
 
-        self.mass = self.robot.mass
+        # Create the Jacobian F (square matrix of state [v,w,fd,td])
+        x = cs.SX.sym('x', 13)
+        u = cs.SX.sym('u', 6)
+        fd = cs.SX.sym('fd', 3)
+        td = cs.SX.sym('td', 3)
+        dx = self.robot.calculate_disturbed_dynamics(x,u,fd,td)
+        x_kp1 = x + dx*self.dt
+        # Jacobian
+        F = cs.SX.eye(12)
+        F[0:6,0:6] = cs.jacobian(x_kp1[7:13], x[7:13])
+        F[0:6,6:12] = cs.jacobian(x_kp1[7:13], cs.vertcat(fd,td))
+        # Into a symbolic function
+        self.F = cs.Function('F', [x, u, fd, td], [F])
+
+        self.mass = self.robot.m
         self.inertia = self.robot.inertia
         self.inertia_inv = np.linalg.inv(self.inertia)
 
-        self.dt = dt
         qv = (0.6/self.mass * self.dt)**2
         qw = [(0.12 / self.inertia[i, i] * self.dt)**2 for i in range(3)]
         qfd = (0.2*self.dt)**2
@@ -23,35 +45,23 @@ class EKFWrenchEstimator:
         self.Q = np.diag([qv]*3 + qw + [qfd]*3 + [qtd]*3) # Process noise covariance
         self.R = np.diag([rv]*3 + [rw]*3) # Measurement noise covariance
 
-    def get_rotMat(self, q):
-        """Returns rotation matrix from quaternion q = [w, x, y, z]."""
-        w, x, y, z = q
-        return np.array([
-            [1 - 2*y**2 - 2*z**2,     2*(x*y - w*z),         2*(x*z + w*y)],
-            [2*(x*y + w*z),           1 - 2*x**2 - 2*z**2,   2*(y*z - w*x)],
-            [2*(x*z - w*y),           2*(y*z + w*x),         1 - 2*x**2 - 2*y**2]
-        ])
-
-    def predict(self, q, F_cmd, T_cmd):
+    def predict(self, x_meas, F_cmd, T_cmd):
         v = self.x[0:3]
         w = self.x[3:6]
-        fd = self.x[6:9]
-        td = self.x[9:12]
+        fd = self.x[6:9]    # Force disturbance in inertial frame
+        td = self.x[9:12]   # Torque disturbance in body frame
 
         # System dynamics
-        R = self.get_rotMat(q)
-        F_tot = R @ F_cmd + fd
-        T_tot = T_cmd + td
+        # Rot = R.from_quat(x_meas[3:7],scalar_first=True)
+        # F_tot = F_cmd + R.inv().apply(fd)   # Total force in body frame
+        # T_tot = T_cmd + td                  # Total torque in body frame
 
-        a_lin = F_tot / self.mass
-        a_ang = self.inertia_inv @ (T_tot - np.cross(w, self.inertia @ w))
-
-        # #! If we want to use the robot model directly
-        # x = self.x[0:13]
-        # u = np.vstack((F_cmd, T_cmd))
-        # dx = self.robot.calculate_disturbed_dynamics(x,u,fd,td)
-        # a_lin = dx[7:10]
-        # a_ang = dx[10:13]
+        # a_lin = F_tot / self.mass
+        # a_ang = self.inertia_inv @ (T_tot - np.cross(w, self.inertia @ w))
+        u = np.hstack((F_cmd, T_cmd))
+        dx = self.robot.calculate_disturbed_dynamics(x_meas,u,fd,td)
+        a_lin = dx[7:10]
+        a_ang = dx[10:13]
 
         # Euler integration
         v_new = v + a_lin * self.dt
@@ -60,14 +70,14 @@ class EKFWrenchEstimator:
         self.x = np.hstack((v_new, w_new, fd, td))
 
         # Jacobian matrix F
-        F = np.eye(12)
-        F[0:3, 6:9] = np.eye(3) * (self.dt / self.mass)
-        F[3:6, 9:12] = self.inertia_inv * self.dt
+        F = self.F(x_meas, u, fd, td)
+        F = np.array(F)
 
         self.P = F @ self.P @ F.T + self.Q
 
-    def update(self, v_meas, w_meas):
+    def update(self, x_meas):
         # Measurement is [v, w] directly
+        v_meas, w_meas = x_meas[7:10], x_meas[10:13]
         z = np.hstack((v_meas, w_meas))
 
         # Measurement Jacobian H
@@ -82,12 +92,12 @@ class EKFWrenchEstimator:
         self.P = (np.eye(12) - K @ H) @ self.P
 
     def step(self, x_meas, F_cmd, T_cmd):
-        q_meas = x_meas[3:7]
-        v_meas = x_meas[7:10]
-        w_meas = x_meas[10:13]
+        # q_meas = x_meas[3:7]
+        # v_meas = x_meas[7:10]
+        # w_meas = x_meas[10:13]
 
-        self.predict(q_meas, F_cmd, T_cmd)
-        self.update(v_meas, w_meas)
+        self.predict(x_meas, F_cmd, T_cmd)
+        self.update(x_meas)
 
         fd = self.x[6:9]
         td = self.x[9:12]

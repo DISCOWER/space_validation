@@ -191,7 +191,9 @@ if __name__ == "__main__":
             plot_instance(fig, axs, real_robot, real_sp_robot, x_sol, u_sol, x_ref)
 
             # have the robot take a step
+            print(f"u_opt (ff): {u_sol[:, 0]}")
             u_applied = fbl_sp_to_uw(real_robot, real_sp_robot, x0, u_sol[:, 0])
+            print(f"u_opt (uw): {u_applied}")
             x0 = real_robot.step(x0, u_applied, dt)
             t += dt
 

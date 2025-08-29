@@ -1,10 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from Utilities.rotations import euler_to_quat_np, quat_to_euler_np
+from scipy.spatial.transform import Rotation as R
 
 def plot_planning_results(robot, t, x, u, 
                           X0=None, Xf=None, ROIs=None, Obs=None, alpha=1.0,
-                          in_axs = None, plot=True,
+                          in_axs = None, plot=True, D3=False,
                           path="stl_mapping/Planning/figures/sp_trajectory.png"):
     # if x.shape[1] == 12:
     #     p, e, v, w = x[:, 0:3], x[:, 3:6], x[:, 6:9], x[:, 9:12]
@@ -43,20 +44,54 @@ def plot_planning_results(robot, t, x, u,
     # plot the trajectory
     if in_axs is None:
         fig = plt.figure(figsize=(15, 5))
-        gs = fig.add_gridspec(2,4, figure=fig)
-        ax_p = fig.add_subplot(gs[:,0])
-        ax_v = fig.add_subplot(gs[:,1])
-        ax_q = fig.add_subplot(gs[0,2])
-        ax_w = fig.add_subplot(gs[1,2])
-        ax_f = fig.add_subplot(gs[0,3])
-        ax_t = fig.add_subplot(gs[1,3])
+        gs = fig.add_gridspec(2,5, figure=fig)
+        if D3:
+            ax_p = fig.add_subplot(gs[:,0:2], projection='3d')
+            ax_p.set_box_aspect([1,1,1])  # Aspect ratio is 1:1:1
+        else:
+            ax_p = fig.add_subplot(gs[:,0:2])
+        ax_p2 = fig.add_subplot(gs[0,2])
+        ax_v = fig.add_subplot(gs[1,2])
+        ax_q = fig.add_subplot(gs[0,3])
+        ax_w = fig.add_subplot(gs[1,3])
+        ax_f = fig.add_subplot(gs[0,4])
+        ax_t = fig.add_subplot(gs[1,4])
     else: 
         ax_p, ax_v, ax_q, ax_w, ax_f, ax_t = in_axs
 
-    if False:
-        ax_p = fig.add_subplot(gs[:,0], projection='3d')
-        ax_p.set_box_aspect([1,1,1])  # Aspect ratio is 1:1:1
+    if D3:
         ax_p.plot(p[:, 0], p[:, 1], p[:, 2], 'g-')
+        # create arrows from pitch, roll, yaw angles
+        forward = np.array([0.5, 0, 0])
+        for i in range(len(p)):
+            if q.shape[1] == 4:
+                Rot = R.from_quat(q[i, :],scalar_first=True)
+            else:
+                Rot = R.from_euler('xyz', q[i, :], degrees=False)
+            direction = Rot.apply(forward)
+            ax_p.quiver(p[i, 0], p[i, 1], p[i, 2], 
+                        direction[0], direction[1], direction[2], color='k')
+
+        if X0 is not None:
+            X0.plot(ax_p, color='green', alpha=0.5)
+        if Xf is not None:
+            Xf.plot(ax_p, color='green', alpha=0.5)
+        if Obs is not None:
+            [obs.plot(ax_p, color='red', alpha=0.5) for obs in Obs]
+        if ROIs is not None:
+            [roi.plot(ax_p, color='blue', alpha=0.5) for roi in ROIs]
+
+        limits = np.array([
+            ax_p.get_xlim3d(),
+            ax_p.get_ylim3d(),
+            ax_p.get_zlim3d()
+        ])
+        spans = limits[:,1] - limits[:,0]
+        centers = np.mean(limits, axis=1)
+        radius = 0.5 * max(spans)
+        ax_p.set_xlim3d([centers[0] - radius, centers[0] + radius])
+        ax_p.set_ylim3d([centers[1] - radius, centers[1] + radius])
+        ax_p.set_zlim3d([centers[2] - radius, centers[2] + radius])
     else:
         ax_p.plot(p[:, 0], p[:, 1], 'g-')
         # ax_p.plot(p[:, 0], p[:, 1], 'go')
@@ -75,23 +110,31 @@ def plot_planning_results(robot, t, x, u,
         ax_p.set_ylabel('Y (m)')
         ax_p.grid()
 
-        ax_v.plot(t, v[:, 0], 'r-',label='dx')
-        ax_v.plot(t, v[:, 0], 'ro')
-        ax_v.plot(t, v[:, 1], 'g-', label='dy')
-        ax_v.plot(t, v[:, 1], 'go')
-        ax_v.plot(t, v[:, 2], 'b-', label='dz')
-        ax_v.plot(t, v[:, 2], 'bo')
-        ax_v.set_xlabel('Time (s)')
-        ax_v.set_ylabel('Velocity (m/s)')
-        ax_v.legend()
-        ax_v.grid()
+    ax_p2.plot(t, p[:, 0], 'r-',label='dx')
+    ax_p2.plot(t, p[:, 1], 'g-', label='dy')
+    ax_p2.plot(t, p[:, 2], 'b-', label='dz')
+    # ax_p2.set_xlabel('Time (s)')
+    ax_p2.set_ylabel('Position (m)')
+    ax_p2.legend()
+    ax_p2.grid()
+
+    ax_v.plot(t, v[:, 0], 'r-',label='dx')
+    # ax_v.plot(t, v[:, 0], 'ro')
+    ax_v.plot(t, v[:, 1], 'g-', label='dy')
+    # ax_v.plot(t, v[:, 1], 'go')
+    ax_v.plot(t, v[:, 2], 'b-', label='dz')
+    # ax_v.plot(t, v[:, 2], 'bo')
+    ax_v.set_xlabel('Time (s)')
+    ax_v.set_ylabel('Velocity (m/s)')
+    ax_v.legend()
+    ax_v.grid()
 
     ax_q.plot(t, q[:, 0], 'r', label='q0')
     ax_q.plot(t, q[:, 1], 'g', label='q1')
     ax_q.plot(t, q[:, 2], 'b', label='q2')
     if q.shape[1] == 4:  # If quaternion representation
         ax_q.plot(t, q[:, 3], 'k', label='q3')
-    ax_q.set_xlabel('Time (s)')
+    # ax_q.set_xlabel('Time (s)')
     if q.shape[1] == 4:
         ax_q.set_ylabel('Quaternion (q0, q1, q2, q3)')
     else:
@@ -112,17 +155,9 @@ def plot_planning_results(robot, t, x, u,
     ax_f.plot(t[:u.shape[0]], u[:,2], label='u3')
     ax_f.axhline(robot.U.lower_bounds[0], color='g', linestyle='-.')#, label="U_lb")
     ax_f.axhline(robot.U.upper_bounds[0], color='g', linestyle='-.')
-    if hasattr(robot, 'U_effective'):
-        ax_f.axhline(alpha*robot.U_effective.lower_bounds[0], color='b', linestyle='--')#, label="alpha*U_effective_lb")
-        ax_f.axhline(alpha*robot.U_effective.upper_bounds[0], color='b', linestyle='--')
-        ax_f.axhline(robot.U_effective.lower_bounds[0], color='r', linestyle=':')#, label="U_effective_lb")
-        ax_f.axhline(robot.U_effective.upper_bounds[0], color='r', linestyle=':')
-    if hasattr(robot, '_U_effective_sym'):
-        ax_f.axhline(alpha*robot.calculate_U_effective(np.zeros((13,))).lower_bounds[0], color='b', linestyle='--')
-        ax_f.axhline(alpha*robot.calculate_U_effective(np.zeros((13,))).upper_bounds[0], color='b', linestyle='--')
-        ax_f.axhline(robot.calculate_U_effective(np.zeros((13,))).lower_bounds[0], color='r', linestyle=':')
-        ax_f.axhline(robot.calculate_U_effective(np.zeros((13,))).upper_bounds[0], color='r', linestyle=':')
-    ax_f.set_xlabel('Time (s)')
+    ax_f.axhline(robot.calculate_U_effective(np.zeros((13,)),alpha).lower_bounds[0], color='b', linestyle='--')
+    ax_f.axhline(robot.calculate_U_effective(np.zeros((13,)),alpha).upper_bounds[0], color='b', linestyle='--')
+    # ax_f.set_xlabel('Time (s)')
     ax_f.set_ylabel('Control input (N)')
     ax_f.legend()
     ax_f.grid()
@@ -132,14 +167,8 @@ def plot_planning_results(robot, t, x, u,
     ax_t.plot(t[:u.shape[0]], u[:,5], label='u6')
     ax_t.axhline(robot.U.lower_bounds[3], color='g', linestyle='-.')#, label="U_lb")
     ax_t.axhline(robot.U.upper_bounds[3], color='g', linestyle='-.')
-    if hasattr(robot, 'U_effective'):
-        ax_t.axhline(alpha*robot.U_effective.lower_bounds[3], color='b', linestyle='--')#, label="alpha*U_effective_lb")
-        ax_t.axhline(alpha*robot.U_effective.upper_bounds[3], color='b', linestyle='--')
-    if hasattr(robot, '_U_effective_sym'):
-        ax_t.axhline(alpha*robot.calculate_U_effective(np.zeros((13,))).lower_bounds[3], color='b', linestyle='--')
-        ax_t.axhline(alpha*robot.calculate_U_effective(np.zeros((13,))).upper_bounds[3], color='b', linestyle='--')
-        ax_t.axhline(robot.calculate_U_effective(np.zeros((13,))).lower_bounds[3], color='r', linestyle=':')
-        ax_t.axhline(robot.calculate_U_effective(np.zeros((13,))).upper_bounds[3], color='r', linestyle=':')
+    ax_t.axhline(robot.calculate_U_effective(np.zeros((13,)),alpha).lower_bounds[3], color='b', linestyle='--')
+    ax_t.axhline(robot.calculate_U_effective(np.zeros((13,)),alpha).upper_bounds[3], color='b', linestyle='--')
     ax_t.set_xlabel('Time (s)')
     ax_t.set_ylabel('Torque input (Nm)')
     ax_t.legend()
@@ -147,3 +176,5 @@ def plot_planning_results(robot, t, x, u,
 
     if plot:
         plt.savefig(path)
+    else:
+        plt.show()

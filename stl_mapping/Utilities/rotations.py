@@ -16,6 +16,7 @@ def skew_symmetric_np(v):
                      [v[2], v[1], -v[0], 0]])
 
 def q_to_rot_mat_cs(q):
+    # ENU->FLU
     qw, qx, qy, qz = q[0], q[1], q[2], q[3]
 
     rot_mat = cs.vertcat(

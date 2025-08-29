@@ -10,6 +10,7 @@ from Utilities.smarc_modelling.src.smarc_modelling.vehicles.BlueROV import BlueR
 from Utilities.Robots import FreeFlyer
 
 from mpc_wrench import MpcWrench
+from mpc_fbl_wrench import MpcFBLWrench
 
 def plot_instance(fig, axs, uw_robot:BlueROV, sp_robot:FreeFlyer, 
                   x_sol, u_sol, x_ref):
@@ -62,8 +63,12 @@ def plot_instance(fig, axs, uw_robot:BlueROV, sp_robot:FreeFlyer,
     times = np.arange(t, t + dt * (N), dt)
     axs[3].plot(times[0:u_sol.shape[1]], u_sol[0, :], 'b-', label='Control')
     axs[3].plot(times[0:u_sol.shape[1]], u_sol[1, :], 'r-', label='Control')
+    axs[3].axhline(uw_robot.U.lower_bounds[0], color='b', linestyle='--')
+    axs[3].axhline(uw_robot.U.upper_bounds[0], color='b', linestyle='--')
+    axs[3].axhline(uw_robot.U.lower_bounds[1], color='r', linestyle='--')
+    axs[3].axhline(uw_robot.U.upper_bounds[1], color='r', linestyle='--')
     axs[3].set_xlim([0, 10])
-    axs[3].set_ylim([-80, 80])
+    axs[3].set_ylim([-100, 100])
     axs[3].set_xlabel('Time (s)')
     axs[3].set_ylabel('Control Input')
     axs[3].set_title('Control Inputs')
@@ -79,10 +84,12 @@ if __name__ == "__main__":
     plt.ion()
     fig, axs = plt.subplots(1, 4, figsize=(15, 6))
 
-    robot_name = 'atmos'
-    # robot_name = 'bluerov'
+    # robot_name = 'atmos'
+    robot_name = 'bluerov'
 
-    mpc = MpcWrench(model_name=robot_name)
+    # mpc = MpcWrench(model_name=robot_name)
+    mpc = MpcFBLWrench(model_name=robot_name)
+
     dt = mpc.dt
     t = 0.
     N = mpc.Nx
@@ -93,14 +100,16 @@ if __name__ == "__main__":
     #                0., 0., 0.])
     x0 = np.array([3, 0, 1.5, 
                 #    1, 0, 0, 0,
-                #    1/np.sqrt(2), 0., 0., 1/np.sqrt(2), 
-                   -0.74473321,  0.00509102,  0.01644424, -0.66714031,  
-                   0.01992397,  0.13478149, -0.0642853,   
-                   0.04263152,  0.18871628, -0.3909702])
+                   1/np.sqrt(2), 0., 0., 1/np.sqrt(2), 
+                #    -0.74473321,  0.00509102,  0.01644424, -0.66714031,  
+                #    0.01992397,  0.13478149, -0.0642853,   
+                #    0.04263152,  0.18871628, -0.3909702])
+                     0., 0., 0.,
+                     0., 0., 0.])
 
     x_ref = np.array([3.55000000e+00,  5.50000008e-01,  1.55000000e+00,  
-                    #   1, 0,0,0,
-                      7.07106781e-01, -1.33906769e-22, -9.69625088e-23,  7.07106781e-01,
+                      1, 0,0,0,
+                    #   7.07106781e-01, -1.33906769e-22, -9.69625088e-23,  7.07106781e-01,
                      0, 0, 0,
                      0, 0, 0,
                      0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  0.00000000e+00])
@@ -120,11 +129,11 @@ if __name__ == "__main__":
         u_sol, x_sol = mpc.get_input(x0, x_ref)
         u_sol = np.repeat(u_sol, 2).reshape(6,2)
 
-        print(f"x_sol: {x_sol.shape}")
-        print(f"x_ref: {x_ref.shape}")
-        print(f"u_sol: {u_sol.shape}")
+        # print(f"x_sol: {x_sol.shape}")
+        # print(f"x_ref: {x_ref.shape}")
+        # print(f"u_sol: {u_sol.shape}")
 
-        plot_instance(fig, axs, None, None, x_sol.T, u_sol, x_ref)
+        plot_instance(fig, axs, real_robot, None, x_sol.T, u_sol, x_ref)
 
         x0 = real_robot.step(x0, u_sol[:,0], dt)
         t += dt

@@ -40,7 +40,7 @@ class Robot:
         dx = self.calculate_fx(self.x) + self.calculate_gx(self.x)@self.u
         return dx
     
-    def step(self, x=None, u=None, dt=0.1)-> np.ndarray:
+    def step(self, x=None, u=None, dt=0.1, normalize:bool=False)-> np.ndarray:
         # # Update the state using the dynamics
         # if x is not None:
         #     self.set_state(x)
@@ -49,8 +49,10 @@ class Robot:
         # # Calculate the dynamics
         # dx = self.dynamics(u)
         # self.x += dx * dt
-        return x + (self.calculate_fx(x) + self.calculate_gx(x)@u) * dt
-        # return self.x
+        x_kp1 = x + (self.calculate_fx(x) + self.calculate_gx(x)@u) * dt
+        if normalize:
+            x_kp1[3:7] = x_kp1[3:7] / cs.norm_2(x_kp1[3:7])  # normalize quaternion
+        return x_kp1
 
     def add_state_constraints(self, prog:gp.Model, items:OptProbItems):
         # Add constraitns on the state that are fundamental:
@@ -59,40 +61,40 @@ class Robot:
         pass
 
 
-class LinearFreeFlyer2DoF(Robot):
-    def __init__(self):
-        super().__init__(n_x=4, n_u=2)
-        # dynamics in the form: dx = f(x) + g(x)u
-        self.mass = 16.8
+# class LinearFreeFlyer2DoF(Robot):
+#     def __init__(self):
+#         super().__init__(n_x=4, n_u=2)
+#         # dynamics in the form: dx = f(x) + g(x)u
+#         self.mass = 16.8
 
-        self.A = np.array([[0,0,1,0],
-                           [0,0,0,1],
-                           [0,0,0,0],
-                           [0,0,0,0]])
-        self.B = np.array([[0, 0],
-                           [0, 0],
-                           [1/self.mass, 0],
-                           [0, 1/self.mass]])
-        self.C = np.array([[0, 0],
-                           [0, 0],
-                           [1/20, 0],
-                           [0, 1/20]])
-        self.K = compute_K(self.B, self.C)
+#         self.A = np.array([[0,0,1,0],
+#                            [0,0,0,1],
+#                            [0,0,0,0],
+#                            [0,0,0,0]])
+#         self.B = np.array([[0, 0],
+#                            [0, 0],
+#                            [1/self.mass, 0],
+#                            [0, 1/self.mass]])
+#         self.C = np.array([[0, 0],
+#                            [0, 0],
+#                            [1/20, 0],
+#                            [0, 1/20]])
+#         self.K = compute_K(self.B, self.C)
 
-        self.U = HyperRectangle(np.array([-3, -3]), np.array([3, 3]))
-        self.D = HyperRectangle(np.array([-1, -1]), np.array([1, 1]))
+#         self.U = HyperRectangle(np.array([-3, -3]), np.array([3, 3]))
+#         self.D = HyperRectangle(np.array([-1, -1]), np.array([1, 1]))
 
-        # self.U_effective = minkowski_difference(self.U, self.K@self.D)
-        self.KD = HyperRectangle(
-            self.K[2:,2:]@self.D.lower_bounds,
-            self.K[2:,2:]@self.D.upper_bounds
-        )
-        self.U_effective = self.U.subtract(self.KD)
+#         # self.U_effective = minkowski_difference(self.U, self.K@self.D)
+#         self.KD = HyperRectangle(
+#             self.K[2:,2:]@self.D.lower_bounds,
+#             self.K[2:,2:]@self.D.upper_bounds
+#         )
+#         self.U_effective = self.U.subtract(self.KD)
 
-    def calculate_fx(self, x):
-        return self.A@x
-    def calculate_gx(self, x):
-        return self.B
+#     def calculate_fx(self, x):
+#         return self.A@x
+#     def calculate_gx(self, x):
+#         return self.B
 
 class LinearFreeFlyer6DoF(Robot):
     def __init__(self):
@@ -139,6 +141,8 @@ class LinearFreeFlyer6DoF(Robot):
             self.K@self.D.upper_bounds
         )
         self.U_effective = self.U.subtract(self.KD)
+        self.calculate_U_effective = lambda x, alpha: self.U.subtract(self.KD.scalar_multiply(alpha))
+
         print(f"U_effective: {self.U_effective.center}, {self.U_effective.lower_bounds}, {self.U_effective.upper_bounds}")
 
     def calculate_fx(self,x):
@@ -235,16 +239,17 @@ class FreeFlyer(Robot):
             q = self.iX.sym('q', 4)
             v = self.iX.sym('v', 3)
             w = self.iX.sym('w', 3)
-            self._U_effective_sym = cs.Function('U_effective', [p, q, v, w],
+            alpha = self.iX.sym('alpha', 1)
+            self._U_effective_sym = cs.Function('U_effective', [p, q, v, w, alpha],
                 [
-                    self.U.lower_bounds - self._K_sym(p, q, v, w)@self.D.lower_bounds,
-                    self.U.upper_bounds - self._K_sym(p, q, v, w)@self.D.upper_bounds
+                    self.U.lower_bounds - alpha*self._K_sym(p, q, v, w)@self.D.lower_bounds,
+                    self.U.upper_bounds - alpha*self._K_sym(p, q, v, w)@self.D.upper_bounds
                 ]
             )
-    def calculate_U_effective(self, x):
+    def calculate_U_effective(self, x, alpha=1):
         p, q, v, w = x[0:3], x[3:7], x[7:10], x[10:13]
-        lb, ub = self._U_effective_sym(p, q, v, w)
-        if isinstance(x, np.ndarray):
+        lb, ub = self._U_effective_sym(p, q, v, w, alpha)
+        if isinstance(x, np.ndarray) and isinstance(alpha, (int, float)):
             return HyperRectangle(np.array(lb), np.array(ub))
         else:
             return HyperRectangle(lb, ub)
@@ -257,9 +262,10 @@ class FreeFlyer(Robot):
             v = self.iX.sym('v', 3)
             w = self.iX.sym('w', 3)
             u = self.iX.sym('u', 6)
+            q_norm = q / cs.norm_2(q)
             self._dynamics_sym = cs.Function('dynamics', [p, q, v, w, u],
                 [
-                    self.calculate_fx(cs.vertcat(p, q, v, w)) + self.calculate_gx(cs.vertcat(p, q, v, w)) @ u
+                    self.calculate_fx(cs.vertcat(p, q_norm, v, w)) + self.calculate_gx(cs.vertcat(p, q_norm, v, w)) @ u
                 ]
             )
     def calculate_dynamics(self, x, u):
@@ -311,15 +317,15 @@ class FreeFlyer(Robot):
             self._fx_sym = cs.Function('fx', [p, q, v, w],
                 [
                     cs.blockcat([
-                        [v],
-                        [0.5 * quat_mult(q, cs.vertcat(0, w))],
-                        [self.iX.zeros(3,)],
-                        [-self.iX(np.linalg.inv(self.inertia)) @ cs.mtimes(w_cross, cs.mtimes(self.inertia, w))]
-                        # #! Test
-                        # [q_to_rot_mat_cs(q) @ v],
+                        # [v],
                         # [0.5 * quat_mult(q, cs.vertcat(0, w))],
                         # [self.iX.zeros(3,)],
                         # [-self.iX(np.linalg.inv(self.inertia)) @ cs.mtimes(w_cross, cs.mtimes(self.inertia, w))]
+                        #! Test
+                        [q_to_rot_mat_cs(q) @ v],
+                        [0.5 * quat_mult(q, cs.vertcat(0, w))],
+                        [self.iX.zeros(3,)],
+                        [-self.iX(np.linalg.inv(self.inertia)) @ cs.mtimes(w_cross, cs.mtimes(self.inertia, w))]
                     ])
                 ]
             )
@@ -341,28 +347,28 @@ class FreeFlyer(Robot):
             self._gx_sym = cs.Function('gx', [p, q, v, w],
                 [
                     cs.blockcat([
-                        [self.iX.zeros((3, 6))],
-                        [self.iX.zeros((4, 6))],
-                        [cs.horzcat(
-                            q_to_rot_mat_cs(q) / self.mass,
-                            self.iX.zeros((3, 3))
-                        )],
-                        [cs.horzcat(
-                            self.iX.zeros((3, 3)),
-                            self.iX(np.linalg.inv(self.inertia))
-                        )]
-
-                        # #! Test
                         # [self.iX.zeros((3, 6))],
                         # [self.iX.zeros((4, 6))],
                         # [cs.horzcat(
-                        #     self.iX(np.linalg.inv(np.diag([self.mass]*3))),
+                        #     q_to_rot_mat_cs(q) / self.mass,
                         #     self.iX.zeros((3, 3))
                         # )],
                         # [cs.horzcat(
                         #     self.iX.zeros((3, 3)),
                         #     self.iX(np.linalg.inv(self.inertia))
                         # )]
+
+                        #! Test
+                        [self.iX.zeros((3, 6))],
+                        [self.iX.zeros((4, 6))],
+                        [cs.horzcat(
+                            self.iX(np.linalg.inv(np.diag([self.mass]*3))),
+                            self.iX.zeros((3, 3))
+                        )],
+                        [cs.horzcat(
+                            self.iX.zeros((3, 3)),
+                            self.iX(np.linalg.inv(self.inertia))
+                        )]
                     ])
                 ]
             )
