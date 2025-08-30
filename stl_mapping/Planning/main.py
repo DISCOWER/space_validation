@@ -18,12 +18,12 @@ from Utilities.sets import HyperRectangle, Polytope
 from Utilities.rotations import euler_to_quat_np, euler_to_quat_cs
 from Utilities.rotations import x_ff_to_x_uw, x_uw_to_x_ff
 from Utilities.stl import Pred, Spec, quant_parse_operator, OptProbItems
-from Utilities.plotting import plot_planning_results
+from Utilities.plotting.plotting import plot_planning_results
 from Utilities.smarc_modelling.src.smarc_modelling.vehicles.BlueROV import BlueROV 
 from Planning.bezier_fitting import bezier_fitting
 
 # hyperparameters
-N = 40          # number of time steps
+N = 50          # number of time steps
 dt = 1.5        # time step size
 t0 = 0          # initial time
 tf = (N-1)*dt   # final time
@@ -36,28 +36,30 @@ sp_robot = LinearFreeFlyer6DoF()
 euler_order = 'xyz'
 
 ### STL Specification
-# scenario = 'toy-example'
-scenario = 'paper3D'
+scenario = 'toy-example'
+# scenario = 'paper3D'
 
 if scenario == 'toy-example':
     D3 = False
     depth = 0.0
-    X0 = HyperRectangle(np.array([0.5, 0, depth]), np.array([0.6, 0.1, depth+0.1]))
-    Xf = HyperRectangle(np.array([2.5, 1.0, depth]), np.array([2.6, 1.1, depth+0.1]))
-    XA = HyperRectangle(np.array([2.5, -1.0, depth,  -np.pi/2-np.pi/8]), np.array([2.6, -0.9, depth+0.1,  -np.pi/2+np.pi/8]))
+    X0 = HyperRectangle(center=np.array([0.75, 0, depth]),      size=np.array([0.5, 0.5, 0.5]))
+    Xf = HyperRectangle(center=np.array([2.75, 1.25, depth]),   size=np.array([0.5, 0.5, 0.5]))
+    XA = HyperRectangle(center=np.array([2.5, -1.25, depth,  -np.pi/2]), size=np.array([0.5, 0.5, 0.5,  np.pi/4]))
+    XB = HyperRectangle(center=np.array([1.5, 0.75, depth,  np.pi/2]),  size=np.array([0.5, 0.5, 0.5,  np.pi/4]))
     # XA = HyperRectangle(np.array([2.5, -1.0, depth,  -np.pi/2-np.pi/8, -np.pi/2-np.pi/8]), 
     #                     np.array([2.6, -0.9, depth+0.1,  -np.pi/2+np.pi/8, -np.pi/2+np.pi/8]))
     # later converted to polytopes for predicates of the form Ax \leq b: Polytope = (A,b)
     # XA = HyperRectangle(np.array([2.5, -1.0, depth]), np.array([2.6, -0.9, depth+0.1]))
 
     Obs = []
-    RoIs = [XA]
+    RoIs = [XA, XB]
 
     World = HyperRectangle(np.array([0, -1.5, -10, -10]), np.array([4, 1.5, 10, 10]))
     phi = Pred("AND", preds=[
         Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(X0)], dims=[0,1,2])]),
         Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1,2])]),
-        Pred("F", [t0,tf], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2, 5])]),
+        Pred("F", [t0,tf/2], preds=[Pred("MU", preds=[Polytope(XA)], dims=[0,1,2, 5])]),
+        Pred("F", [tf/2,tf], preds=[Pred("MU", preds=[Polytope(XB)], dims=[0,1,2, 5])]),
         Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(World)], dims=[0,1,6,7])]),
     ])
     spec = Spec(phi, t0, tf)
@@ -238,26 +240,29 @@ if True:
     u_vars = ocp.variable(6, N-1)
     delta = ocp.variable(1)
     alpha_var = ocp.variable(1)
-    ocp.set_initial(alpha_var, alpha)
 
     ocp.set_initial(x_vars, x_ff.T)
     ocp.set_initial(u_vars, u_ff.T)
+    ocp.set_initial(alpha_var, alpha)
+    ocp.set_initial(delta, 0)
+
+    ocp.subject_to(delta >= 0)
 
     for i in range(N-1):
         # ocp.subject_to(u_vars[:,i] >= sp_robot_nl.U.lower_bounds)
         # ocp.subject_to(u_vars[:,i] <= sp_robot_nl.U.upper_bounds)
-        ocp.subject_to(u_vars[:,i] >= sp_robot_nl.calculate_U_effective(np.zeros((13,1)),alpha).lower_bounds)
-        ocp.subject_to(u_vars[:,i] <= sp_robot_nl.calculate_U_effective(np.zeros((13,1)),alpha).upper_bounds)
+        ocp.subject_to(u_vars[:,i] >= sp_robot_nl.calculate_U_effective(np.zeros((13,1)),alpha-0.5).lower_bounds)
+        ocp.subject_to(u_vars[:,i] <= sp_robot_nl.calculate_U_effective(np.zeros((13,1)),alpha-0.5).upper_bounds)
 
     for i in range(N-1):
         ocp.subject_to(x_vars[:,i+1] == sp_robot_nl.step(x_vars[:,i], u_vars[:,i], dt, normalize=True))
 
-    n_equal = 13
+    n_equal = 7
     for i in range(N):
         ocp.subject_to(x_vars[0:n_equal,i] <= x_ff[i,0:n_equal] + delta*np.ones(n_equal))
         ocp.subject_to(x_vars[0:n_equal,i] >= x_ff[i,0:n_equal] - delta*np.ones(n_equal))
-    # ocp.subject_to(x_vars[:7,0] == x_ff[0,:7])
-    # ocp.subject_to(x_vars[:7,N-1] == x_ff[N-1,:7])
+    ocp.subject_to(x_vars[:7,0] == x_ff[0,:7])
+    ocp.subject_to(x_vars[:7,N-1] == x_ff[N-1,:7])
 
 
     quad_u_var = 0

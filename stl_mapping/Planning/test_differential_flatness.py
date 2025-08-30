@@ -10,7 +10,7 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
 from Utilities.beziers import eval_bezier
 from Utilities.Robots import FreeFlyer, LinearFreeFlyer6DoF
-from Utilities.plotting import plot_planning_results
+from stl_mapping.Utilities.plotting.plotting import plot_planning_results
 
 data = np.load('stl_mapping/Planning/solutions/sp_solution_nl.npz')
 

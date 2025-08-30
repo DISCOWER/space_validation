@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+from pathlib import Path
+import scienceplots
+from matplotlib import rc
+from rosbags.rosbag2 import Reader
+from rosbags.typesys import Stores, get_types_from_msg, get_typestore
+
+import numpy as np
+import matplotlib.pyplot as plt
+from rosbag_class import RosBagClass
+
+robot_name = 'bluerov'
+experiment = '2d'
+file_path = f'{str(Path.home())}/space_ws/rosbags/rosbag2_2025_08_08-16_47_48/'
+# file_path = f'{str(Path.home())}/space_ws/rosbags/rosbag2_2025_08_29-12_35_02/'
+obj = RosBagClass(file_path=file_path,
+                  robot_name=robot_name,
+                  threeD=False)
+
+# Set up plot style
+plt.style.use(['science'])
+rc('text', usetex=True)
+rc('font', family='times', size=12)
+
+plt.rcParams['legend.frameon'] = True             # Enable legend frame
+plt.rcParams['legend.facecolor'] = 'white'        # Set background color
+plt.rcParams['legend.edgecolor'] = 'white'        # Set border color
+plt.rcParams['legend.framealpha'] = 1.0
+plt.rcParams['legend.loc'] = 'best'
+
+fig = plt.figure(figsize=(15, 4.5),constrained_layout=True)
+gs = fig.add_gridspec(2,5, figure=fig)
+ax_p = fig.add_subplot(gs[:,0:2])
+ax_p2 = fig.add_subplot(gs[0,2])
+ax_v = fig.add_subplot(gs[1,2])
+ax_q = fig.add_subplot(gs[0,3])
+ax_w = fig.add_subplot(gs[1,3])
+ax_f = fig.add_subplot(gs[0,4])
+ax_d = fig.add_subplot(gs[1,4])
+
+
+obj.plot_position(ax_p,plot_robot=5)
+obj.plot_position_time(ax_p2)
+obj.plot_velocity(ax_v)
+obj.plot_attitude(ax_q)
+obj.plot_angular_velocity(ax_w)
+obj.plot_force(ax_f)
+obj.plot_disturbance(ax_d,sigma=2)
+
+plt.show()
+# plt.savefig(f'stl_mapping/Utilities/plotting/figures/{robot_name}_{experiment}.pdf')

@@ -285,16 +285,6 @@ class MPCNode(Node):
             self.get_logger().info("Received stop signal, stopping MPC computation.")
 
     def publish_estimated_disturbance(self, fd_est, td_est, dist_cov):
-        # wrench_msg = WrenchStamped()
-        # wrench_msg.header.stamp = self.get_clock().now().to_msg()
-        # wrench_msg.header.frame_id = 'map'
-
-        # wrench_msg.wrench.force.x = float(fd_est[0])
-        # wrench_msg.wrench.force.y = float(fd_est[1])
-        # wrench_msg.wrench.force.z = float(fd_est[2])
-        # wrench_msg.wrench.torque.x = float(td_est[0])
-        # wrench_msg.wrench.torque.y = float(td_est[1])
-        # wrench_msg.wrench.torque.z = float(td_est[2])
         wrench_msg = TwistWithCovarianceStamped()
         wrench_msg.header.stamp = self.get_clock().now().to_msg()
         wrench_msg.header.frame_id = 'map'
