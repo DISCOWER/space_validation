@@ -50,7 +50,7 @@ from Utilities.smarc_modelling.src.smarc_modelling.vehicles.BlueROV import BlueR
 from rclpy.node import Node
 
 from px4_msgs.msg import VehicleThrustSetpoint, VehicleTorqueSetpoint
-from Utilities.qos_profiles import NORMAL_QOS
+from stl_mapping.Utilities.ros.qos_profiles import NORMAL_QOS
 
 
 class MpcFBLWrench(Node):
@@ -93,6 +93,7 @@ class MpcFBLWrench(Node):
             1e0, 1e0, 1e0,
             1e0, 1e0, 1e0]) 
         self.P = 10 * self.Q        # Terminal state weighting matrix
+
         # #! BlueROV weights
         # self.Q = np.diag([          # State weighting matrix
         #     1e2, 1e2, 1e2,
@@ -144,7 +145,7 @@ class MpcFBLWrench(Node):
         torque_msg.xyz = [u_opt[3], u_opt[4], u_opt[5]]
         self.publisher_post_fbl_torque_control.publish(torque_msg)
 
-    def fbl_uw_to_ff(self, x:ca.SX|np.ndarray, u:ca.SX|np.ndarray):
+    def fbl_uw_to_sp(self, x:ca.SX|np.ndarray, u:ca.SX|np.ndarray):
         fx_uw = self.uw_robot.calculate_fx(x)
         gx_uw = self.uw_robot.calculate_gx(x)
         fx_sp = self.sp_robot.calculate_fx(x)
@@ -154,7 +155,7 @@ class MpcFBLWrench(Node):
         else:
             return np.linalg.pinv(gx_sp) @ (fx_uw + gx_uw@u - fx_sp)
     
-    def fbl_ff_to_uw(self, x:ca.SX|np.ndarray, u:ca.SX|np.ndarray):
+    def fbl_sp_to_uw(self, x:ca.SX|np.ndarray, u:ca.SX|np.ndarray):
         fx_sp = self.sp_robot.calculate_fx(x)
         gx_sp = self.sp_robot.calculate_gx(x)
         fx_uw = self.uw_robot.calculate_fx(x)
@@ -251,12 +252,12 @@ class MpcFBLWrench(Node):
         ocp.constraints.x0[3] = 1  # Initial quaternion
 
         # Feedback linearization constraints
-        ocp.model.con_h_expr = self.fbl_ff_to_uw(model.x, model.u)
+        ocp.model.con_h_expr = self.fbl_sp_to_uw(model.x, model.u)
         ocp.dims.nh = ocp.model.con_h_expr.shape[0]
         ocp.constraints.lh = self.uw_robot.U.lower_bounds
         ocp.constraints.uh = self.uw_robot.U.upper_bounds
 
-        ocp.model.con_h_expr_0 = self.fbl_ff_to_uw(model.x, model.u)
+        ocp.model.con_h_expr_0 = self.fbl_sp_to_uw(model.x, model.u)
         ocp.dims.nh_0 = ocp.model.con_h_expr_0.shape[0]
         ocp.constraints.lh_0 = self.uw_robot.U.lower_bounds
         ocp.constraints.uh_0 = self.uw_robot.U.upper_bounds
@@ -275,7 +276,7 @@ class MpcFBLWrench(Node):
         ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM' # PARTIAL_CONDENSING_HPIPM, FULL_CONDENSING_HPIPM,
         ocp.solver_options.hpipm_mode = 'ROBUST'
         ocp.solver_options.integrator_type = 'ERK' # 'ERK', 'DISCRETE', 'IRK'
-        ocp.solver_options.sim_method_newton_iter = 2
+        ocp.solver_options.sim_method_newton_iter = 5
         ocp.solver_options.hessian_approx = 'GAUSS_NEWTON' # 'GAUSS_NEWTON', 'EXACT'
 
         ocp.solver_options.tol    = 1e-6       # NLP tolerance. 1e-6 is default for tolerances
@@ -306,29 +307,44 @@ class MpcFBLWrench(Node):
             self.solver.set(k, "p", np.concatenate((x_ref_k, u_ref_k, fd, td), axis=0))
 
         status = self.solver.solve()
-        u_opt = self.solver.get(0, 'u')
+        u_sp = self.solver.get(0, 'u')
         if status != 0:
             self.get_logger().info("Solver failed. Retrying with warm-start reset.")
             self.solver.reset()
             status = self.solver.solve()
             if status != 0:
                 self.get_logger().info("Solver failed again. Using previous solution.")
-                u_opt =  self.solver.get(1, 'u')
-        
+                u_sp =  self.solver.get(1, 'u')
+
         # get solution
-        x_pred = np.ndarray((self.Nx+1, self.nx))
+        u_pred = np.zeros((self.Nx, self.nu))
+        for i in range(self.Nx):
+            u_pred[i,:] = self.solver.get(i, "u")
+
+        x_pred = np.zeros((self.Nx+1, self.nx))
         for i in range(self.Nx):
             x_pred[i,:] = self.solver.get(i, "x")
         x_pred[self.Nx,:] = self.solver.get(self.Nx, "x")
 
-        self.publish_pre_fbl_messages(u_opt)
+        # apply solution to the underwater environment
+        u_pred_uw = np.zeros((self.Nx, self.nu))
+        x_pred_uw = np.zeros((self.Nx+1, self.nx))
+        x_pred_uw[0,:] = x0
+        for i in range(self.Nx):
+            u_pred_uw[i,:] = self.fbl_sp_to_uw(x_pred_uw[i,:], u_pred[i,:])
+            x_pred_uw[i+1,:] = self.uw_robot.step(x_pred_uw[i,:], u_pred_uw[i,:], dt=self.dt)
+
+        self.publish_pre_fbl_messages(u_sp)
 
         # pass the control input through the feedback linearization
         # to get the underwater control input that realizes the space-like behavior
         # self.get_logger().info(f"u_opt (ff): {u_opt}")
-        u_opt = self.fbl_ff_to_uw(x0, u_opt)
+        u_uw = self.fbl_sp_to_uw(x0, u_sp)
         # self.get_logger().info(f"u_opt (uw): {u_opt}")
 
-        self.publish_post_fbl_messages(u_opt)
+        self.publish_post_fbl_messages(u_uw)
 
-        return u_opt, x_pred
+        sol_sp = {'x': x_pred.T, 'u': u_pred.T}
+        sol_uw = {'x': x_pred_uw.T, 'u': u_pred_uw.T}
+
+        return u_uw, x_pred, sol_sp, sol_uw

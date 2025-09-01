@@ -515,10 +515,10 @@ void atmos_ff_acados_setup_nlp_in(atmos_ff_solver_capsule* capsule, const int N,
     W_0[0+(NY0) * 0] = 100;
     W_0[1+(NY0) * 1] = 100;
     W_0[2+(NY0) * 2] = 100;
-    W_0[3+(NY0) * 3] = 50;
-    W_0[4+(NY0) * 4] = 50;
-    W_0[5+(NY0) * 5] = 50;
-    W_0[6+(NY0) * 6] = 50;
+    W_0[3+(NY0) * 3] = 20;
+    W_0[4+(NY0) * 4] = 20;
+    W_0[5+(NY0) * 5] = 20;
+    W_0[6+(NY0) * 6] = 20;
     W_0[7+(NY0) * 7] = 30;
     W_0[8+(NY0) * 8] = 30;
     W_0[9+(NY0) * 9] = 30;
@@ -547,10 +547,10 @@ void atmos_ff_acados_setup_nlp_in(atmos_ff_solver_capsule* capsule, const int N,
     W[0+(NY) * 0] = 100;
     W[1+(NY) * 1] = 100;
     W[2+(NY) * 2] = 100;
-    W[3+(NY) * 3] = 50;
-    W[4+(NY) * 4] = 50;
-    W[5+(NY) * 5] = 50;
-    W[6+(NY) * 6] = 50;
+    W[3+(NY) * 3] = 20;
+    W[4+(NY) * 4] = 20;
+    W[5+(NY) * 5] = 20;
+    W[6+(NY) * 6] = 20;
     W[7+(NY) * 7] = 30;
     W[8+(NY) * 8] = 30;
     W[9+(NY) * 9] = 30;
@@ -580,10 +580,10 @@ void atmos_ff_acados_setup_nlp_in(atmos_ff_solver_capsule* capsule, const int N,
     W_e[0+(NYN) * 0] = 1000;
     W_e[1+(NYN) * 1] = 1000;
     W_e[2+(NYN) * 2] = 1000;
-    W_e[3+(NYN) * 3] = 500;
-    W_e[4+(NYN) * 4] = 500;
-    W_e[5+(NYN) * 5] = 500;
-    W_e[6+(NYN) * 6] = 500;
+    W_e[3+(NYN) * 3] = 200;
+    W_e[4+(NYN) * 4] = 200;
+    W_e[5+(NYN) * 5] = 200;
+    W_e[6+(NYN) * 6] = 200;
     W_e[7+(NYN) * 7] = 300;
     W_e[8+(NYN) * 8] = 300;
     W_e[9+(NYN) * 9] = 300;
@@ -691,18 +691,18 @@ void atmos_ff_acados_setup_nlp_in(atmos_ff_solver_capsule* capsule, const int N,
     double* luh_0 = calloc(2*NH0, sizeof(double));
     double* lh_0 = luh_0;
     double* uh_0 = luh_0 + NH0;
-    lh_0[0] = -10;
-    lh_0[1] = -10;
-    lh_0[2] = -10;
-    lh_0[3] = -10;
-    lh_0[4] = -10;
-    lh_0[5] = -10;
-    uh_0[0] = 10;
-    uh_0[1] = 10;
-    uh_0[2] = 10;
-    uh_0[3] = 10;
-    uh_0[4] = 10;
-    uh_0[5] = 10;
+    lh_0[0] = -85;
+    lh_0[1] = -85;
+    lh_0[2] = -120;
+    lh_0[3] = -26;
+    lh_0[4] = -14;
+    lh_0[5] = -22;
+    uh_0[0] = 85;
+    uh_0[1] = 85;
+    uh_0[2] = 120;
+    uh_0[3] = 26;
+    uh_0[4] = 14;
+    uh_0[5] = 22;
 
     ocp_nlp_constraints_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, 0, "nl_constr_h_fun_jac", &capsule->nl_constr_h_0_fun_jac);
     ocp_nlp_constraints_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, 0, "nl_constr_h_fun", &capsule->nl_constr_h_0_fun);
@@ -791,18 +791,18 @@ void atmos_ff_acados_setup_nlp_in(atmos_ff_solver_capsule* capsule, const int N,
     double* luh = calloc(2*NH, sizeof(double));
     double* lh = luh;
     double* uh = luh + NH;
-    lh[0] = -10;
-    lh[1] = -10;
-    lh[2] = -10;
-    lh[3] = -10;
-    lh[4] = -10;
-    lh[5] = -10;
-    uh[0] = 10;
-    uh[1] = 10;
-    uh[2] = 10;
-    uh[3] = 10;
-    uh[4] = 10;
-    uh[5] = 10;
+    lh[0] = -85;
+    lh[1] = -85;
+    lh[2] = -120;
+    lh[3] = -26;
+    lh[4] = -14;
+    lh[5] = -22;
+    uh[0] = 85;
+    uh[1] = 85;
+    uh[2] = 120;
+    uh[3] = 26;
+    uh[4] = 14;
+    uh[5] = 22;
 
     for (int i = 1; i < N; i++)
     {
@@ -897,7 +897,7 @@ static void atmos_ff_acados_create_set_opts(atmos_ff_solver_capsule* capsule)
     for (int i = 0; i < N; i++)
         ocp_nlp_solver_opts_set_at_stage(nlp_config, nlp_opts, i, "dynamics_num_stages", &sim_method_num_stages);
 
-    int newton_iter_val = 2;
+    int newton_iter_val = 5;
     for (int i = 0; i < N; i++)
         ocp_nlp_solver_opts_set_at_stage(nlp_config, nlp_opts, i, "dynamics_newton_iter", &newton_iter_val);
 

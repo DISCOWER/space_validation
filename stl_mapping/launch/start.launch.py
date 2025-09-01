@@ -44,12 +44,17 @@ def generate_launch_description():
     record_proc = ExecuteProcess(cmd=record_cmd)
 
     #! Send a "Start" signal to anyone that cares
-    start_proc = ExecuteProcess(
-        cmd=[
-            'ros2 topic pub --once /stl_mapping/start \
-                std_msgs/msg/Bool \
-                "{data: true}"'
-        ], shell=True)
+    # start_proc = ExecuteProcess(
+    #     cmd=[
+    #         'ros2 topic pub --once /stl_mapping/start \
+    #             std_msgs/msg/Bool \
+    #             "{data: true}"'
+    #     ], shell=True)
+    start_proc = Node(
+        package='stl_mapping',
+        executable='start_node'
+    )
+
 
     #! Copy the planning files to the rosbag directory
     copy_proc = ExecuteProcess(

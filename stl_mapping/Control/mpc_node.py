@@ -4,7 +4,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.clock import Clock
 import os
-from Utilities.qos_profiles import NORMAL_QOS, RELIABLE_QOS
+from stl_mapping.Utilities.ros.qos_profiles import NORMAL_QOS, RELIABLE_QOS
 from Utilities.get_reference_trajectory import get_reference_trajectory, ReferenceTrajectory
         
 from scipy.spatial.transform import Rotation as R

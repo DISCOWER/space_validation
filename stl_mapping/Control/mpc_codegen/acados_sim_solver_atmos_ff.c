@@ -130,7 +130,7 @@ int atmos_ff_acados_sim_create(atmos_ff_sim_solver_capsule * capsule)
     // sim opts
     sim_opts *atmos_ff_sim_opts = sim_opts_create(atmos_ff_sim_config, atmos_ff_sim_dims);
     capsule->acados_sim_opts = atmos_ff_sim_opts;
-    int tmp_int = 2;
+    int tmp_int = 5;
     sim_opts_set(atmos_ff_sim_config, atmos_ff_sim_opts, "newton_iter", &tmp_int);
     double tmp_double = 0;
     sim_opts_set(atmos_ff_sim_config, atmos_ff_sim_opts, "newton_tol", &tmp_double);

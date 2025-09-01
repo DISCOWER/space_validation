@@ -31,6 +31,7 @@ setup(
         'console_scripts': [
                 # controllers
                 'mpc_node = Control.mpc_node:main',
+                'start_node = Utilities.ros.start_node:main'
         ],
     },
 )

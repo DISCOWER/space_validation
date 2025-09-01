@@ -47,7 +47,7 @@ from models.bluerov_wrench import bluerov_model_wrench
 from rclpy.node import Node
 
 from px4_msgs.msg import VehicleThrustSetpoint, VehicleTorqueSetpoint
-from Utilities.qos_profiles import NORMAL_QOS
+from stl_mapping.Utilities.ros.qos_profiles import NORMAL_QOS
 
 import rclpy
 rclpy.init()
