@@ -89,11 +89,20 @@ class MpcFBLWrench(Node):
             2e1, 2e1, 2e1, 2e1,
             3e1, 3e1, 3e1,  
             3e1, 3e1, 3e1])             
-        self.R = 1*np.diag([          # State weighting matrix
+        self.R = 0.1*np.diag([          # State weighting matrix
             1e0, 1e0, 1e0,
             1e0, 1e0, 1e0]) 
         self.P = 10 * self.Q        # Terminal state weighting matrix
-        
+        # #! BlueROV weights
+        # self.Q = np.diag([          # State weighting matrix
+        #     1e2, 1e2, 1e2,
+        #     5e2, 5e2, 5e2, 5e2,
+        #     3e0, 3e0, 3e0,  
+        #     3e0, 3e0, 3e0])          
+        # self.R = 0.01*np.diag([          # State weighting matrix
+        #     1e0, 1e0, 1e0,
+        #     1e0, 1e0, 1e0]) 
+        # self.P = 10 * self.Q        # Terminal state weighting matrix
         # Bounds
         self.lbx = np.array([0.5, -2, 0,  -1, -1, -1])
         self.ubx = np.array([8.5, 2, 2.5, 1,  1,  1])
@@ -168,7 +177,7 @@ class MpcFBLWrench(Node):
         ocp.code_export_directory = codegen_dir
 
         # Define the model
-        model = bluerov_model_wrench()#atmos_model_wrench()
+        model = atmos_model_wrench()
         ocp.model = model
         
         # Set dimensions
@@ -316,9 +325,9 @@ class MpcFBLWrench(Node):
 
         # pass the control input through the feedback linearization
         # to get the underwater control input that realizes the space-like behavior
-        self.get_logger().info(f"u_opt (ff): {u_opt}")
+        # self.get_logger().info(f"u_opt (ff): {u_opt}")
         u_opt = self.fbl_ff_to_uw(x0, u_opt)
-        self.get_logger().info(f"u_opt (uw): {u_opt}")
+        # self.get_logger().info(f"u_opt (uw): {u_opt}")
 
         self.publish_post_fbl_messages(u_opt)
 

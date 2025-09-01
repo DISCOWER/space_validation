@@ -36,13 +36,13 @@ sp_robot = LinearFreeFlyer6DoF()
 euler_order = 'xyz'
 
 ### STL Specification
-scenario = 'toy-example'
-# scenario = 'paper3D'
+# scenario = 'toy-example'
+scenario = 'paper3D'
 
 if scenario == 'toy-example':
     D3 = False
     depth = 0.0
-    X0 = HyperRectangle(center=np.array([0.75, 0, depth]),      size=np.array([0.5, 0.5, 0.5]))
+    X0 = HyperRectangle(center=np.array([1.5, 0, depth]),      size=np.array([0.5, 0.5, 0.5]))
     Xf = HyperRectangle(center=np.array([2.75, 1.25, depth]),   size=np.array([0.5, 0.5, 0.5]))
     XA = HyperRectangle(center=np.array([2.5, -1.25, depth,  -np.pi/2]), size=np.array([0.5, 0.5, 0.5,  np.pi/4]))
     XB = HyperRectangle(center=np.array([1.5, 0.75, depth,  np.pi/2]),  size=np.array([0.5, 0.5, 0.5,  np.pi/4]))
@@ -85,22 +85,22 @@ elif scenario == 'paper3D':
         Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(Xf)], dims=[0,1,2])]),
         Pred("G", [t0,tf], preds= [Pred("NEG", preds= [Pred("MU", preds=[Polytope(Obs1)], dims=[0,1,2])] )] ),
         Pred("OR", preds=[
-            # Pred("G", [10,12], preds=[Pred("MU", preds=[Polytope(XA1)], dims=[0,1,2, 4,5])]),
-            Pred("G", [20,25], preds=[Pred("MU", preds=[Polytope(XA2)], dims=[0,1,2, 4,5])])
+            # Pred("G", [20,25], preds=[Pred("MU", preds=[Polytope(XA1)], dims=[0,1,2, 4,5])]),
+            Pred("F", [30,35], preds=[Pred("MU", preds=[Polytope(XA2)], dims=[0,1,2, 4,5])])
         ]),
         Pred("OR", preds=[
-            # Pred("F", [30,35], preds=[Pred("MU", preds=[Polytope(XB1)], dims=[0,1,2, 4,5])]),
-            Pred("F", [30,35], preds=[Pred("MU", preds=[Polytope(XB2)], dims=[0,1,2, 4,5])])
+            Pred("F", [20,25], preds=[Pred("MU", preds=[Polytope(XB1)], dims=[0,1,2, 4,5])]),
+            Pred("F", [20,25], preds=[Pred("MU", preds=[Polytope(XB2)], dims=[0,1,2, 4,5])])
         ]),
         Pred("OR", preds=[
-            # Pred("F", [35,40], preds=[Pred("MU", preds=[Polytope(XC1)], dims=[0,1,2, 4,5])]),
+            Pred("F", [35,40], preds=[Pred("MU", preds=[Polytope(XC1)], dims=[0,1,2, 4,5])]),
             Pred("F", [35,40], preds=[Pred("MU", preds=[Polytope(XC2)], dims=[0,1,2, 4,5])])
         ])
     ])
     spec = Spec(phi, t0, tf)
 
 # Initial Motion planner on Linear Model
-if False:
+if True:
     opt = gp.Model("prob1")
     x_vars = opt.addMVar((N, sp_robot.n_x), lb=-np.inf, ub=np.inf, name="X")
     u_vars = opt.addMVar((N-1, sp_robot.n_u), lb=-np.inf, ub=np.inf, name="U")
@@ -211,28 +211,16 @@ for i in range(u_ff.shape[0]):
 u_ff = u_ff_converted
 
 # plot the trajectory
-plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, RoIs, Obs, alpha=alpha, D3=D3,
+alpha_nl = (1/np.sqrt(2))*alpha
+plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, RoIs, Obs, alpha=alpha_nl, D3=D3,
                       path="stl_mapping/Planning/figures/atmos_linear_trajectory.png")
 
-np.savez('stl_mapping/Planning/solutions/atmos_linear_solution_quat_body.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
+np.savez('stl_mapping/Planning/solutions/atmos_linear_solution_quat_body.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha_nl, times=t_sp)
 
 #TODO: this is a valid conversion (Lin to non-lin) if the system (with zero roll) is differentially flat?
 #TODO: this means that this linear decoupling is valid, and x_ff and u_ff are valid for the nonlinear space robot
 #TODO: CHECK THIS!
 sp_robot_nl = FreeFlyer()
-# x_ff_nl = np.zeros((x_ff.shape[0], x_ff.shape[1]))
-# u_ff_nl = u_ff
-# x_ff_i = copy.deepcopy(x_ff[0, :])
-# x_ff_nl[0, :] = x_ff_i
-# for i in range(x_ff.shape[0]-1):
-#     # q = R.from_quat(x_ff_nl[i, 3:7], scalar_first=True)
-#     u_ff_i = u_ff[i, :]  # convert u from body FLU to ENU frame
-#     x_ff_i = sp_robot_nl.step(x_ff_i, u_ff_i, dt)
-#     x_ff_i[3:7] /= np.linalg.norm(x_ff_i[3:7])  # normalize quaternion
-#     x_ff_nl[i+1, :] = x_ff_i
-# plot_planning_results(sp_robot_nl, t_sp, x_ff_nl, u_ff, X0, Xf, RoIs, Obs, alpha=alpha,
-#                       path="stl_mapping/Planning/figures/atmos_nonlinear_trajectory.png")
-
 
 if True:
     ocp = cs.Opti()
@@ -251,8 +239,8 @@ if True:
     for i in range(N-1):
         # ocp.subject_to(u_vars[:,i] >= sp_robot_nl.U.lower_bounds)
         # ocp.subject_to(u_vars[:,i] <= sp_robot_nl.U.upper_bounds)
-        ocp.subject_to(u_vars[:,i] >= sp_robot_nl.calculate_U_effective(np.zeros((13,1)),alpha-0.5).lower_bounds)
-        ocp.subject_to(u_vars[:,i] <= sp_robot_nl.calculate_U_effective(np.zeros((13,1)),alpha-0.5).upper_bounds)
+        ocp.subject_to(u_vars[:,i] >= sp_robot_nl.calculate_U_effective(np.zeros((13,1)),alpha_nl).lower_bounds)
+        ocp.subject_to(u_vars[:,i] <= sp_robot_nl.calculate_U_effective(np.zeros((13,1)),alpha_nl).upper_bounds)
 
     for i in range(N-1):
         ocp.subject_to(x_vars[:,i+1] == sp_robot_nl.step(x_vars[:,i], u_vars[:,i], dt, normalize=True))
@@ -261,8 +249,8 @@ if True:
     for i in range(N):
         ocp.subject_to(x_vars[0:n_equal,i] <= x_ff[i,0:n_equal] + delta*np.ones(n_equal))
         ocp.subject_to(x_vars[0:n_equal,i] >= x_ff[i,0:n_equal] - delta*np.ones(n_equal))
-    ocp.subject_to(x_vars[:7,0] == x_ff[0,:7])
-    ocp.subject_to(x_vars[:7,N-1] == x_ff[N-1,:7])
+    # ocp.subject_to(x_vars[:7,0] == x_ff[0,:7])
+    # ocp.subject_to(x_vars[:7,N-1] == x_ff[N-1,:7])
 
 
     quad_u_var = 0
@@ -284,10 +272,10 @@ if True:
     except Exception as e:
         print(f"Solution not found: {e}")
 
-plot_planning_results(sp_robot_nl, t_ff_nl, x_ff_nl, u_ff_nl, X0, Xf, RoIs, Obs, alpha=alpha, D3=D3,
+plot_planning_results(sp_robot_nl, t_ff_nl, x_ff_nl, u_ff_nl, X0, Xf, RoIs, Obs, alpha=alpha_nl, D3=D3,
                       path="stl_mapping/Planning/figures/atmos_opt_nonlinear_trajectory.png")
 
-np.savez('stl_mapping/Planning/solutions/atmos_nonlinear_solution.npz', x=x_ff_nl, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
+np.savez('stl_mapping/Planning/solutions/atmos_nonlinear_solution.npz', x=x_ff_nl, u=u_ff, dt=dt, alpha=alpha_nl, times=t_sp)
 data = np.load('stl_mapping/Planning/solutions/atmos_nonlinear_solution.npz')
 bezier_fitting(data,'atmos')
 
@@ -332,18 +320,11 @@ for i in range(N-1):
 
 
 # save the trajectory
-np.savez('stl_mapping/Planning/solutions/bluerov_nonlinear_solution_fbl.npz', x=x_uw_fbl_sp, u=u_uw_fbl_sp, dt=dt, alpha=alpha, times=t_sp)
+np.savez('stl_mapping/Planning/solutions/bluerov_nonlinear_solution_fbl.npz', x=x_uw_fbl_sp, u=u_uw_fbl_sp, dt=dt, alpha=alpha_nl, times=t_sp)
 
 # plot the trajectory
-plot_planning_results(uw_robot, t_sp, x_uw_fbl_sp, u_uw_fbl_sp, X0, Xf, RoIs, Obs, alpha=alpha, D3=D3,
+plot_planning_results(uw_robot, t_sp, x_uw_fbl_sp, u_uw_fbl_sp, X0, Xf, RoIs, Obs, alpha=alpha_nl, D3=D3,
                       path="stl_mapping/Planning/figures/bluerov_nonlinear_trajectory_fbl.png")
-
-# Analysis of alpha
-u_max = np.max(np.abs(u_uw_fbl_sp), axis=0)
-print(f"\nAlpha if u_fbl(x_sp,u_sp) applied to BlueROV directly: {np.max(u_max/uw_robot.U.upper_bounds)} (was {alpha} for ff)")
-print(f"This is lower because BlueROV is faster than free flyer")
-print(f"U should become {np.max(u_max)/alpha} for same alpha (was {uw_robot.U.upper_bounds[0]}) which is {(np.max(u_max)/alpha)/uw_robot.U.upper_bounds[0]*100}%")
-# exit()
 
 #TODO: now we either solve the time-scaling of trajectory and control input
 #TODO: or we solve the optimization problem to make alpha equal, we need to figure out what is warranted
@@ -368,8 +349,8 @@ if True:
     ocp.subject_to(delta >= 0)
 
     for i in range(N):
-        ocp.subject_to(u_vars[:,i] >= uw_robot.calculate_U_effective(np.zeros((13,1)),alpha).lower_bounds)
-        ocp.subject_to(u_vars[:,i] <= uw_robot.calculate_U_effective(np.zeros((13,1)),alpha).upper_bounds)
+        ocp.subject_to(u_vars[:,i] >= uw_robot.calculate_U_effective(np.zeros((13,1)),alpha_nl).lower_bounds)
+        ocp.subject_to(u_vars[:,i] <= uw_robot.calculate_U_effective(np.zeros((13,1)),alpha_nl).upper_bounds)
 
         # ocp.subject_to(u_vars[:,i] >= alpha * uw_robot.calculate_U_effective(x_vars[:,i]).lower_bounds)
         # ocp.subject_to(u_vars[:,i] <= alpha * uw_robot.calculate_U_effective(x_vars[:,i]).upper_bounds)
@@ -433,10 +414,10 @@ else:
 # print(f"Replanned dt_uw: {dt_uw} (was {dt}) which is {(dt_uw)/dt*100}%")
 
 # plot the trajectory
-plot_planning_results(uw_robot, t_uw, x_uw, u_uw, X0, Xf, RoIs, Obs, alpha=alpha, D3=D3,
+plot_planning_results(uw_robot, t_uw, x_uw, u_uw, X0, Xf, RoIs, Obs, alpha=alpha_nl, D3=D3,
                       path="stl_mapping/Planning/figures/bluerov_nonlinear_trajectory.png")
 
 # save the trajectory
-np.savez('stl_mapping/Planning/solutions/bluerov_nonlinear_solution.npz', x=x_uw, u=u_uw, dt=dt_uw, alpha=alpha, times=t_uw)
+np.savez('stl_mapping/Planning/solutions/bluerov_nonlinear_solution.npz', x=x_uw, u=u_uw, dt=dt_uw, alpha=alpha_nl, times=t_uw)
 data = np.load('stl_mapping/Planning/solutions/bluerov_nonlinear_solution.npz')
 bezier_fitting(data, 'bluerov')

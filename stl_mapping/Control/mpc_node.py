@@ -33,7 +33,7 @@ class MPCNode(Node):
         self.rate = self.declare_parameter('rate', 5.0).value
 
         self.mpc = MpcWrench(model_name=self.model_name)
-        # self.mpc = MpcFBLWrench(model_name=self.model_name)
+        self.fbl_mpc = MpcFBLWrench(model_name=self.model_name)
         self.control = np.zeros((self.mpc.nu, 1))
         self.get_logger().info("MPC solver initialized successfully")
 
@@ -320,8 +320,8 @@ class MPCNode(Node):
         # EKF in FLU frame so don't transform
         # self.F_app = u[:3]
         # self.T_app = u[3:6]
-        self.get_logger().info(f"Applied force: {force_output_msg.xyz}")
-        self.get_logger().info(f"Applied torque: {torque_output_msg.xyz}")
+        # self.get_logger().info(f"Applied force: {force_output_msg.xyz}")
+        # self.get_logger().info(f"Applied torque: {torque_output_msg.xyz}")
 
         self.publisher_thrust_setpoint.publish(force_output_msg)
         self.publisher_torque_setpoint.publish(torque_output_msg)
@@ -472,11 +472,66 @@ class MPCNode(Node):
             u_ref = np.zeros((6, 1))
 
         x_ref = np.zeros((13, self.mpc.Nx + 1))  # Initialize reference trajectory
+
+        # #! Easy sys-id
+        # x_orig = np.array([3,0,1.5, 1,0,0,0,  0,0,0,0,0,0])
+        # test_points = np.array([x_orig,
+                                
+        #                         x_orig + np.array([0.4,0,0, 0,0,0,0,0,0,0,0,0,0]),
+        #                         x_orig,
+
+        #                         x_orig + np.array([-0.4,0,0, 0,0,0,0,0,0,0,0,0,0]),
+        #                         x_orig,
+                                
+        #                         x_orig + np.array([0,0.4,0, 0,0,0,0,0,0,0,0,0,0]),
+        #                         x_orig,
+
+        #                         x_orig + np.array([0,-0.4,0, 0,0,0,0,0,0,0,0,0,0]),
+        #                         x_orig,
+
+        #                         x_orig + np.array([0,0,0.4, 0,0,0,0,0,0,0,0,0,0]),
+        #                         x_orig,
+
+        #                         x_orig + np.array([0,0,-0.4, 0,0,0,0,0,0,0,0,0,0]),
+        #                         x_orig,
+
+        #                         x_orig + np.array([0,0,0, 0.924,0,0,0.383, 0,0,0,0,0,0]),
+        #                         x_orig,
+
+        #                         x_orig + np.array([0,0,0, 0.924,0,0,-0.383, 0,0,0,0,0,0]),
+        #                         x_orig,
+
+        #                         x_orig + np.array([0,0,0, 0.924,0,0.383,0, 0,0,0,0,0,0]),
+        #                         x_orig,
+
+        #                         x_orig + np.array([0,0,0, 0.924,0,-0.383,0, 0,0,0,0,0,0]),
+        #                         x_orig,
+
+        #                         x_orig + np.array([0,0,0, 0.924,0.383,0,0, 0,0,0,0,0,0]),
+        #                         x_orig,
+
+        #                         x_orig + np.array([0,0,0, 0.924,-0.383,0,0, 0,0,0,0,0,0]),
+        #                         x_orig,
+
+        #                         ],dtype=float)
+        # # arrange from 0 to 4*number of test points in increments of 4
+        # period = 4.0
         for idx, ti in enumerate(times):
-            # x_ref[:, idx] = np.array([1., 0., 0.,
-            #                           1., 0., 0., 0.,
-            #                           0., 0., 0.,
-            #                           0., 0., 0.]).reshape(13,)
+        #     #! Easy sys-id
+        #     # get the first index of times for which ti > times
+        #     if t - self.t0 < 0:
+        #         test_idx = 0
+        #     else:
+        #         test_idx = int((t-self.t0) // period) % test_points.shape[0]
+        #     # self.get_logger().info(f"test_times: {test_times}")
+        #     self.get_logger().info(f"idx: {test_idx}")
+        #     self.get_logger().info(f"dt: {t-self.t0}")
+        #     x_ref[:, idx] = test_points[test_idx]
+            # self.get_logger().info(f"{x_ref[:, test_idx].flatten()}")
+            x_ref[:, idx] = np.array([1., 0., 0.,
+                                      1., 0., 0., 0.,
+                                      0., 0., 0.,
+                                      0., 0., 0.]).reshape(13,)
             x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
 
         x_ref = np.vstack((x_ref, np.repeat(u_ref, x_ref.shape[1], axis=1)))  # Append u_ref to x_ref
@@ -495,6 +550,10 @@ class MPCNode(Node):
             self.control, x_pred = self.mpc.get_input(x0, x_ref, fd=self.fd_est, td=self.td_est)
         else:
             self.control, x_pred = self.mpc.get_input(x0, x_ref)
+        #! Run the FBL MPC but don't use the output, just to get the solution
+        #! in the rosbag or in plotjuggler
+        self.control, x_pred = self.fbl_mpc.get_input(x0, x_ref)
+
         # self.get_logger().info(f"Control: {self.control.flatten()}")
         self.F_cmd = self.control[0:3]
         self.T_cmd = self.control[3:6]

@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+
 from Utilities.rotations import euler_to_quat_np, quat_to_euler_np
 from scipy.spatial.transform import Rotation as R
 

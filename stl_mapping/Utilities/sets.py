@@ -107,7 +107,7 @@ class HyperRectangle():
                 [corners[j] for j in [0, 3, 7, 4]],  # left
                 [corners[j] for j in [1, 2, 6, 5]],  # right
             ]
-            box = Poly3DCollection(faces, alpha=alpha, color=color)
+            box = Poly3DCollection(faces, alpha=0.25, color=color, zsort='average')
             ax.add_collection3d(box)
 
 class Zonotope():

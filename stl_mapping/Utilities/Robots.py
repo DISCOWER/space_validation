@@ -387,7 +387,7 @@ class FreeFlyer(Robot):
             v = self.iX.sym('v', 3)
             w = self.iX.sym('w', 3)
             cx = self.iX.zeros((13,6))
-            cx[7:10, 0:3] = self.iX.eye(3)/self.mass
+            cx[7:10, 0:3] = q_to_rot_mat_cs(q).T/self.mass
             cx[10:13, 3:6] = self.iX(np.linalg.inv(self.inertia))
             self._cx_sym = cs.Function('cx', [p, q, v, w],
                 [

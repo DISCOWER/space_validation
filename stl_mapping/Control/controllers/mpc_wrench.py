@@ -56,24 +56,14 @@ class MpcWrench(Node):
     def __init__(self, model_name:str='atmos'):
         super().__init__('mpc_wrench')
         # Create two publishers for pre- and post-feedback equivalence control
-        self.publisher_pre_fbl_force_control = self.create_publisher(
+        self.publisher_force_control = self.create_publisher(
             VehicleThrustSetpoint,
-            '/stl_mapping/pre_fbl_force_setpoint',
+            '/stl_mapping/force_setpoint',
             NORMAL_QOS
         )
-        self.publisher_pre_fbl_torque_control = self.create_publisher(
+        self.publisher_torque_control = self.create_publisher(
             VehicleTorqueSetpoint,
-            '/stl_mapping/pre_fbl_torque_setpoint',
-            NORMAL_QOS
-        )
-        self.publisher_post_fbl_force_control = self.create_publisher(
-            VehicleThrustSetpoint,
-            '/stl_mapping/post_fbl_force_setpoint',
-            NORMAL_QOS
-        )
-        self.publisher_post_fbl_torque_control = self.create_publisher(
-            VehicleTorqueSetpoint,
-            '/stl_mapping/post_fbl_torque_setpoint',
+            '/stl_mapping/torque_setpoint',
             NORMAL_QOS
         )
 
@@ -83,36 +73,48 @@ class MpcWrench(Node):
         self.Nu = 30                # Prediction horizon, inputs
 
         #! ATMOS weights
-        self.Q = np.diag([          # State weighting matrix
-            1e2, 1e2, 1e2,
-            5e1, 5e1, 5e1, 5e1,
-            3e1, 3e1, 3e1,  
-            3e1, 3e1, 3e1])             
-        self.R = 0.1*np.diag([          # State weighting matrix
-            1e0, 1e0, 1e0,
-            1e0, 1e0, 1e0]) 
-        self.P = 10 * self.Q        # Terminal state weighting matrix
-        
-        # #! BlueROV weights
-        # self.Q = np.diag([          # State weighting matrix
-        #     1e2, 1e2, 1e2,
-        #     5e2, 5e2, 5e2, 5e2,
-        #     3e0, 3e0, 3e0,  
-        #     3e0, 3e0, 3e0])          
-        # self.R = 0.01*np.diag([          # State weighting matrix
-        #     1e0, 1e0, 1e0,
-        #     1e0, 1e0, 1e0]) 
-        # self.P = 10 * self.Q        # Terminal state weighting matrix
-        
-        #! ATMOS Bounds
-        # self.lbx = np.array([0+0.25, -1.58+0.25, -0.5, -0.5, -3])
-        # self.ubx = np.array([4.1-0.25, 1.74-0.25, 0.5, 0.5, 3])
-        # self.idxbx = np.array([0, 1, 7, 8, 12]) # Indexes of states that are bounded
+        if model_name == 'atmos':
+            self.Q = np.diag([          # State weighting matrix
+                1e2, 1e2, 1e2,
+                5e1, 5e1, 5e1, 5e1,
+                3e1, 3e1, 3e1,  
+                3e1, 3e1, 3e1])             
+            self.R = 0.1*np.diag([          # State weighting matrix
+                1e0, 1e0, 1e0,
+                1e0, 1e0, 1e0]) 
+            self.P = 10 * self.Q        # Terminal state weighting matrix
+            #! ATMOS Bounds
+            self.lbx = np.array([0+0.25, -1.58+0.25, -0.5, -0.5, -3])
+            self.ubx = np.array([4.1-0.25, 1.74-0.25, 0.5, 0.5, 3])
+            self.idxbx = np.array([0, 1, 7, 8, 12]) # Indexes of states that are bounded
+        elif model_name == 'bluerov':
+            #! BlueROV weights
+            self.Q = np.diag([          # State weighting matrix
+                1e2, 1e2, 1e2,
+                5e2, 5e2, 5e2, 5e2,
+                3e0, 3e0, 3e0,  
+                3e0, 3e0, 3e0])          
+            self.R = 0.01*np.diag([          # State weighting matrix
+                1e0, 1e0, 1e0,
+                1e0, 1e0, 1e0]) 
+            self.P = 2 * self.Q        # Terminal state weighting matrix
+            # #! Sys-id weights
+            # self.Q = np.diag([          # State weighting matrix
+            #     1e1, 1e1, 1e1,
+            #     5e3, 5e3, 5e3, 5e3,
+            #     3e0, 3e0, 3e0,  
+            #     3e0, 3e0, 3e0])          
+            # self.R = 0.1*np.diag([          # State weighting matrix
+            #     1e0, 1e0, 1e0,
+            #     1e0, 1e0, 1e0]) 
+            # self.P = 10 * self.Q        # Terminal state weighting matrix
 
-        #! BlueROV Bounds
-        self.lbx = np.array([0.5, -2, 0,  -1, -1, -1])
-        self.ubx = np.array([8.5, 2, 2.5, 1,  1,  1])
-        self.idxbx = np.array([0, 1, 2, 7, 8, 9]) # Indexes of states that are bounded
+            #! BlueROV Bounds
+            self.lbx = np.array([0.5, -2, 0,  -1, -1, -1])
+            self.ubx = np.array([8.5, 2, 2.5, 1,  1,  1])
+            self.idxbx = np.array([0, 1, 2, 7, 8, 9]) # Indexes of states that are bounded
+        else:
+            raise ValueError(f"Model {model_name} not recognized.")
 
         # Weight on slack varibles
         self.W_slack = np.array([1e4]*len(self.idxbx))
@@ -122,29 +124,17 @@ class MpcWrench(Node):
         self.model_name = model_name
         self.solver = self.setup()
 
-    def publish_pre_fbl_messages(self, u_opt):
+    def publish_messages(self, u_opt):
         # Publish pre-feedback control messages
         thrust_msg = VehicleThrustSetpoint()
         thrust_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         thrust_msg.xyz = [u_opt[0], u_opt[1], u_opt[2]]
-        self.publisher_pre_fbl_force_control.publish(thrust_msg)
+        self.publisher_force_control.publish(thrust_msg)
 
         torque_msg = VehicleTorqueSetpoint()
         torque_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         torque_msg.xyz = [u_opt[3], u_opt[4], u_opt[5]]
-        self.publisher_pre_fbl_torque_control.publish(torque_msg)
-
-    def publish_post_fbl_messages(self, u_opt):
-        # Publish post-feedback control messages
-        thrust_msg = VehicleThrustSetpoint()
-        thrust_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-        thrust_msg.xyz = [u_opt[0], u_opt[1], u_opt[2]]
-        self.publisher_post_fbl_force_control.publish(thrust_msg)
-
-        torque_msg = VehicleTorqueSetpoint()
-        torque_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-        torque_msg.xyz = [u_opt[3], u_opt[4], u_opt[5]]
-        self.publisher_post_fbl_torque_control.publish(torque_msg)
+        self.publisher_torque_control.publish(torque_msg)
 
     def setup(self):
         # create ocp object to formulate the OCP
@@ -282,9 +272,9 @@ class MpcWrench(Node):
         self.solver.set(0, "lbx", x0.flatten())
         self.solver.set(0, "ubx", x0.flatten())
 
-        self.get_logger().info("\n\n")
-        self.get_logger().info(f"x0: {x0[0:7].flatten()}")
-        self.get_logger().info(f"xref: {x_ref[0:7,0].flatten()}")
+        # self.get_logger().info("\n\n")
+        # self.get_logger().info(f"x0: {x0[0:7].flatten()}")
+        # self.get_logger().info(f"xref: {x_ref[0:7,0].flatten()}")
 
         # Update reference
         if x_ref.ndim == 1:
@@ -315,11 +305,10 @@ class MpcWrench(Node):
             x_pred[i,:] = self.solver.get(i, "x")
         x_pred[self.Nx,:] = self.solver.get(self.Nx, "x")
 
-        self.get_logger().info(f"Cost: {self.solver.get_cost()}")
+        # self.get_logger().info(f"Cost: {self.solver.get_cost()}")
 
         # publish the same pre and post fbl because we don't do any fbl
         # but we keep things consistent for later analysis
-        self.publish_pre_fbl_messages(u_opt)
-        self.publish_post_fbl_messages(u_opt)
+        self.publish_messages(u_opt)
 
         return u_opt, x_pred
