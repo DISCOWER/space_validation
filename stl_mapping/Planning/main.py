@@ -45,7 +45,7 @@ if scenario == 'toy-example':
     X0 = HyperRectangle(center=np.array([1.5, 0, depth]),      size=np.array([0.5, 0.5, 0.5]))
     Xf = HyperRectangle(center=np.array([2.75, 1.25, depth]),   size=np.array([0.5, 0.5, 0.5]))
     XA = HyperRectangle(center=np.array([2.5, -1.25, depth,  -np.pi/2]), size=np.array([0.5, 0.5, 0.5,  np.pi/4]))
-    XB = HyperRectangle(center=np.array([1.5, 0.75, depth,  np.pi/2]),  size=np.array([0.5, 0.5, 0.5,  np.pi/4]))
+    XB = HyperRectangle(center=np.array([2.0, 0.75, depth,  np.pi/2]),  size=np.array([0.5, 0.5, 0.5,  np.pi/4]))
     # XA = HyperRectangle(np.array([2.5, -1.0, depth,  -np.pi/2-np.pi/8, -np.pi/2-np.pi/8]), 
     #                     np.array([2.6, -0.9, depth+0.1,  -np.pi/2+np.pi/8, -np.pi/2+np.pi/8]))
     # later converted to polytopes for predicates of the form Ax \leq b: Polytope = (A,b)
@@ -65,17 +65,18 @@ if scenario == 'toy-example':
     spec = Spec(phi, t0, tf)
 elif scenario == 'paper3D':
     D3 = True
-    X0 = HyperRectangle(center=np.array([1.0, 0, 1.5]), size=np.array([0.5, 0.5, 0.5]))
-    Xf = HyperRectangle(center=np.array([1.0, 0, 1.5]), size=np.array([0.5, 0.5, 0.5]))
+    depth = 0.0
+    X0 = HyperRectangle(center=np.array([1.0, 0, depth]), size=np.array([0.5, 0.5, 0.5]))
+    Xf = HyperRectangle(center=np.array([1.0, 0, depth]), size=np.array([0.5, 0.5, 0.5]))
 
     # Three observation tasks, each having two possible views around the Obstacle.
-    Obs1 = HyperRectangle(center=np.array([4.0, 0, 1.5]),                   size=np.array([1.0, 1.5, 0.5]))
-    XA1 = HyperRectangle(center=np.array([3.0, 0, 1.5, 0, 0]),              size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    XA2 = HyperRectangle(center=np.array([5.0, 0, 1.5, 0, -np.pi]),         size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    XB1 = HyperRectangle(center=np.array([4.0, -1.25, 1.5, 0, np.pi/2]),    size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    XB2 = HyperRectangle(center=np.array([4.0, 1.25, 1.5, 0, -np.pi/2]),    size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    XC1 = HyperRectangle(center=np.array([4.0, 0, 2.25, np.pi/2, 0]),      size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    XC2 = HyperRectangle(center=np.array([4.0, 0, 0.75, -np.pi/2, 0]),       size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    Obs1 = HyperRectangle(center=np.array([4.0, 0, depth]),                   size=np.array([1.0, 1.5, 0.5]))
+    XA1 = HyperRectangle(center=np.array([3.0, 0, depth, 0, 0]),              size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    XA2 = HyperRectangle(center=np.array([5.0, 0, depth, 0, -np.pi]),         size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    XB1 = HyperRectangle(center=np.array([4.0, -1.25, depth, 0, np.pi/2]),    size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    XB2 = HyperRectangle(center=np.array([4.0, 1.25, depth, 0, -np.pi/2]),    size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    XC1 = HyperRectangle(center=np.array([4.0, 0, depth+0.75, np.pi/2, 0]),      size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    XC2 = HyperRectangle(center=np.array([4.0, 0, depth-0.75, -np.pi/2, 0]),       size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
 
     Obs = [Obs1]
     RoIs = [XA2, XB1, XB2, XC1, XC2]
@@ -90,11 +91,11 @@ elif scenario == 'paper3D':
         ]),
         Pred("OR", preds=[
             Pred("F", [20,25], preds=[Pred("MU", preds=[Polytope(XB1)], dims=[0,1,2, 4,5])]),
-            Pred("F", [20,25], preds=[Pred("MU", preds=[Polytope(XB2)], dims=[0,1,2, 4,5])])
+            # Pred("F", [20,25], preds=[Pred("MU", preds=[Polytope(XB2)], dims=[0,1,2, 4,5])])
         ]),
         Pred("OR", preds=[
             Pred("F", [35,40], preds=[Pred("MU", preds=[Polytope(XC1)], dims=[0,1,2, 4,5])]),
-            Pred("F", [35,40], preds=[Pred("MU", preds=[Polytope(XC2)], dims=[0,1,2, 4,5])])
+            # Pred("F", [35,40], preds=[Pred("MU", preds=[Polytope(XC2)], dims=[0,1,2, 4,5])])
         ])
     ])
     spec = Spec(phi, t0, tf)

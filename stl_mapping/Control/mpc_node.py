@@ -4,7 +4,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.clock import Clock
 import os
-from stl_mapping.Utilities.ros.qos_profiles import NORMAL_QOS, RELIABLE_QOS
+from Utilities.ros.qos_profiles import NORMAL_QOS, RELIABLE_QOS
 from Utilities.get_reference_trajectory import get_reference_trajectory, ReferenceTrajectory
         
 from scipy.spatial.transform import Rotation as R
@@ -19,6 +19,9 @@ from Control.controllers.mpc_wrench import MpcWrench
 from Control.controllers.mpc_fbl_wrench import MpcFBLWrench
 from Control.estimators.ekf_wrench_estimator import EKFWrenchEstimator
 from Utilities.rotations import quat_to_euler_np
+from Utilities.Robots import FreeFlyer
+from Utilities.smarc_modelling.src.smarc_modelling.vehicles.BlueROV import BlueROV
+import copy
 
 class MPCNode(Node):
     def __init__(self):
@@ -32,6 +35,12 @@ class MPCNode(Node):
         self.offset = np.array([self.x_offset, self.y_offset, self.z_offset])
         self.rate = self.declare_parameter('rate', 5.0).value
 
+        if self.model_name == "atmos":
+            self.robot = FreeFlyer()
+        elif self.model_name == "bluerov":
+            self.robot = BlueROV()
+        else:
+            raise ValueError(f"Unknown model name: {self.model_name}")
         self.mpc = MpcWrench(model_name=self.model_name)
         self.fbl_mpc = MpcFBLWrench(model_name=self.model_name)
         self.control = np.zeros((self.mpc.nu, 1))
@@ -140,11 +149,17 @@ class MPCNode(Node):
 
         self.get_logger().info("MPC publishers initialized successfully")
 
+        # Settings
+        self.offset_free = True
+        self.feedback_equivalence = False
+
         # Disturbance variables
-        self.offset_free = False
         self.F_cmd = np.zeros((3, 1))  # Force commanded
         self.T_cmd = np.zeros((3, 1))  # Torque commanded
-        self.ekf_estimator = EKFWrenchEstimator(dt=0.05, robot_name=self.model_name)
+        if self.feedback_equivalence:
+            self.ekf_estimator = EKFWrenchEstimator(dt=0.05, robot_name='atmos')
+        else:
+            self.ekf_estimator = EKFWrenchEstimator(dt=0.05, robot_name=self.model_name)
         self.fd_est = np.zeros(3)  # Estimated force disturbance
         self.td_est = np.zeros(3)  # Estimated torque disturbance
         self.dist_cov = np.zeros((6, 6))  # Disturbance covariance matrix
@@ -159,8 +174,10 @@ class MPCNode(Node):
             self.F_scaling = 2 * self.F_thruster if NORMALIZED_WRENCH else 1.0
             self.T_scaling = 4 * self.r_thruster * self.F_thruster if NORMALIZED_WRENCH else 1.0
         elif self.model_name == "bluerov":
-            self.F_scaling = 0.216235294*np.array([85, 85, 120])
-            self.T_scaling = np.array([26, 14, 22])
+            # self.F_scaling = 0.216235294*np.array([85, 85, 120])
+            # self.T_scaling = np.array([26, 14, 22])
+            self.F_scaling = np.array([72, 72, 26])
+            self.T_scaling = np.array([8, 7, 6.5])
         else:
             raise Exception("Unknown model name for wrench scaling")
 
@@ -178,7 +195,8 @@ class MPCNode(Node):
         self.plan_path = self.declare_parameter('plan_path', f'{self.model_name}_solution_bezier.npz').value
 
         this_file_dir = os.path.dirname(os.path.abspath(__file__))
-        path = os.path.abspath(os.path.join(this_file_dir, '../../../../share/stl_mapping/'))
+        # path = os.path.abspath(os.path.join(this_file_dir, '../../../install/stl_mapping/share/stl_mapping/'))
+        path = os.path.abspath(os.path.join(os.path.expanduser("~"), 'space_ws/src/stl_mapping/stl_mapping/Planning/solutions'))
         # path = '/home/none/space_ws/src/stl_mapping/stl_mapping/Planning/solutions/'
         self.plan_path = os.path.join(path, self.plan_path)
         self.get_logger().info(f"Loaded plan from {self.plan_path}")
@@ -528,10 +546,12 @@ class MPCNode(Node):
         #     self.get_logger().info(f"dt: {t-self.t0}")
         #     x_ref[:, idx] = test_points[test_idx]
             # self.get_logger().info(f"{x_ref[:, test_idx].flatten()}")
-            x_ref[:, idx] = np.array([1., 0., 0.,
-                                      1., 0., 0., 0.,
-                                      0., 0., 0.,
-                                      0., 0., 0.]).reshape(13,)
+            # x_ref[:, idx] = np.array([1.5, 0.0, 1.5,
+            #                           1.0, 0., 0., 0.,
+            #                         #   0.5, 0.5, 0.5, 0.5,
+            #                         #   1/np.sqrt(2), 0., 1/np.sqrt(2), 0.,
+            #                           0., 0., 0.,
+            #                           0., 0., 0.]).reshape(13,)
             x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
 
         x_ref = np.vstack((x_ref, np.repeat(u_ref, x_ref.shape[1], axis=1)))  # Append u_ref to x_ref
@@ -542,21 +562,32 @@ class MPCNode(Node):
         # self.get_logger().info(f"p: {x0[:3,0].flatten()}")
         # self.get_logger().info(f"p_ref: {x_ref[:3, 0].flatten()}")
         # self.get_logger().info(f"v: {x0[7:10,0]}")
+        # self.get_logger().info(f"g_vec: {self.robot.calculate_test_g(x0)}")
 
         self.publish_reference_state(x_ref[:,0])
 
         # Get control input
-        if self.offset_free:
-            self.control, x_pred = self.mpc.get_input(x0, x_ref, fd=self.fd_est, td=self.td_est)
+        if self.feedback_equivalence:
+            if self.offset_free:
+                self.control, x_pred = self.fbl_mpc.get_input(x0, x_ref, fd=self.fd_est, td=self.td_est)
+            else:
+                self.control, x_pred = self.fbl_mpc.get_input(x0, x_ref)
+            # Run the other MPC as well, just for continuity and rosbags
+            _, _ = self.mpc.get_input(x0, x_ref)
         else:
-            self.control, x_pred = self.mpc.get_input(x0, x_ref)
-        #! Run the FBL MPC but don't use the output, just to get the solution
-        #! in the rosbag or in plotjuggler
-        self.control, x_pred = self.fbl_mpc.get_input(x0, x_ref)
+            if self.offset_free:
+                self.control, x_pred = self.mpc.get_input(x0, x_ref, fd=self.fd_est, td=self.td_est)
+            else:
+                self.control, x_pred = self.mpc.get_input(x0, x_ref)
+            _, _ = self.fbl_mpc.get_input(x0, x_ref)
 
         # self.get_logger().info(f"Control: {self.control.flatten()}")
-        self.F_cmd = self.control[0:3]
-        self.T_cmd = self.control[3:6]
+        if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+            self.F_cmd = copy.deepcopy(self.control[0:3])
+            self.T_cmd = copy.deepcopy(self.control[3:6])
+        else:
+            self.F_cmd = np.zeros((3, 1))
+            self.T_cmd = np.zeros((3, 1))
 
         # quat_error = (x_pred[0, 6:10] @ x_ref[6:10, 0])**2
         # self.get_logger().warning(f"quat_error: {1-quat_error}")

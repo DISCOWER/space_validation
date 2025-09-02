@@ -1,7 +1,7 @@
 {
     "acados_include_path": "/home/none/acados/include",
     "acados_lib_path": "/home/none/acados/lib",
-    "code_export_directory": "/home/none/space_ws/src/stl_mapping/stl_mapping/Control/mpc_codegen",
+    "code_export_directory": "/home/none/space_ws/build/stl_mapping/Control/mpc_codegen",
     "constraints": {
         "C": [],
         "C_e": [],
@@ -96,20 +96,20 @@
         "lg": [],
         "lg_e": [],
         "lh": [
-            -85,
-            -85,
-            -120,
-            -26,
-            -14,
-            -22
+            -42.5,
+            -42.5,
+            -60.0,
+            -13.0,
+            -7.0,
+            -11.0
         ],
         "lh_0": [
-            -85,
-            -85,
-            -120,
-            -26,
-            -14,
-            -22
+            -42.5,
+            -42.5,
+            -60.0,
+            -13.0,
+            -7.0,
+            -11.0
         ],
         "lh_e": [],
         "lphi": [],
@@ -161,20 +161,20 @@
         "ug": [],
         "ug_e": [],
         "uh": [
-            85,
-            85,
-            120,
-            26,
-            14,
-            22
+            42.5,
+            42.5,
+            60.0,
+            13.0,
+            7.0,
+            11.0
         ],
         "uh_0": [
-            85,
-            85,
-            120,
-            26,
-            14,
-            22
+            42.5,
+            42.5,
+            60.0,
+            13.0,
+            7.0,
+            11.0
         ],
         "uh_e": [],
         "uphi": [],
@@ -495,7 +495,7 @@
                 0.0,
                 0.0,
                 0.0,
-                0.1,
+                1.0,
                 0.0,
                 0.0,
                 0.0,
@@ -517,7 +517,7 @@
                 0.0,
                 0.0,
                 0.0,
-                0.1,
+                1.0,
                 0.0,
                 0.0,
                 0.0,
@@ -539,7 +539,7 @@
                 0.0,
                 0.0,
                 0.0,
-                0.1,
+                1.0,
                 0.0,
                 0.0,
                 0.0
@@ -561,7 +561,7 @@
                 0.0,
                 0.0,
                 0.0,
-                0.1,
+                10.0,
                 0.0,
                 0.0
             ],
@@ -583,7 +583,7 @@
                 0.0,
                 0.0,
                 0.0,
-                0.1,
+                10.0,
                 0.0
             ],
             [
@@ -605,7 +605,7 @@
                 0.0,
                 0.0,
                 0.0,
-                0.1
+                10.0
             ]
         ],
         "W_0": [
@@ -896,7 +896,7 @@
                 0.0,
                 0.0,
                 0.0,
-                0.1,
+                1.0,
                 0.0,
                 0.0,
                 0.0,
@@ -918,7 +918,7 @@
                 0.0,
                 0.0,
                 0.0,
-                0.1,
+                1.0,
                 0.0,
                 0.0,
                 0.0,
@@ -940,7 +940,7 @@
                 0.0,
                 0.0,
                 0.0,
-                0.1,
+                1.0,
                 0.0,
                 0.0,
                 0.0
@@ -962,7 +962,7 @@
                 0.0,
                 0.0,
                 0.0,
-                0.1,
+                10.0,
                 0.0,
                 0.0
             ],
@@ -984,7 +984,7 @@
                 0.0,
                 0.0,
                 0.0,
-                0.1,
+                10.0,
                 0.0
             ],
             [
@@ -1006,7 +1006,7 @@
                 0.0,
                 0.0,
                 0.0,
-                0.1
+                10.0
             ]
         ],
         "W_e": [
@@ -1383,7 +1383,7 @@
         "atmos_ff_cost/atmos_ff_cost_y_e_fun_jac_ut_xt.c",
         "atmos_ff_cost/atmos_ff_cost_y_e_hess.c"
     ],
-    "json_file": "/home/none/space_ws/src/stl_mapping/stl_mapping/Control/mpc_codegen/acados_ocp.json",
+    "json_file": "/home/none/space_ws/build/stl_mapping/Control/mpc_codegen/acados_ocp.json",
     "model": {
         "con_h_expr": "@1=vertcat(p, q, v, w), @2=gx(@1){0}, @3=@1[:7], @4=@1[7:13], @5=nu_r_euler(@3, @4), mac((mac(@2',@2,zeros(6x6))\\dense(@2')),((fx(p, q, v, w){0}+mac(gx(p, q, v, w){0},u,zeros(13x1)))-fx(@3, @4, @5{0}, @5{1}){0}),zeros(6x1))",
         "con_h_expr_0": "@1=vertcat(p, q, v, w), @2=gx(@1){0}, @3=@1[:7], @4=@1[7:13], @5=nu_r_euler(@3, @4), mac((mac(@2',@2,zeros(6x6))\\dense(@2')),((fx(p, q, v, w){0}+mac(gx(p, q, v, w){0},u,zeros(13x1)))-fx(@3, @4, @5{0}, @5{1}){0}),zeros(6x1))",

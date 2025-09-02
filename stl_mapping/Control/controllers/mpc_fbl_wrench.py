@@ -50,7 +50,7 @@ from Utilities.smarc_modelling.src.smarc_modelling.vehicles.BlueROV import BlueR
 from rclpy.node import Node
 
 from px4_msgs.msg import VehicleThrustSetpoint, VehicleTorqueSetpoint
-from stl_mapping.Utilities.ros.qos_profiles import NORMAL_QOS
+from Utilities.ros.qos_profiles import NORMAL_QOS
 
 
 class MpcFBLWrench(Node):
@@ -89,9 +89,9 @@ class MpcFBLWrench(Node):
             2e1, 2e1, 2e1, 2e1,
             3e1, 3e1, 3e1,  
             3e1, 3e1, 3e1])             
-        self.R = 0.1*np.diag([          # State weighting matrix
+        self.R = 1*np.diag([          # State weighting matrix
             1e0, 1e0, 1e0,
-            1e0, 1e0, 1e0]) 
+            1e1, 1e1, 1e1]) 
         self.P = 10 * self.Q        # Terminal state weighting matrix
 
         # #! BlueROV weights
@@ -329,7 +329,7 @@ class MpcFBLWrench(Node):
         # apply solution to the underwater environment
         u_pred_uw = np.zeros((self.Nx, self.nu))
         x_pred_uw = np.zeros((self.Nx+1, self.nx))
-        x_pred_uw[0,:] = x0
+        x_pred_uw[0,:] = x0.reshape(self.nx,)
         for i in range(self.Nx):
             u_pred_uw[i,:] = self.fbl_sp_to_uw(x_pred_uw[i,:], u_pred[i,:])
             x_pred_uw[i+1,:] = self.uw_robot.step(x_pred_uw[i,:], u_pred_uw[i,:], dt=self.dt)
@@ -347,4 +347,4 @@ class MpcFBLWrench(Node):
         sol_sp = {'x': x_pred.T, 'u': u_pred.T}
         sol_uw = {'x': x_pred_uw.T, 'u': u_pred_uw.T}
 
-        return u_uw, x_pred, sol_sp, sol_uw
+        return u_uw, x_pred#, sol_sp, sol_uw

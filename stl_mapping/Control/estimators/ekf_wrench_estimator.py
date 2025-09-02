@@ -3,9 +3,11 @@ import casadi as cs
 from Utilities.Robots import FreeFlyer
 from Utilities.smarc_modelling.src.smarc_modelling.vehicles.BlueROV import BlueROV
 from scipy.spatial.transform import Rotation as R
+from rclpy.node import Node
 
-class EKFWrenchEstimator:
+class EKFWrenchEstimator(Node):
     def __init__(self, dt:float = 0.1, robot_name:str = 'atmos'):
+        super().__init__('ekf_wrench_estimator')
         if robot_name == 'atmos':
             self.robot = FreeFlyer()
         elif robot_name == 'bluerov':
@@ -22,9 +24,7 @@ class EKFWrenchEstimator:
         dx = self.robot.calculate_disturbed_dynamics(x,u,fd,td)
         x_kp1 = x + dx*self.dt
         # Jacobian
-        F = cs.SX.eye(12)
-        F[0:6,0:6] = cs.jacobian(x_kp1[7:13], x[7:13])
-        F[0:6,6:12] = cs.jacobian(x_kp1[7:13], cs.vertcat(fd,td))
+        F = cs.jacobian(cs.vertcat(x_kp1[7:13], fd, td), cs.vertcat(x[7:13], fd, td))
         # Into a symbolic function
         self.F = cs.Function('F', [x, u, fd, td], [F])
 
@@ -41,7 +41,7 @@ class EKFWrenchEstimator:
 
         # State: [v, w, fd, td] in R^12
         self.x = np.zeros(12)  # Initial state vector
-        self.P = 100*np.eye(12) # initial uncertainty
+        self.P = 5*np.eye(12) # initial uncertainty
         self.Q = np.diag([qv]*3 + qw + [qfd]*3 + [qtd]*3) # Process noise covariance
         self.R = np.diag([rv]*3 + [rw]*3) # Measurement noise covariance
 
@@ -89,6 +89,9 @@ class EKFWrenchEstimator:
         K = self.P @ H.T @ np.linalg.inv(S)
         y = z - (H @ self.x)
         self.x = self.x + K @ y
+
+        self.get_logger().info(f"self.x: {self.x}")
+        self.get_logger().info(f"z: {z}")
         self.P = (np.eye(12) - K @ H) @ self.P
 
     def step(self, x_meas, F_cmd, T_cmd):

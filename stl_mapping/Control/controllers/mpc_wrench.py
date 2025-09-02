@@ -47,7 +47,7 @@ from models.bluerov_wrench import bluerov_model_wrench
 from rclpy.node import Node
 
 from px4_msgs.msg import VehicleThrustSetpoint, VehicleTorqueSetpoint
-from stl_mapping.Utilities.ros.qos_profiles import NORMAL_QOS
+from Utilities.ros.qos_profiles import NORMAL_QOS
 
 import rclpy
 rclpy.init()
@@ -90,13 +90,13 @@ class MpcWrench(Node):
         elif model_name == 'bluerov':
             #! BlueROV weights
             self.Q = np.diag([          # State weighting matrix
-                1e2, 1e2, 1e2,
-                5e2, 5e2, 5e2, 5e2,
+                5e2, 5e2, 5e2,
+                1e4, 1e4, 1e4, 1e4,
                 3e0, 3e0, 3e0,  
-                3e0, 3e0, 3e0])          
-            self.R = 0.01*np.diag([          # State weighting matrix
+                3e3, 3e3, 3e3])          
+            self.R = 0.1*np.diag([          # State weighting matrix
                 1e0, 1e0, 1e0,
-                1e0, 1e0, 1e0]) 
+                1e1, 1e1, 1e1]) 
             self.P = 2 * self.Q        # Terminal state weighting matrix
             # #! Sys-id weights
             # self.Q = np.diag([          # State weighting matrix
@@ -108,6 +108,15 @@ class MpcWrench(Node):
             #     1e0, 1e0, 1e0,
             #     1e0, 1e0, 1e0]) 
             # self.P = 10 * self.Q        # Terminal state weighting matrix
+            # self.Q = np.diag([          # State weighting matrix
+            #     1e0, 1e0, 1e0,
+            #     6e2, 3e2, 3e2, 3e2,
+            #     3e1, 3e1, 3e1,  
+            #     1e1, 1e1, 1e1])          
+            # self.R = np.diag([          # State weighting matrix
+            #     1e-2, 1e-2, 1e-2,
+            #     1e2, 1e2, 1e2]) 
+            # self.P = 20 * self.Q        # Terminal state weighting matrix
 
             #! BlueROV Bounds
             self.lbx = np.array([0.5, -2, 0,  -1, -1, -1])
@@ -201,7 +210,8 @@ class MpcWrench(Node):
         q_z = q1[0] * q2[3] + q1[1] * q2[2] - q1[2] * q2[1] + q1[3] * q2[0]
 
         q_error = ca.vertcat(q_w, q_x, q_y, q_z)
-        q_error = ca.if_else(q_w < 0, -q_error, q_error)
+        # q_error = ca.if_else(q_w < 0, -q_error, q_error)
+        q_error = q_error * ca.sign(q_w)
 
         #! old
         # q_error = ca.fabs(model.x[6:10].T @ x_ref[6:10])
