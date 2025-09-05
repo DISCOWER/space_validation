@@ -36,8 +36,8 @@ sp_robot = LinearFreeFlyer6DoF()
 euler_order = 'xyz'
 
 ### STL Specification
-# scenario = 'toy-example'
-scenario = 'paper3D'
+scenario = 'toy-example'
+# scenario = 'paper3D'
 
 if scenario == 'toy-example':
     D3 = False

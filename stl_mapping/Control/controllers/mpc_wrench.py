@@ -48,17 +48,9 @@ from rclpy.node import Node
 
 from px4_msgs.msg import VehicleThrustSetpoint, VehicleTorqueSetpoint
 from Utilities.ros.qos_profiles import NORMAL_QOS
-
+from Utilities.rotations import quat_mult
 import rclpy
 rclpy.init()
-
-def quat_mult(q1, q2):
-    return ca.vertcat(
-        q1[0]*q2[0] - q1[1]*q2[1] - q1[2]*q2[2] - q1[3]*q2[3],
-        q1[0]*q2[1] + q1[1]*q2[0] + q1[2]*q2[3] - q1[3]*q2[2],
-        q1[0]*q2[2] - q1[1]*q2[3] + q1[2]*q2[0] + q1[3]*q2[1],
-        q1[0]*q2[3] + q1[1]*q2[2] - q1[2]*q2[1] + q1[3]*q2[0]
-    )
 
 class MpcWrench(Node):
     def __init__(self, model_name:str='atmos'):
@@ -87,7 +79,7 @@ class MpcWrench(Node):
                 5e1, 5e1, 5e1, 5e1,
                 3e1, 3e1, 3e1,  
                 3e1, 3e1, 3e1])             
-            self.R = 0.1*np.diag([          # State weighting matrix
+            self.R = 1*np.diag([          # State weighting matrix
                 1e0, 1e0, 1e0,
                 1e0, 1e0, 1e0]) 
             self.P = 10 * self.Q        # Terminal state weighting matrix
@@ -135,7 +127,7 @@ class MpcWrench(Node):
 
         # Weight on slack varibles
         self.W_slack = np.array([1e4]*len(self.idxbx))
-        self.idx_slack = np.array([0, 1, 2, 3, 4, 5]) # Indexes of slack variables
+        self.idx_slack = np.arange(len(self.idxbx)) # Indexes of slack variables
 
         # Create the OCP
         self.model_name = model_name

@@ -8,6 +8,7 @@ from rclpy.node import Node
 class EKFWrenchEstimator(Node):
     def __init__(self, dt:float = 0.1, robot_name:str = 'atmos'):
         super().__init__('ekf_wrench_estimator')
+        self.robot_name = robot_name
         if robot_name == 'atmos':
             self.robot = FreeFlyer()
         elif robot_name == 'bluerov':
@@ -33,12 +34,22 @@ class EKFWrenchEstimator(Node):
         self.inertia_inv = np.linalg.inv(self.inertia)
 
         # captures how quickly it can change per second 
-        qv = (0.6/self.mass * self.dt)**2
-        qw = [(0.12 / self.inertia[i, i] * self.dt)**2 for i in range(3)]
-        qfd = (0.2*self.dt)**2      # 200mN/s
-        qtd = (0.05*self.dt)**2
-        rv = (1e-2*self.dt)**2
-        rw = (0.05*self.dt)**2
+        if self.robot_name == 'atmos':
+            qv = (0.6/self.mass * self.dt)**2
+            qw = [(0.12 / self.inertia[i, i] * self.dt)**2 for i in range(3)]
+            qfd = (0.2*self.dt)**2      # 200mN/s
+            qtd = (0.05*self.dt)**2
+            rv = (1e-2*self.dt)**2
+            rw = (0.05*self.dt)**2
+        elif self.robot_name == 'bluerov':
+            qv = (0.6/self.mass * self.dt)**2
+            qw = [(0.12 / self.inertia[i, i] * self.dt)**2 for i in range(3)]
+            qfd = 15*(0.2*self.dt)**2      # 200mN/s
+            qtd = 10*(0.05*self.dt)**2
+            rv = (1e-2*self.dt)**2
+            rw = (0.05*self.dt)**2
+        else:
+            raise ValueError(f"Unknown robot name: {robot_name}")
 
         # State: [v, w, fd, td] in R^12
         self.x = np.zeros(12)  # Initial state vector
@@ -59,6 +70,7 @@ class EKFWrenchEstimator(Node):
 
         # a_lin = F_tot / self.mass
         # a_ang = self.inertia_inv @ (T_tot - np.cross(w, self.inertia @ w))
+        
         u = np.hstack((F_cmd, T_cmd))
         dx = self.robot.calculate_disturbed_dynamics(x_meas,u,fd,td)
         a_lin = dx[7:10]
@@ -96,10 +108,6 @@ class EKFWrenchEstimator(Node):
         self.P = (np.eye(12) - K @ H) @ self.P
 
     def step(self, x_meas, F_cmd, T_cmd):
-        # q_meas = x_meas[3:7]
-        # v_meas = x_meas[7:10]
-        # w_meas = x_meas[10:13]
-
         self.predict(x_meas, F_cmd, T_cmd)
         self.update(x_meas)
 

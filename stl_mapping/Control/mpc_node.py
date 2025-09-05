@@ -160,7 +160,7 @@ class MPCNode(Node):
 
         #! Temp
         self.other_control = np.zeros((6, 1))
-        self.ekf_estimator = EKFWrenchEstimator(dt=0.05, robot_name=self.model_name)
+        self.ekf_estimator = EKFWrenchEstimator(dt=0.02, robot_name=self.model_name)
         self.other_ekf_estimator = EKFWrenchEstimator(dt=self.ekf_estimator.dt, robot_name=self.other_model_name)
         self.fd_est = np.zeros(3)  # Estimated force disturbance
         self.td_est = np.zeros(3)  # Estimated torque disturbance
@@ -181,7 +181,8 @@ class MPCNode(Node):
         elif self.model_name == "bluerov":
             self.F_scaling = np.array([72, 72, 26])
             # self.T_scaling = np.array([8, 7, 6.5])
-            self.T_scaling = np.array([26, 14, 22])
+            # self.T_scaling = np.array([26, 14, 22])
+            self.T_scaling = np.array([12, 14, 22])
         else:
             raise Exception("Unknown model name for wrench scaling")
 
@@ -194,7 +195,7 @@ class MPCNode(Node):
 
         timer_period_dist_est = self.ekf_estimator.dt # seconds
         self.timer_dist_est = self.create_timer(timer_period_dist_est, self.disturbance_estimation_callback)
-        # self.timer_other_dist_est = self.create_timer(timer_period_dist_est, self.other_disturbance_estimation_callback)
+        self.timer_other_dist_est = self.create_timer(timer_period_dist_est, self.other_disturbance_estimation_callback)
 
         # Load the plan from a file (declared as launch argument)
         self.plan_path = self.declare_parameter('plan_path', f'{self.model_name}_solution_bezier.npz').value
@@ -230,39 +231,17 @@ class MPCNode(Node):
         # times = np.linspace(0, self.reference.r.shape[0]*self.reference.dt, 250)
 
     def vehicle_attitude_callback(self, msg):
-        if self.model_name == "atmos":
-            # NED-> ENU transformation
-            # Receives quaternion in NED frame as (qw, qx, qy, qz)
-            q_enu = 1/np.sqrt(2) * np.array([msg.q[0] + msg.q[3], msg.q[1] + msg.q[2], msg.q[1] - msg.q[2], msg.q[0] - msg.q[3]])
-            q_enu /= np.linalg.norm(q_enu)
-            self.vehicle_attitude = q_enu.astype(float)
-        else:
-            self.vehicle_attitude = np.array([msg.q[0], msg.q[1], msg.q[2], msg.q[3]], dtype=float)
+        self.vehicle_attitude = np.array([msg.q[0], msg.q[1], msg.q[2], msg.q[3]], dtype=float)
 
     def vehicle_local_position_callback(self, msg):
-        if self.model_name == "atmos":
-            # NED-> ENU transformation
-            self.vehicle_local_position[0] = msg.y
-            self.vehicle_local_position[1] = msg.x
-            self.vehicle_local_position[2] = -msg.z
-            self.vehicle_local_velocity[0] = msg.vy
-            self.vehicle_local_velocity[1] = msg.vx
-            self.vehicle_local_velocity[2] = -msg.vz
-        else:
-            self.vehicle_local_position = np.array([msg.x, msg.y, msg.z])
-            self.vehicle_local_velocity = np.array([msg.vx, msg.vy, msg.vz])
-            # get a body-frame velocity, because this is what the MPC model requires
-            q = R.from_quat(self.vehicle_attitude,scalar_first=True)
-            self.vehicle_local_velocity_body = q.inv().apply(self.vehicle_local_velocity)
+        self.vehicle_local_position = np.array([msg.x, msg.y, msg.z])
+        self.vehicle_local_velocity = np.array([msg.vx, msg.vy, msg.vz])
+        # get a body-frame velocity, because this is what the MPC model requires
+        q = R.from_quat(self.vehicle_attitude,scalar_first=True)
+        self.vehicle_local_velocity_body = q.inv().apply(self.vehicle_local_velocity)
 
     def vehicle_angular_velocity_callback(self, msg):
-        if self.model_name == "atmos":
-            # NED-> ENU transformation
-            self.vehicle_angular_velocity[0] = msg.xyz[0]
-            self.vehicle_angular_velocity[1] = -msg.xyz[1]
-            self.vehicle_angular_velocity[2] = -msg.xyz[2]
-        else:
-            self.vehicle_angular_velocity = np.array([msg.xyz[0], msg.xyz[1], msg.xyz[2]])
+        self.vehicle_angular_velocity = np.array([msg.xyz[0], msg.xyz[1], msg.xyz[2]])
 
     def vehicle_status_callback(self, msg):
         # print("NAV_STATUS: ", msg.nav_state)
@@ -334,13 +313,13 @@ class MPCNode(Node):
         u[0:3] /= self.F_scaling
         u[3:6] /= self.T_scaling
 
-        if self.model_name == "atmos":
-            # ENU -> NED transformation
-            force_output_msg.xyz = [u[0], -u[1], -u[2]]
-            torque_output_msg.xyz = [u[3], -u[4], -u[5]]
-        else:
-            force_output_msg.xyz = [u[0], u[1], u[2]]
-            torque_output_msg.xyz = [u[3], u[4], u[5]]
+        # if self.model_name == "atmos":
+        #     # ENU -> NED transformation
+        #     force_output_msg.xyz = [u[0], -u[1], -u[2]]
+        #     torque_output_msg.xyz = [u[3], -u[4], -u[5]]
+        # else:
+        force_output_msg.xyz = [u[0], u[1], u[2]]
+        torque_output_msg.xyz = [u[3], u[4], u[5]]
         # EKF in FLU frame so don't transform
         # self.F_app = u[:3]
         # self.T_app = u[3:6]
@@ -493,6 +472,7 @@ class MPCNode(Node):
                        self.vehicle_angular_velocity[1],
                        self.vehicle_angular_velocity[2]]).reshape(13, 1)
 
+        self.get_logger().info(f"x0: {x0.flatten()}")
         if not self.started:
             # self.get_logger().info("Mission not started, using constant reference (t=0)")
             times = np.zeros(self.mpc.Nx + 1)  # No time since start, constant reference
@@ -510,7 +490,7 @@ class MPCNode(Node):
             else:
                 fd_est = np.clip(self.fd_est, -5, 5)
                 td_est = np.clip(self.td_est, -1, 1)
-            # rotation matrix of FRU in ENU
+            # rotation matrix of FRD in NED
             q = R.from_quat(self.vehicle_attitude, scalar_first=True)
             u_ref = -np.concatenate((q.inv().apply(fd_est), td_est), axis=0).reshape((6, 1))
         else:
@@ -520,49 +500,6 @@ class MPCNode(Node):
 
         x_ref = np.zeros((13, self.mpc.Nx + 1))  # Initialize reference trajectory
 
-        # #! Easy sys-id
-        # x_orig = np.array([3,0,1.5, 1,0,0,0,  0,0,0,0,0,0])
-        # test_points = np.array([x_orig,
-                                
-        #                         x_orig + np.array([0.4,0,0, 0,0,0,0,0,0,0,0,0,0]),
-        #                         x_orig,
-
-        #                         x_orig + np.array([-0.4,0,0, 0,0,0,0,0,0,0,0,0,0]),
-        #                         x_orig,
-                                
-        #                         x_orig + np.array([0,0.4,0, 0,0,0,0,0,0,0,0,0,0]),
-        #                         x_orig,
-
-        #                         x_orig + np.array([0,-0.4,0, 0,0,0,0,0,0,0,0,0,0]),
-        #                         x_orig,
-
-        #                         x_orig + np.array([0,0,0.4, 0,0,0,0,0,0,0,0,0,0]),
-        #                         x_orig,
-
-        #                         x_orig + np.array([0,0,-0.4, 0,0,0,0,0,0,0,0,0,0]),
-        #                         x_orig,
-
-        #                         x_orig + np.array([0,0,0, 0.924,0,0,0.383, 0,0,0,0,0,0]),
-        #                         x_orig,
-
-        #                         x_orig + np.array([0,0,0, 0.924,0,0,-0.383, 0,0,0,0,0,0]),
-        #                         x_orig,
-
-        #                         x_orig + np.array([0,0,0, 0.924,0,0.383,0, 0,0,0,0,0,0]),
-        #                         x_orig,
-
-        #                         x_orig + np.array([0,0,0, 0.924,0,-0.383,0, 0,0,0,0,0,0]),
-        #                         x_orig,
-
-        #                         x_orig + np.array([0,0,0, 0.924,0.383,0,0, 0,0,0,0,0,0]),
-        #                         x_orig,
-
-        #                         x_orig + np.array([0,0,0, 0.924,-0.383,0,0, 0,0,0,0,0,0]),
-        #                         x_orig,
-
-        #                         ],dtype=float)
-        # # arrange from 0 to 4*number of test points in increments of 4
-        # period = 4.0
         for idx, ti in enumerate(times):
         #     #! Easy sys-id
         #     # get the first index of times for which ti > times
@@ -575,10 +512,11 @@ class MPCNode(Node):
         #     self.get_logger().info(f"dt: {t-self.t0}")
         #     x_ref[:, idx] = test_points[test_idx]
             # self.get_logger().info(f"{x_ref[:, test_idx].flatten()}")
-            x_ref[:, idx] = np.array([3.5, 1.25, 1.5,
-                                    #   1.0, 0., 0., 0.,
+            x_ref[:, idx] = np.array([0.0, 1.5, -0.6,
+                                      1.0, 0., 0., 0.,
                                     #   0.5, 0.5, 0.5, 0.5,
-                                      1/np.sqrt(2), 0., -1/np.sqrt(2), 0.,
+                                    #   1/np.sqrt(2), 0., 1/np.sqrt(2), 0.,
+                                    # 1/np.sqrt(2), -1/np.sqrt(2), 0., 0.,
                                       0., 0., 0.,
                                       0., 0., 0.]).reshape(13,)
             # x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
@@ -595,23 +533,22 @@ class MPCNode(Node):
 
         self.publish_reference_state(x_ref[:,0])
 
-        self.get_logger().info(f"fd_est: {fd_est}, td_est: {td_est}")
-        self.get_logger().info(f"u_ref: {u_ref.flatten()}")
+        # self.get_logger().info(f"fd_est: {fd_est}, td_est: {td_est}")
+        # self.get_logger().info(f"u_ref: {u_ref.flatten()}")
 
         # Get control input
         if self.feedback_equivalence:
             if self.offset_free:
-                self.control, x_pred = self.fbl_mpc.get_input(x0, x_ref, fd=fd_est, td=td_est)
+                self.control, x_pred, self.other_control, _ = self.fbl_mpc.get_input(x0, x_ref, fd=fd_est, td=td_est)
             else:
-                self.control, x_pred = self.fbl_mpc.get_input(x0, x_ref)
-            # Run the other MPC as well, just for continuity and rosbags
-            self.other_control, _ = self.mpc.get_input(x0, x_ref)
+                self.control, x_pred, self.other_control, _ = self.fbl_mpc.get_input(x0, x_ref)
         else:
             if self.offset_free:
                 self.control, x_pred = self.mpc.get_input(x0, x_ref, fd=fd_est, td=td_est)
             else:
                 self.control, x_pred = self.mpc.get_input(x0, x_ref)
-            self.other_control, _ = self.fbl_mpc.get_input(x0, x_ref)
+            # Run the other MPC as well, just for continuity and rosbags
+            _, _, self.other_control, _ = self.fbl_mpc.get_input(x0, x_ref)
 
         # self.get_logger().info(f"Control: {self.control.flatten()}")
         if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:

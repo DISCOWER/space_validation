@@ -502,7 +502,7 @@ void bluerov_acados_setup_nlp_in(bluerov_solver_capsule* capsule, const int N, d
     W_0[0+(NY0) * 0] = 500;
     W_0[1+(NY0) * 1] = 500;
     W_0[2+(NY0) * 2] = 500;
-    W_0[3+(NY0) * 3] = 10000;
+    W_0[3+(NY0) * 3] = 20000;
     W_0[4+(NY0) * 4] = 10000;
     W_0[5+(NY0) * 5] = 10000;
     W_0[6+(NY0) * 6] = 10000;
@@ -534,7 +534,7 @@ void bluerov_acados_setup_nlp_in(bluerov_solver_capsule* capsule, const int N, d
     W[0+(NY) * 0] = 500;
     W[1+(NY) * 1] = 500;
     W[2+(NY) * 2] = 500;
-    W[3+(NY) * 3] = 10000;
+    W[3+(NY) * 3] = 20000;
     W[4+(NY) * 4] = 10000;
     W[5+(NY) * 5] = 10000;
     W[6+(NY) * 6] = 10000;
@@ -567,7 +567,7 @@ void bluerov_acados_setup_nlp_in(bluerov_solver_capsule* capsule, const int N, d
     W_e[0+(NYN) * 0] = 1000;
     W_e[1+(NYN) * 1] = 1000;
     W_e[2+(NYN) * 2] = 1000;
-    W_e[3+(NYN) * 3] = 20000;
+    W_e[3+(NYN) * 3] = 40000;
     W_e[4+(NYN) * 4] = 20000;
     W_e[5+(NYN) * 5] = 20000;
     W_e[6+(NYN) * 6] = 20000;

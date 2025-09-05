@@ -25,7 +25,8 @@ def generate_launch_description():
             package='px4_offboard',
             namespace=namespace,
             executable='visualizer',
-            name='visualizer_0'
+            name='visualizer_0',
+            parameters=[{'model_name': model}]
     )),
 
 #     # camera 

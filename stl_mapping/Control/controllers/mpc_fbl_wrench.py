@@ -47,6 +47,7 @@ from models.bluerov_wrench import bluerov_model_wrench
 from Utilities.rotations import x_uw_to_x_ff, x_uw_to_x_ff_cs, x_ff_to_x_uw_cs
 from Utilities.Robots import FreeFlyer
 from Utilities.smarc_modelling.src.smarc_modelling.vehicles.BlueROV import BlueROV
+from Utilities.rotations import quat_mult
 from rclpy.node import Node
 
 from px4_msgs.msg import VehicleThrustSetpoint, VehicleTorqueSetpoint
@@ -83,27 +84,27 @@ class MpcFBLWrench(Node):
         self.Nx = 30                # Prediction horizon, states             
         self.Nu = 30                # Prediction horizon, inputs
 
-        #! ATMOS weights
-        self.Q = np.diag([          # State weighting matrix
-            1e2, 1e2, 1e2,
-            2e1, 2e1, 2e1, 2e1,
-            3e1, 3e1, 3e1,  
-            3e1, 3e1, 3e1])             
-        self.R = 1*np.diag([          # State weighting matrix
-            1e0, 1e0, 1e0,
-            1e1, 1e1, 1e1]) 
-        self.P = 10 * self.Q        # Terminal state weighting matrix
-
-        # #! BlueROV weights
+        # #! ATMOS weights
         # self.Q = np.diag([          # State weighting matrix
         #     1e2, 1e2, 1e2,
-        #     5e2, 5e2, 5e2, 5e2,
-        #     3e0, 3e0, 3e0,  
-        #     3e0, 3e0, 3e0])          
-        # self.R = 0.01*np.diag([          # State weighting matrix
+        #     2e1, 2e1, 2e1, 2e1,
+        #     3e1, 3e1, 3e1,  
+        #     3e1, 3e1, 3e1])             
+        # self.R = 1*np.diag([          # State weighting matrix
         #     1e0, 1e0, 1e0,
-        #     1e0, 1e0, 1e0]) 
+        #     1e1, 1e1, 1e1]) 
         # self.P = 10 * self.Q        # Terminal state weighting matrix
+
+        #! BlueROV weights
+        self.Q = np.diag([          # State weighting matrix
+            1e2, 1e2, 1e2,
+            5e1, 5e1, 5e1, 5e1,
+            3e1, 3e1, 3e1,  
+            3e1, 3e1, 3e1])          
+        self.R = 0.1*np.diag([          # State weighting matrix
+            1e0, 1e0, 1e0,
+            1e0, 1e0, 1e0]) 
+        self.P = 10 * self.Q        # Terminal state weighting matrix
         # Bounds
         self.lbx = np.array([0.5, -2, 0,  -1, -1, -1])
         self.ubx = np.array([8.5, 2, 2.5, 1,  1,  1])
@@ -208,18 +209,25 @@ class MpcFBLWrench(Node):
 
         q1 = x_ref[3:7]
         q2 = model.x[3:7]
-        # Sice unit quaternion, quaternion inverse is equal to its conjugate
-        q_conj = ca.vertcat(q2[0], -q2[1], -q2[2], -q2[3])
-        q2 = q_conj/ca.norm_2(q2)
-        
-        # q_error = q1 @ q2^-1
-        q_w = q1[0] * q2[0] - q1[1] * q2[1] - q1[2] * q2[2] - q1[3] * q2[3]
-        q_x = q1[0] * q2[1] + q1[1] * q2[0] + q1[2] * q2[3] - q1[3] * q2[2]
-        q_y = q1[0] * q2[2] - q1[1] * q2[3] + q1[2] * q2[0] + q1[3] * q2[1]
-        q_z = q1[0] * q2[3] + q1[1] * q2[2] - q1[2] * q2[1] + q1[3] * q2[0]
+        q1 = q1 / ca.norm_2(q1)
+        q2 = q2 / ca.norm_2(q2)
+        q_error = quat_mult(q1, ca.vertcat(q2[0], -q2[1], -q2[2], -q2[3]))
+        q_error = q_error * ca.sign(q_error[0])
 
-        q_error = ca.vertcat(q_w, q_x, q_y, q_z)
-        q_error = ca.if_else(q_w < 0, -q_error, q_error)
+        # q1 = x_ref[3:7]
+        # q2 = model.x[3:7]
+        # # Sice unit quaternion, quaternion inverse is equal to its conjugate
+        # q_conj = ca.vertcat(q2[0], -q2[1], -q2[2], -q2[3])
+        # q2 = q_conj/ca.norm_2(q2)
+        
+        # # q_error = q1 @ q2^-1
+        # q_w = q1[0] * q2[0] - q1[1] * q2[1] - q1[2] * q2[2] - q1[3] * q2[3]
+        # q_x = q1[0] * q2[1] + q1[1] * q2[0] + q1[2] * q2[3] - q1[3] * q2[2]
+        # q_y = q1[0] * q2[2] - q1[1] * q2[3] + q1[2] * q2[0] + q1[3] * q2[1]
+        # q_z = q1[0] * q2[3] + q1[1] * q2[2] - q1[2] * q2[1] + q1[3] * q2[0]
+
+        # q_error = ca.vertcat(q_w, q_x, q_y, q_z)
+        # q_error = ca.if_else(q_w < 0, -q_error, q_error)
 
         # quat_error = ca.fabs(model.x[6:10].T @ x_ref[6:10])
         # quat_error = (model.x[3:7].T @ x_ref[3:7])**2
@@ -347,4 +355,4 @@ class MpcFBLWrench(Node):
         sol_sp = {'x': x_pred.T, 'u': u_pred.T}
         sol_uw = {'x': x_pred_uw.T, 'u': u_pred_uw.T}
 
-        return u_uw, x_pred#, sol_sp, sol_uw
+        return u_uw, x_pred, u_sp, x_pred#, sol_sp, sol_uw
