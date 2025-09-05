@@ -52,6 +52,14 @@ from Utilities.ros.qos_profiles import NORMAL_QOS
 import rclpy
 rclpy.init()
 
+def quat_mult(q1, q2):
+    return ca.vertcat(
+        q1[0]*q2[0] - q1[1]*q2[1] - q1[2]*q2[2] - q1[3]*q2[3],
+        q1[0]*q2[1] + q1[1]*q2[0] + q1[2]*q2[3] - q1[3]*q2[2],
+        q1[0]*q2[2] - q1[1]*q2[3] + q1[2]*q2[0] + q1[3]*q2[1],
+        q1[0]*q2[3] + q1[1]*q2[2] - q1[2]*q2[1] + q1[3]*q2[0]
+    )
+
 class MpcWrench(Node):
     def __init__(self, model_name:str='atmos'):
         super().__init__('mpc_wrench')
@@ -91,7 +99,7 @@ class MpcWrench(Node):
             #! BlueROV weights
             self.Q = np.diag([          # State weighting matrix
                 5e2, 5e2, 5e2,
-                1e4, 1e4, 1e4, 1e4,
+                2e4, 1e4, 1e4, 1e4,
                 3e0, 3e0, 3e0,  
                 3e3, 3e3, 3e3])          
             self.R = 0.1*np.diag([          # State weighting matrix
@@ -199,19 +207,25 @@ class MpcWrench(Node):
 
         q1 = x_ref[3:7]
         q2 = model.x[3:7]
-        # Sice unit quaternion, quaternion inverse is equal to its conjugate
-        q_conj = ca.vertcat(q2[0], -q2[1], -q2[2], -q2[3])
-        q2 = q_conj/ca.norm_2(q2)
-        
-        # q_error = q1 @ q2^-1
-        q_w = q1[0] * q2[0] - q1[1] * q2[1] - q1[2] * q2[2] - q1[3] * q2[3]
-        q_x = q1[0] * q2[1] + q1[1] * q2[0] + q1[2] * q2[3] - q1[3] * q2[2]
-        q_y = q1[0] * q2[2] - q1[1] * q2[3] + q1[2] * q2[0] + q1[3] * q2[1]
-        q_z = q1[0] * q2[3] + q1[1] * q2[2] - q1[2] * q2[1] + q1[3] * q2[0]
+        q1 = q1 / ca.norm_2(q1)
+        q2 = q2 / ca.norm_2(q2)
+        q_error = quat_mult(q1, ca.vertcat(q2[0], -q2[1], -q2[2], -q2[3]))
+        q_error = q_error * ca.sign(q_error[0])
 
-        q_error = ca.vertcat(q_w, q_x, q_y, q_z)
-        # q_error = ca.if_else(q_w < 0, -q_error, q_error)
-        q_error = q_error * ca.sign(q_w)
+        # Old quaternion error calculation
+        # Sice unit quaternion, quaternion inverse is equal to its conjugate
+        # q_conj = ca.vertcat(q2[0], -q2[1], -q2[2], -q2[3])
+        # q2 = q_conj/ca.norm_2(q2)
+        
+        # # q_error = q1 @ q2^-1
+        # q_w = q1[0] * q2[0] - q1[1] * q2[1] - q1[2] * q2[2] - q1[3] * q2[3]
+        # q_x = q1[0] * q2[1] + q1[1] * q2[0] + q1[2] * q2[3] - q1[3] * q2[2]
+        # q_y = q1[0] * q2[2] - q1[1] * q2[3] + q1[2] * q2[0] + q1[3] * q2[1]
+        # q_z = q1[0] * q2[3] + q1[1] * q2[2] - q1[2] * q2[1] + q1[3] * q2[0]
+
+        # q_error = ca.vertcat(q_w, q_x, q_y, q_z)
+        # # q_error = ca.if_else(q_w < 0, -q_error, q_error)
+        # q_error = q_error * ca.sign(q_w)
 
         #! old
         # q_error = ca.fabs(model.x[6:10].T @ x_ref[6:10])
