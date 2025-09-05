@@ -29,6 +29,8 @@ class MPCNode(Node):
         self.get_logger().info("Initializing MPC Node")
 
         self.model_name = self.declare_parameter('model_name', 'atmos').value
+        self.other_model_name = 'bluerov' if self.model_name == 'atmos' else 'atmos'
+
         self.x_offset = self.declare_parameter('x_offset', 0.0).value
         self.y_offset = self.declare_parameter('y_offset', 0.0).value
         self.z_offset = self.declare_parameter('z_offset', 0.0).value
@@ -103,10 +105,6 @@ class MPCNode(Node):
             VehicleThrustSetpoint,
             'fmu/in/vehicle_thrust_setpoint',
             NORMAL_QOS)
-        self.publisher_torque_setpoint = self.create_publisher(
-            VehicleTorqueSetpoint,
-            'fmu/in/vehicle_torque_setpoint',
-            NORMAL_QOS)
         self.predicted_path_pub = self.create_publisher(
             Path,
             'stl_mapping/predicted_path',
@@ -129,23 +127,24 @@ class MPCNode(Node):
             10)
         self.disturbance_est_pub = self.create_publisher(
             TwistWithCovarianceStamped,
-            'disturbance_estimate',
+            f'{self.model_name}/disturbance_estimate',
+            10)
+        self.other_disturbance_est_pub = self.create_publisher(
+            TwistWithCovarianceStamped,
+            f'{self.other_model_name}/disturbance_estimate',
             10)
         self.reference_p_v_pub = self.create_publisher(
             VehicleLocalPosition,
             'stl_mapping/reference_pos_vel',
-            10
-        )
+            10)
         self.reference_q_pub = self.create_publisher(
             VehicleAttitude,
             'stl_mapping/reference_q',
-            10
-        )
+            10)
         self.reference_w_pub = self.create_publisher(
             VehicleAngularVelocity,
             'stl_mapping/reference_w',
-            10
-        )
+            10)
 
         self.get_logger().info("MPC publishers initialized successfully")
 
@@ -156,13 +155,19 @@ class MPCNode(Node):
         # Disturbance variables
         self.F_cmd = np.zeros((3, 1))  # Force commanded
         self.T_cmd = np.zeros((3, 1))  # Torque commanded
-        if self.feedback_equivalence:
-            self.ekf_estimator = EKFWrenchEstimator(dt=0.05, robot_name='atmos')
-        else:
-            self.ekf_estimator = EKFWrenchEstimator(dt=0.05, robot_name=self.model_name)
+        self.other_F_cmd = np.zeros((3, 1))  # Force commanded
+        self.other_T_cmd = np.zeros((3, 1))  # Torque commanded
+
+        #! Temp
+        self.other_control = np.zeros((6, 1))
+        self.ekf_estimator = EKFWrenchEstimator(dt=0.05, robot_name=self.model_name)
+        self.other_ekf_estimator = EKFWrenchEstimator(dt=self.ekf_estimator.dt, robot_name=self.other_model_name)
         self.fd_est = np.zeros(3)  # Estimated force disturbance
         self.td_est = np.zeros(3)  # Estimated torque disturbance
         self.dist_cov = np.zeros((6, 6))  # Disturbance covariance matrix
+        self.other_fd_est = np.zeros(3)
+        self.other_td_est = np.zeros(3)
+        self.other_dist_cov = np.zeros((6, 6))
 
         # The PX4 uses normalized wrench input. If NORMALIZED_WRENCH is True, the control
         # input has to be normalized. I will at some point do a PR to the PX4 to
@@ -174,10 +179,9 @@ class MPCNode(Node):
             self.F_scaling = 2 * self.F_thruster if NORMALIZED_WRENCH else 1.0
             self.T_scaling = 4 * self.r_thruster * self.F_thruster if NORMALIZED_WRENCH else 1.0
         elif self.model_name == "bluerov":
-            # self.F_scaling = 0.216235294*np.array([85, 85, 120])
-            # self.T_scaling = np.array([26, 14, 22])
             self.F_scaling = np.array([72, 72, 26])
-            self.T_scaling = np.array([8, 7, 6.5])
+            # self.T_scaling = np.array([8, 7, 6.5])
+            self.T_scaling = np.array([26, 14, 22])
         else:
             raise Exception("Unknown model name for wrench scaling")
 
@@ -190,12 +194,11 @@ class MPCNode(Node):
 
         timer_period_dist_est = self.ekf_estimator.dt # seconds
         self.timer_dist_est = self.create_timer(timer_period_dist_est, self.disturbance_estimation_callback)
+        # self.timer_other_dist_est = self.create_timer(timer_period_dist_est, self.other_disturbance_estimation_callback)
 
         # Load the plan from a file (declared as launch argument)
         self.plan_path = self.declare_parameter('plan_path', f'{self.model_name}_solution_bezier.npz').value
 
-        this_file_dir = os.path.dirname(os.path.abspath(__file__))
-        # path = os.path.abspath(os.path.join(this_file_dir, '../../../install/stl_mapping/share/stl_mapping/'))
         path = os.path.abspath(os.path.join(os.path.expanduser("~"), 'space_ws/src/stl_mapping/stl_mapping/Planning/solutions'))
         # path = '/home/none/space_ws/src/stl_mapping/stl_mapping/Planning/solutions/'
         self.plan_path = os.path.join(path, self.plan_path)
@@ -302,7 +305,7 @@ class MPCNode(Node):
         else:
             self.get_logger().info("Received stop signal, stopping MPC computation.")
 
-    def publish_estimated_disturbance(self, fd_est, td_est, dist_cov):
+    def publish_estimated_disturbance(self, fd_est, td_est, dist_cov, other=False):
         wrench_msg = TwistWithCovarianceStamped()
         wrench_msg.header.stamp = self.get_clock().now().to_msg()
         wrench_msg.header.frame_id = 'map'
@@ -315,7 +318,10 @@ class MPCNode(Node):
         wrench_msg.twist.twist.angular.z = float(td_est[2])
         wrench_msg.twist.covariance = dist_cov.flatten().tolist() + [0.0] * (36 - len(dist_cov.flatten()))
 
-        self.disturbance_est_pub.publish(wrench_msg)
+        if other:
+            self.other_disturbance_est_pub.publish(wrench_msg)
+        else:
+            self.disturbance_est_pub.publish(wrench_msg)
 
     def publish_wrench_setpoint(self, u):
         force_output_msg = VehicleThrustSetpoint()
@@ -434,6 +440,23 @@ class MPCNode(Node):
         self.fd_est, self.td_est, self.dist_cov = self.ekf_estimator.step(x0.flatten(), self.F_cmd.flatten(), self.T_cmd.flatten())
         self.publish_estimated_disturbance(self.fd_est, self.td_est, self.dist_cov)
 
+    def other_disturbance_estimation_callback(self):
+        x0 = np.array([self.vehicle_local_position[0],
+                        self.vehicle_local_position[1],
+                        self.vehicle_local_position[2],
+                        self.vehicle_attitude[0],
+                        self.vehicle_attitude[1],
+                        self.vehicle_attitude[2],
+                        self.vehicle_attitude[3],
+                        self.vehicle_local_velocity_body[0],
+                        self.vehicle_local_velocity_body[1],
+                        self.vehicle_local_velocity_body[2],
+                        self.vehicle_angular_velocity[0],
+                        self.vehicle_angular_velocity[1],
+                        self.vehicle_angular_velocity[2]]).reshape(13, 1)
+        self.other_fd_est, self.other_td_est, self.other_dist_cov = self.other_ekf_estimator.step(x0.flatten(), self.other_F_cmd.flatten(), self.other_T_cmd.flatten())
+        self.publish_estimated_disturbance(self.other_fd_est, self.other_td_est, self.other_dist_cov, other=True)
+
     def publish_reference_state(self, x_ref):
         p_v_msg = VehicleLocalPosition()
         p_v_msg.x = float(x_ref[0])
@@ -480,14 +503,20 @@ class MPCNode(Node):
             # self.get_logger().info(f"t_mpc: {t_mpc}, times: {times}")
 
         if self.offset_free:
+            # limit fd_est and td_est to values between -10 and 10
+            if self.feedback_equivalence:
+                fd_est = np.clip(self.other_fd_est, -10, 10)
+                td_est = np.clip(self.other_td_est, -5, 5)
+            else:
+                fd_est = np.clip(self.fd_est, -5, 5)
+                td_est = np.clip(self.td_est, -1, 1)
             # rotation matrix of FRU in ENU
             q = R.from_quat(self.vehicle_attitude, scalar_first=True)
-            # limit fd_est and td_est to values between -10 and 10
-            fd_est = np.clip(self.fd_est, -5, 5)
-            td_est = np.clip(self.td_est, -1, 1)
             u_ref = -np.concatenate((q.inv().apply(fd_est), td_est), axis=0).reshape((6, 1))
         else:
             u_ref = np.zeros((6, 1))
+            fd_est = np.zeros((3, 1))
+            td_est = np.zeros((3, 1))
 
         x_ref = np.zeros((13, self.mpc.Nx + 1))  # Initialize reference trajectory
 
@@ -546,13 +575,13 @@ class MPCNode(Node):
         #     self.get_logger().info(f"dt: {t-self.t0}")
         #     x_ref[:, idx] = test_points[test_idx]
             # self.get_logger().info(f"{x_ref[:, test_idx].flatten()}")
-            # x_ref[:, idx] = np.array([1.5, 0.0, 1.5,
-            #                           1.0, 0., 0., 0.,
-            #                         #   0.5, 0.5, 0.5, 0.5,
-            #                         #   1/np.sqrt(2), 0., 1/np.sqrt(2), 0.,
-            #                           0., 0., 0.,
-            #                           0., 0., 0.]).reshape(13,)
-            x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
+            x_ref[:, idx] = np.array([3.5, 1.25, 1.5,
+                                    #   1.0, 0., 0., 0.,
+                                    #   0.5, 0.5, 0.5, 0.5,
+                                      1/np.sqrt(2), 0., -1/np.sqrt(2), 0.,
+                                      0., 0., 0.,
+                                      0., 0., 0.]).reshape(13,)
+            # x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
 
         x_ref = np.vstack((x_ref, np.repeat(u_ref, x_ref.shape[1], axis=1)))  # Append u_ref to x_ref
         x_ref[:3, :] += self.offset.reshape(3, 1)
@@ -566,28 +595,35 @@ class MPCNode(Node):
 
         self.publish_reference_state(x_ref[:,0])
 
+        self.get_logger().info(f"fd_est: {fd_est}, td_est: {td_est}")
+        self.get_logger().info(f"u_ref: {u_ref.flatten()}")
+
         # Get control input
         if self.feedback_equivalence:
             if self.offset_free:
-                self.control, x_pred = self.fbl_mpc.get_input(x0, x_ref, fd=self.fd_est, td=self.td_est)
+                self.control, x_pred = self.fbl_mpc.get_input(x0, x_ref, fd=fd_est, td=td_est)
             else:
                 self.control, x_pred = self.fbl_mpc.get_input(x0, x_ref)
             # Run the other MPC as well, just for continuity and rosbags
-            _, _ = self.mpc.get_input(x0, x_ref)
+            self.other_control, _ = self.mpc.get_input(x0, x_ref)
         else:
             if self.offset_free:
-                self.control, x_pred = self.mpc.get_input(x0, x_ref, fd=self.fd_est, td=self.td_est)
+                self.control, x_pred = self.mpc.get_input(x0, x_ref, fd=fd_est, td=td_est)
             else:
                 self.control, x_pred = self.mpc.get_input(x0, x_ref)
-            _, _ = self.fbl_mpc.get_input(x0, x_ref)
+            self.other_control, _ = self.fbl_mpc.get_input(x0, x_ref)
 
         # self.get_logger().info(f"Control: {self.control.flatten()}")
         if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             self.F_cmd = copy.deepcopy(self.control[0:3])
             self.T_cmd = copy.deepcopy(self.control[3:6])
+            self.other_F_cmd = copy.deepcopy(self.other_control[0:3])
+            self.other_T_cmd = copy.deepcopy(self.other_control[3:6])
         else:
             self.F_cmd = np.zeros((3, 1))
             self.T_cmd = np.zeros((3, 1))
+            self.other_F_cmd = np.zeros((3, 1))
+            self.other_T_cmd = np.zeros((3, 1))
 
         # quat_error = (x_pred[0, 6:10] @ x_ref[6:10, 0])**2
         # self.get_logger().warning(f"quat_error: {1-quat_error}")

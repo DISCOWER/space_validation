@@ -717,18 +717,18 @@ void bluerov_acados_setup_nlp_in(bluerov_solver_capsule* capsule, const int N, d
     double* lubu = calloc(2*NBU, sizeof(double));
     double* lbu = lubu;
     double* ubu = lubu + NBU;
-    lbu[0] = -42.5;
-    ubu[0] = 42.5;
-    lbu[1] = -42.5;
-    ubu[1] = 42.5;
-    lbu[2] = -60;
-    ubu[2] = 60;
-    lbu[3] = -13;
-    ubu[3] = 13;
-    lbu[4] = -7;
-    ubu[4] = 7;
-    lbu[5] = -11;
-    ubu[5] = 11;
+    lbu[0] = -85;
+    ubu[0] = 85;
+    lbu[1] = -85;
+    ubu[1] = 85;
+    lbu[2] = -120;
+    ubu[2] = 120;
+    lbu[3] = -26;
+    ubu[3] = 26;
+    lbu[4] = -14;
+    ubu[4] = 14;
+    lbu[5] = -22;
+    ubu[5] = 22;
 
     for (int i = 0; i < N; i++)
     {

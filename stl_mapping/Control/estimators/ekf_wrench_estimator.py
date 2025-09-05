@@ -32,9 +32,10 @@ class EKFWrenchEstimator(Node):
         self.inertia = self.robot.inertia
         self.inertia_inv = np.linalg.inv(self.inertia)
 
+        # captures how quickly it can change per second 
         qv = (0.6/self.mass * self.dt)**2
         qw = [(0.12 / self.inertia[i, i] * self.dt)**2 for i in range(3)]
-        qfd = (0.2*self.dt)**2
+        qfd = (0.2*self.dt)**2      # 200mN/s
         qtd = (0.05*self.dt)**2
         rv = (1e-2*self.dt)**2
         rw = (0.05*self.dt)**2
@@ -90,8 +91,8 @@ class EKFWrenchEstimator(Node):
         y = z - (H @ self.x)
         self.x = self.x + K @ y
 
-        self.get_logger().info(f"self.x: {self.x}")
-        self.get_logger().info(f"z: {z}")
+        # self.get_logger().info(f"self.x: {self.x}")
+        # self.get_logger().info(f"z: {z}")
         self.P = (np.eye(12) - K @ H) @ self.P
 
     def step(self, x_meas, F_cmd, T_cmd):

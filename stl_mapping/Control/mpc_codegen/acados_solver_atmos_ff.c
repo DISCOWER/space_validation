@@ -691,18 +691,18 @@ void atmos_ff_acados_setup_nlp_in(atmos_ff_solver_capsule* capsule, const int N,
     double* luh_0 = calloc(2*NH0, sizeof(double));
     double* lh_0 = luh_0;
     double* uh_0 = luh_0 + NH0;
-    lh_0[0] = -42.5;
-    lh_0[1] = -42.5;
-    lh_0[2] = -60;
-    lh_0[3] = -13;
-    lh_0[4] = -7;
-    lh_0[5] = -11;
-    uh_0[0] = 42.5;
-    uh_0[1] = 42.5;
-    uh_0[2] = 60;
-    uh_0[3] = 13;
-    uh_0[4] = 7;
-    uh_0[5] = 11;
+    lh_0[0] = -85;
+    lh_0[1] = -85;
+    lh_0[2] = -120;
+    lh_0[3] = -26;
+    lh_0[4] = -14;
+    lh_0[5] = -22;
+    uh_0[0] = 85;
+    uh_0[1] = 85;
+    uh_0[2] = 120;
+    uh_0[3] = 26;
+    uh_0[4] = 14;
+    uh_0[5] = 22;
 
     ocp_nlp_constraints_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, 0, "nl_constr_h_fun_jac", &capsule->nl_constr_h_0_fun_jac);
     ocp_nlp_constraints_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, 0, "nl_constr_h_fun", &capsule->nl_constr_h_0_fun);
@@ -791,18 +791,18 @@ void atmos_ff_acados_setup_nlp_in(atmos_ff_solver_capsule* capsule, const int N,
     double* luh = calloc(2*NH, sizeof(double));
     double* lh = luh;
     double* uh = luh + NH;
-    lh[0] = -42.5;
-    lh[1] = -42.5;
-    lh[2] = -60;
-    lh[3] = -13;
-    lh[4] = -7;
-    lh[5] = -11;
-    uh[0] = 42.5;
-    uh[1] = 42.5;
-    uh[2] = 60;
-    uh[3] = 13;
-    uh[4] = 7;
-    uh[5] = 11;
+    lh[0] = -85;
+    lh[1] = -85;
+    lh[2] = -120;
+    lh[3] = -26;
+    lh[4] = -14;
+    lh[5] = -22;
+    uh[0] = 85;
+    uh[1] = 85;
+    uh[2] = 120;
+    uh[3] = 26;
+    uh[4] = 14;
+    uh[5] = 22;
 
     for (int i = 1; i < N; i++)
     {
