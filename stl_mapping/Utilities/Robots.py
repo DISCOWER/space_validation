@@ -261,9 +261,10 @@ class FreeFlyer(Robot):
 
         # TODO: deal with the fact that K and D are not of same dimension
         max_floor_force = (36*self.mass)/1000
+        max_floor_torque = 0.01
         self.D = HyperRectangle(
-            np.array(3*[-max_floor_force] + 3*[0]),
-            np.array(3*[max_floor_force] + 3*[0])
+            np.array(3*[-max_floor_force] + 3*[-max_floor_torque]),
+            np.array(3*[max_floor_force] + 3*[max_floor_torque])
         )
         self.create_K()
         self.create_U_effective()

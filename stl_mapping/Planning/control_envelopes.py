@@ -135,7 +135,7 @@ def get_thruster_bounds(robot_type: str):
         num_thrusters = 8
     elif robot_type == "astrobee":
         # Example values for Astrobee thrusters (can be changed)
-        T_forward_max = 2/3*1.075 #1.5  # N
+        T_forward_max = 0.75*2/3*1.075 #1.5  # N
         T_reverse_max = 0  # N
         num_thrusters = 24
 

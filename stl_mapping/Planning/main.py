@@ -66,7 +66,8 @@ if scenario == 'paper2D':
     spec = Spec(phi, t0, tf)
 
 elif scenario == 'paper3D':
-    N = 80
+    N = 60
+    dt = 1.5
     tf = (N-1)*dt   # final time
 
     sp_robot = LinearFreeFlyer6DoF(envelope=True, model="astrobee")  # linearized 6DoF free-flyer
@@ -78,8 +79,8 @@ elif scenario == 'paper3D':
 
     # Three observation tasks, each having two possible views around the Obstacle.
     Obs1 = HyperRectangle(center=np.array([4.0, 0, depth]),                   size=np.array([1.0, 1.5, 0.5]))
-    XA1 = HyperRectangle(center=np.array([3.0, 0, depth, 0, 0]),              size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    XA2 = HyperRectangle(center=np.array([5.0, 0, depth, 0, -np.pi]),         size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    XA1 = HyperRectangle(center=np.array([5.0, 0, depth, 0, 0]),              size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    XA2 = HyperRectangle(center=np.array([2.0, 0, depth, 0, -np.pi]),         size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
     XB1 = HyperRectangle(center=np.array([4.0, -1.25, depth, 0, np.pi/2]),    size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
     XB2 = HyperRectangle(center=np.array([4.0, 1.25, depth, 0, -np.pi/2]),    size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
     XC1 = HyperRectangle(center=np.array([4.0, 0, depth+0.75, np.pi/2, 0]),      size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
@@ -93,16 +94,16 @@ elif scenario == 'paper3D':
         Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(rectangle=Xf)], dims=[0,1,2])]),
         Pred("G", [t0,tf], preds= [Pred("NEG", preds= [Pred("MU", preds=[Polytope(rectangle=Obs1)], dims=[0,1,2])] )] ),
         Pred("OR", preds=[
-            Pred("G", [20,25], preds=[Pred("MU", preds=[Polytope(rectangle=XA1)], dims=[0,1,2, 4,5])]),
-            Pred("F", [30,35], preds=[Pred("MU", preds=[Polytope(rectangle=XA2)], dims=[0,1,2, 4,5])])
+            Pred("F", [30,40], preds=[Pred("MU", preds=[Polytope(rectangle=XA1)], dims=[0,1,2, 3,5])]),
+            # Pred("F", [30,35], preds=[Pred("MU", preds=[Polytope(rectangle=XA2)], dims=[0,1,2, 3,5])])
         ]),
         Pred("OR", preds=[
-            Pred("F", [20,25], preds=[Pred("MU", preds=[Polytope(rectangle=XB1)], dims=[0,1,2, 4,5])]),
-            Pred("F", [20,25], preds=[Pred("MU", preds=[Polytope(rectangle=XB2)], dims=[0,1,2, 4,5])])
+            Pred("F", [65,70], preds=[Pred("MU", preds=[Polytope(rectangle=XB1)], dims=[0,1,2, 3,5])]),
+            Pred("F", [65,70], preds=[Pred("MU", preds=[Polytope(rectangle=XB2)], dims=[0,1,2, 3,5])])
         ]),
         Pred("OR", preds=[
-            # Pred("F", [35,40], preds=[Pred("MU", preds=[Polytope(rectangle=XC1)], dims=[0,1,2, 4,5])]),
-            Pred("F", [50,55], preds=[Pred("MU", preds=[Polytope(rectangle=XC2)], dims=[0,1,2, 4,5])])
+            Pred("F", [80,90], preds=[Pred("MU", preds=[Polytope(rectangle=XC1)], dims=[0,1,2, 3,5])]),
+            Pred("F", [80,90], preds=[Pred("MU", preds=[Polytope(rectangle=XC2)], dims=[0,1,2, 3,5])])
         ])
     ])
     spec = Spec(phi, t0, tf)
@@ -234,20 +235,16 @@ if True:
     x_vars = ocp.variable(13, N)
     u_vars = ocp.variable(6, N-1)
     delta = ocp.variable(1)
-    alpha_var = ocp.variable(1)
 
     ocp.set_initial(x_vars, x_ff.T)
     ocp.set_initial(u_vars, u_ff.T)
-    ocp.set_initial(alpha_var, alpha)
     ocp.set_initial(delta, 0)
 
     ocp.subject_to(delta >= 0)
 
     for i in range(N-1):
-        # ocp.subject_to(u_vars[:,i] >= sp_robot_nl.U.lower_bounds)
-        # ocp.subject_to(u_vars[:,i] <= sp_robot_nl.U.upper_bounds)
-        ocp.subject_to(u_vars[:,i] >= sp_robot_nl.calculate_U_effective(np.zeros((13,1)),alpha).lower_bounds)
-        ocp.subject_to(u_vars[:,i] <= sp_robot_nl.calculate_U_effective(np.zeros((13,1)),alpha).upper_bounds)
+        ocp.subject_to(u_vars[:,i] >= sp_robot_nl.calculate_U_effective(x_vars[:,i],alpha).lower_bounds)
+        ocp.subject_to(u_vars[:,i] <= sp_robot_nl.calculate_U_effective(x_vars[:,i],alpha).upper_bounds)
 
     for i in range(N-1):
         ocp.subject_to(x_vars[:,i+1] == sp_robot_nl.step(x_vars[:,i], u_vars[:,i], dt, normalize=True))
