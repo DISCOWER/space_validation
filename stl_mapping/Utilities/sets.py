@@ -51,6 +51,7 @@ class HyperRectangle():
                            self.upper_bounds[0],
                            -self.lower_bounds[1],
                            self.upper_bounds[1]])
+        self.dim = self.lower_bounds.shape[0]
 
     def sum(self, other):
         # assert self.dim == other.dim, "Hyperrectangles must have the same dimension."
@@ -155,24 +156,29 @@ class Zonotope():
         ax.add_patch(poly)
 
 class Polytope():
-    def __init__(self, H:np.ndarray, b:np.ndarray):
-        self.H = H
-        self.b = b
-        self.dim = H.shape[1]
-        self.N_faces = H.shape[0]  # Number of faces in the area
-    
-    def __init__(self, rectangle:HyperRectangle):
-        self.dim = len(rectangle.lower_bounds)
-        self.N_faces = 2 * self.dim
-        self.H = np.zeros((self.N_faces, self.dim))
-        self.b = np.zeros(self.N_faces)
-        for i in range(self.dim):
-            self.H[i, i] = -1
-            self.b[i] = -rectangle.lower_bounds[i]
-            self.H[i + self.dim, i] = 1
-            self.b[i + self.dim] = rectangle.upper_bounds[i]
-        # print(f"\nPolytope created with {self.N_faces} faces and dimension {self.dim}")
-        # print(f"H: {self.H}, b: {self.b}")
+    def __init__(self, 
+                 H:np.ndarray=None, 
+                 b:np.ndarray=None,
+                 rectangle:HyperRectangle=None):
+        if rectangle is None and not (H is None or b is None):
+            self.H = H
+            self.b = b
+            self.dim = H.shape[1]
+            self.N_faces = H.shape[0]  # Number of faces in the area
+        elif rectangle is not None and H is None and b is None:
+            self.dim = len(rectangle.lower_bounds)
+            self.N_faces = 2 * self.dim
+            self.H = np.zeros((self.N_faces, self.dim))
+            self.b = np.zeros(self.N_faces)
+            for i in range(self.dim):
+                self.H[i, i] = -1
+                self.b[i] = -rectangle.lower_bounds[i]
+                self.H[i + self.dim, i] = 1
+                self.b[i + self.dim] = rectangle.upper_bounds[i]
+            # print(f"\nPolytope created with {self.N_faces} faces and dimension {self.dim}")
+            # print(f"H: {self.H}, b: {self.b}")
+        else:
+            raise ValueError("Either H and b or rectangle must be provided.")
 
     def print(self):
         return f"Area_[faces={self.N_faces}]"

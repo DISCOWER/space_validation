@@ -1,7 +1,7 @@
 import numpy as np
 import casadi as cs
 import gurobipy as gp
-from Utilities.sets import HyperRectangle, Zonotope
+from Utilities.sets import HyperRectangle, Zonotope, Polytope
 from Utilities.rotations import skew_symmetric_cs, skew_symmetric_np, q_to_rot_mat_cs, q_to_rot_mat_np
 from Utilities.rotations import euler_to_quat_cs, euler_to_quat_np
 from Utilities.rotations import quat_mult
@@ -97,7 +97,7 @@ class Robot:
 #         return self.B
 
 class LinearFreeFlyer6DoF(Robot):
-    def __init__(self):
+    def __init__(self, envelope:bool=False, model:str="atmos"):
         super().__init__(n_x=12, n_u=6)
         # dynamics in the form: dx = f(x) + g(x)u
         self.mass = 16.8 #(16.8: empty, 17.8: full)  # kg
@@ -115,35 +115,91 @@ class LinearFreeFlyer6DoF(Robot):
                                     [0, 0, 0, 0, 0, 1/self.inertia[2,2]]])
         
         self.C = np.zeros((12, 6))
-        # TODO: deal with positive and negative values here
-        self.C[6:12, 0:6] = np.diag([1/20]*6)
+        self.C[6:12, :] = self.B[6:12, :]
+
+        # Compute mapping matrix K
         self.K = np.linalg.pinv(self.B)@self.C #compute_K(self.B, self.C)
 
-        # Define the control input bounds
-        max_thrust = 2.125
-        max_torque = 0.714
-        scale_thrust = 2/3
-        scale_torque = 1/3
-        self.U = HyperRectangle(
-            np.array([-scale_thrust*max_thrust]*3 + [-scale_torque*max_torque]*3),
-            np.array([scale_thrust*max_thrust]*3 + [scale_torque*max_torque]*3)
-        )
+        # Max force on floor, gathered from floor map data
         max_floor_force = (36*self.mass)/1000
-        self.D = HyperRectangle(
-            np.array(3*[-max_floor_force] + 3*[0]),
-            np.array(3*[max_floor_force] + 3*[0])
-        )
+        max_floor_torque = 0.01
 
-        # self.U_effective = minkowski_difference(self.U, self.K@self.D)
+        # Define the control input bounds
+        if envelope:
+            if model == "atmos":
+                A_f, b_f = np.load("stl_mapping/Planning/solutions/polytopes/force_polytope_atmos.npz", allow_pickle=True).values()
+                A_t, b_t = np.load("stl_mapping/Planning/solutions/polytopes/torque_polytope_atmos.npz", allow_pickle=True).values()
+                A_t = np.array([A_t[1:3,0]]).T
+                b_t = b_t[1:3]
+                self.U = Polytope(
+                    H=np.vstack((np.hstack((A_f,np.zeros((A_f.shape[0], 4)))),
+                                 np.array([[0,0,1,0,0,0],
+                                           [0,0,-1,0,0,0]]),
+                                np.hstack((np.zeros((A_t.shape[0],5)), A_t)),
+                                np.array([[0,0,0,1,0,0],
+                                          [0,0,0,-1,0,0],
+                                          [0,0,0,0,1,0],
+                                          [0,0,0,0,-1,0]]))),
+                    b=np.hstack((b_f, [0.,0.], b_t, [0.,0.,0.,0.]))
+                )
+                self.D = HyperRectangle(
+                        np.array(2*[-max_floor_force] + [0] + [0,0] + [-max_floor_torque]),
+                        np.array(2*[max_floor_force] + [0] + [0,0] + [max_floor_torque])
+                    )
+            else:
+                A_f, b_f = np.load("stl_mapping/Planning/solutions/polytopes/force_polytope_astrobee.npz", allow_pickle=True).values()
+                A_t, b_t = np.load("stl_mapping/Planning/solutions/polytopes/torque_polytope_astrobee.npz", allow_pickle=True).values()
+                self.U = Polytope(
+                    H=np.vstack((np.hstack((A_f,np.zeros((A_f.shape[0], 3)))),
+                                np.hstack((np.zeros((A_t.shape[0],3)), A_t)))),
+                    b=np.hstack((b_f, b_t))
+                )
+                max_floor_force = (36*self.mass)/1000
+                self.D = HyperRectangle(
+                        np.array(3*[-max_floor_force] + 3*[-max_floor_torque]),
+                        np.array(3*[max_floor_force] + 3*[max_floor_torque])
+                    )
+        else:
+            max_thrust = 2.125
+            max_torque = 0.714
+            scale_thrust = 2/3
+            scale_torque = 1/3
+            self.U = HyperRectangle(
+                np.array([-scale_thrust*max_thrust]*3 + [-scale_torque*max_torque]*3),
+                np.array([scale_thrust*max_thrust]*3 + [scale_torque*max_torque]*3)
+            )
+            self.D = HyperRectangle(
+                np.array(3*[-max_floor_force] + 3*[-max_floor_torque]),
+                np.array(3*[max_floor_force] + 3*[max_floor_torque])
+            )
         # TODO: deal with the fact that K and D are not of same dimension
         self.KD = HyperRectangle(
             self.K@self.D.lower_bounds,
             self.K@self.D.upper_bounds
         )
-        self.U_effective = self.U.subtract(self.KD)
-        self.calculate_U_effective = lambda x, alpha: self.U.subtract(self.KD.scalar_multiply(alpha))
 
-        print(f"U_effective: {self.U_effective.center}, {self.U_effective.lower_bounds}, {self.U_effective.upper_bounds}")
+        # if self.U is a HyperRectangle we can do simple subtraction
+        if isinstance(self.U, HyperRectangle):
+            self.U_effective = self.U.subtract(self.KD)
+            self.calculate_U_effective = lambda x, alpha: self.U.subtract(self.KD.scalar_multiply(alpha))
+            print(f"U_effective: {self.U_effective.center}, {self.U_effective.lower_bounds}, {self.U_effective.upper_bounds}")
+        # if it's a polygon, its a bit more involved
+        elif isinstance(self.U, Polytope):
+            self.U_effective = Polytope(
+                H=self.U.H,
+                b=np.array([
+                    self.U.b[i] - np.sum(np.abs(self.K.T @ self.U.H[i]) * self.D.upper_bounds)
+                    for i in range(self.U.H.shape[0])
+                ])
+            )
+            self.calculate_U_effective = lambda x, alpha: Polytope(
+                H=self.U.H,
+                b=np.array([
+                    self.U.b[i] - alpha*np.sum(np.abs(self.K.T @ self.U.H[i]) * self.D.upper_bounds)
+                    for i in range(self.U.H.shape[0])
+                ])
+            )
+        print("Finished calculating U_effective")
 
     def calculate_fx(self,x):
         return self.A@x
@@ -160,10 +216,10 @@ class LinearFreeFlyer6DoF(Robot):
             # # Add constrains for pitch to be between [-pi/2, pi/2] (prevent gymbal lock)
             # prog.addConstr(items.x_vars[i, 3] >= -np.pi/2, f"pitch_lower_{i}")
             # prog.addConstr(items.x_vars[i, 3] <= np.pi/2, f"pitch_upper_{i}")
+
             # Add constraints for roll to be 0
-            # TODO: make this a user-defined dimension (based on order of euler angles)
-            prog.addConstr(items.x_vars[i, 4] >= -np.pi, f"roll_lower_{i}")
-            prog.addConstr(items.x_vars[i, 4] <= np.pi, f"roll_upper_{i}")
+            prog.addConstr(items.x_vars[i, 4] >= 0., f"roll_lower_{i}")
+            prog.addConstr(items.x_vars[i, 4] <= 0., f"roll_upper_{i}")
 
 
             # Add constraints for the angular velocities to be between [-pi/8, pi/8]

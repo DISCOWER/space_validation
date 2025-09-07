@@ -99,9 +99,9 @@ def quant_EVENTUALLY(opt:gp.Model, pred:Pred, items):
     try:
         rhos = []
         for p in pred.preds:
-            for i in range(p.rhos.shape[0]):
+            for i in range(p.rhos[0].shape[0]):
                 if in_interval(items, pred.I, i):
-                    rhos.append(p.rhos[i])
+                    rhos.append(p.rhos[0][i])
         opt.addConstr(pred.rho == gp.max_(rhos), name=f"rho_F_{pred.print()}")
     except Exception as e:
         print(f"Error in quant_EVENTUALLY: {e}")
@@ -113,17 +113,18 @@ def quant_ALWAYS(opt:gp.Model, pred:Pred, items:OptProbItems):
     try:
         rhos = []
         for p in pred.preds:
-            for i in range(p.rhos.shape[0]):
+            for i in range(p.rhos[0].shape[0]):
                 check = in_interval(items, pred.I, i)
                 if check:
-                    rhos.append(p.rhos[i])
+                    rhos.append(p.rhos[0][i])
         opt.addConstr(pred.rho == gp.min_(rhos), name=f"min_rhos_G_{pred.print()}")
     except Exception as e:
         print(f"Error in quant_ALWAYS: {e}")
     opt.update()
 
 def quant_UNTIL(opt:gp.Model, pred:Pred, items:OptProbItems):
-    pred.rho = opt.addVar(vtype=gp.GRB.CONTINUOUS, name=f"rho_U_{pred.print()}")
+    pred.rho = opt.addVar(vtype=gp.GRB.CONTINUOUS, 
+                          name=f"rho_U_{pred.print()}")
     try:
         rhos = []
         for i in range(len(pred.preds[0].rhos)):
@@ -139,42 +140,50 @@ def quant_UNTIL(opt:gp.Model, pred:Pred, items:OptProbItems):
 
 def quant_MU(opt:gp.Model, pred:Pred, items:OptProbItems):
     print(f"quant_MU: {pred.print()}")
-    N = items.x_vars.shape[0]
-    N_faces = pred.preds[0].N_faces
-    dims = pred.dims
+    pred.rhos = []
+    for pred_idx in range(len(pred.preds)):
+        pred_i = pred.preds[pred_idx]
+        
+        N = items.x_vars.shape[0]
+        N_faces = pred_i.N_faces
+        dims = pred.dims
 
-    pred.rhos = opt.addMVar((N,), vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, 
-                            name=f"rho_MU_{pred.print()}")
-    pred.rho_faces = []
-    try:
-        for i in range(N):
-            rho_faces = opt.addMVar((N_faces,), vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY,
-                                    name=f"rho_faces_MU_{pred.print()}_i{i}")
-            pred.rho_faces.append(rho_faces)
-            for face in range(N_faces):
-                ineqs = pred.preds[0].H @ items.x_vars[i,dims] - pred.preds[0].b
-                opt.addConstr(ineqs[face] == -rho_faces[face], name=f"rho_faces_MU_{pred.print()}_i{i}_face{face}")
-            opt.addConstr(pred.rhos[i] == gp.min_([rf for rf in rho_faces]), name=f"rho_MU_{pred.print()}_i{i}")
+        pred.rhos.append(opt.addMVar((N,), vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, 
+                                name=f"rho_MU_{pred.print()}"))
+        pred.rho_faces = []
+        try:
+            for i in range(N):
+                rho_faces = opt.addMVar((N_faces,), vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY,
+                                        name=f"rho_faces_MU_{pred.print()}_i{i}")
+                pred.rho_faces.append(rho_faces)
+                for face in range(N_faces):
+                    ineqs = pred_i.H @ items.x_vars[i,dims] - pred_i.b
+                    opt.addConstr(ineqs[face] == -rho_faces[face], name=f"rho_faces_MU_{pred.print()}_i{i}_face{face}")
+                opt.addConstr(pred.rhos[pred_idx][i] == gp.min_([rf for rf in rho_faces]), name=f"rho_MU_{pred.print()}_i{i}")
 
-    except Exception as e:
-        print(f"Error in quant_MU: {e}")
-    opt.update()
+        except Exception as e:
+            print(f"Error in quant_MU: {e}")
+        opt.update()
 
 def quant_NEG(opt:gp.Model, pred:Pred, items:OptProbItems):
     print(f"quant_NEG: {pred.print()}")
-    if pred.preds[0].type == "MU":
-        pred.rhos = opt.addMVar((items.x_vars.shape[0],), vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, 
+    pred.rhos = []
+    for p in pred.preds:
+        if pred.preds[0].type == "MU":
+            rhos = opt.addMVar((items.x_vars.shape[0],), vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, 
+                                    name=f"rho_NEG_{pred.print()}")
+            try:
+                for i in range(items.x_vars.shape[0]):
+                    opt.addConstr(rhos[i] == -p.rhos[i], name=f"rho_NEG_{pred.print()}_i{i}")
+            except Exception as e:
+                print(f"Error in quant_NEG: {e}")
+            pred.rhos.append(rhos)
+        else:
+            rhos = opt.addVar(vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, 
                                 name=f"rho_NEG_{pred.print()}")
-        try:
-            for i in range(items.x_vars.shape[0]):
-                opt.addConstr(pred.rhos[i] == -pred.preds[0].rhos[i], name=f"rho_NEG_{pred.print()}_i{i}")
-        except Exception as e:
-            print(f"Error in quant_NEG: {e}")
-    else:
-        pred.rho = opt.addVar(vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, 
-                              name=f"rho_NEG_{pred.print()}")
-        try:
-            opt.addConstr(pred.rho == -pred.preds[0].rho, name=f"rho_NEG_{pred.print()}")
-        except Exception as e:
-            print(f"Error in quant_NEG: {e}")
+            try:
+                opt.addConstr(pred.rho == -p.rho, name=f"rho_NEG_{pred.print()}")
+            except Exception as e:
+                print(f"Error in quant_NEG: {e}")
+        pred.rhos.append(rhos)
     opt.update()
