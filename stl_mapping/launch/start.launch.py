@@ -20,7 +20,7 @@ def generate_launch_description():
     # Get the current date and time in a yyyy_mm_dd-hh_mm_ss string format
     # so we can also copy planning files to the same rosbag!
     current_time = time.strftime("%Y_%m_%d-%H_%M_%S")
-    rosbag_name = f'stl_mapping_run_{current_time}'
+    rosbag_name = f'stl_mapping_run_{current_time}/'
 
     # robots = ['snap', 'crackle']
     # robots = ['pop']
@@ -40,7 +40,7 @@ def generate_launch_description():
     topics_to_record = ['-a']
 
     #! Record the specified topics
-    record_cmd = ['ros2','bag','record']+topics_to_record+['-o', rosbag_name]
+    record_cmd = ['ros2','bag','record']+topics_to_record#+['-o', rosbag_name]
     record_proc = ExecuteProcess(cmd=record_cmd)
 
     #! Send a "Start" signal to anyone that cares

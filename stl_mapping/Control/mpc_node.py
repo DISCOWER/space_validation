@@ -150,7 +150,7 @@ class MPCNode(Node):
 
         # Settings
         self.offset_free = True
-        self.feedback_equivalence = False
+        self.feedback_equivalence = True
 
         # Disturbance variables
         self.F_cmd = np.zeros((3, 1))  # Force commanded
@@ -512,14 +512,14 @@ class MPCNode(Node):
         #     self.get_logger().info(f"dt: {t-self.t0}")
         #     x_ref[:, idx] = test_points[test_idx]
             # self.get_logger().info(f"{x_ref[:, test_idx].flatten()}")
-            x_ref[:, idx] = np.array([0.0, 1.5, -0.6,
-                                      1.0, 0., 0., 0.,
-                                    #   0.5, 0.5, 0.5, 0.5,
-                                    #   1/np.sqrt(2), 0., 1/np.sqrt(2), 0.,
-                                    # 1/np.sqrt(2), -1/np.sqrt(2), 0., 0.,
-                                      0., 0., 0.,
-                                      0., 0., 0.]).reshape(13,)
-            # x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
+            # x_ref[:, idx] = np.array([0.0, 1.5, -0.6,
+            #                           1.0, 0., 0., 0.,
+            #                         #   0.5, 0.5, 0.5, 0.5,
+            #                         #   1/np.sqrt(2), 0., 1/np.sqrt(2), 0.,
+            #                         # 1/np.sqrt(2), -1/np.sqrt(2), 0., 0.,
+            #                           0., 0., 0.,
+            #                           0., 0., 0.]).reshape(13,)
+            x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
 
         x_ref = np.vstack((x_ref, np.repeat(u_ref, x_ref.shape[1], axis=1)))  # Append u_ref to x_ref
         x_ref[:3, :] += self.offset.reshape(3, 1)

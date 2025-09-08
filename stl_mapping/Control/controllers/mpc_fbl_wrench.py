@@ -84,7 +84,7 @@ class MpcFBLWrench(Node):
         self.Nx = 30                # Prediction horizon, states             
         self.Nu = 30                # Prediction horizon, inputs
 
-        # #! ATMOS weights
+        # #! BlueROV weights
         # self.Q = np.diag([          # State weighting matrix
         #     1e2, 1e2, 1e2,
         #     2e1, 2e1, 2e1, 2e1,
@@ -95,12 +95,12 @@ class MpcFBLWrench(Node):
         #     1e1, 1e1, 1e1]) 
         # self.P = 10 * self.Q        # Terminal state weighting matrix
 
-        #! BlueROV weights
+        #! ATMOS weights
         self.Q = np.diag([          # State weighting matrix
             1e2, 1e2, 1e2,
-            5e1, 5e1, 5e1, 5e1,
-            3e1, 3e1, 3e1,  
-            3e1, 3e1, 3e1])          
+            5e3, 5e3, 5e3, 5e3,
+            3e2, 3e2, 3e2,  
+            3e2, 3e2, 3e2])          
         self.R = 0.1*np.diag([          # State weighting matrix
             1e0, 1e0, 1e0,
             1e0, 1e0, 1e0]) 

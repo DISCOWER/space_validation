@@ -41,9 +41,9 @@ if scenario == 'paper2D':
     D3 = False
     depth = 0.0
     X0 = HyperRectangle(center=np.array([1.5, 0, depth]),      size=np.array([0.5, 0.5, 0.5]))
-    Xf = HyperRectangle(center=np.array([2.75, 1.25, depth]),   size=np.array([0.5, 0.5, 0.5]))
-    XA = HyperRectangle(center=np.array([2.5, -1.25, depth,  -np.pi/2]), size=np.array([0.5, 0.5, 0.5,  np.pi/4]))
-    XB = HyperRectangle(center=np.array([2.0, 0.75, depth,  np.pi/2]),  size=np.array([0.5, 0.5, 0.5,  np.pi/4]))
+    Xf = HyperRectangle(center=np.array([2.75, 0.75, depth]),   size=np.array([0.5, 0.5, 0.5]))
+    XA = HyperRectangle(center=np.array([2.5, -0.5, depth,  -np.pi/2]), size=np.array([0.5, 0.5, 0.5,  np.pi/4]))
+    XB = HyperRectangle(center=np.array([2.0, 0.5, depth,  np.pi/2]),  size=np.array([0.5, 0.5, 0.5,  np.pi/4]))
     Xleft = HyperRectangle(center=np.array([1.5, 0, depth]), size=np.array([3.0, 1.0, 0.5]))
     Xback = HyperRectangle(center=np.array([-1.0, 0, depth]), size=np.array([0.5, -0.5, 0.5]))
 

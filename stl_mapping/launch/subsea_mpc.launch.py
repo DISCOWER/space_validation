@@ -27,7 +27,7 @@ def generate_launch_description():
             executable='mpc_node',
             name='mpc_node_0',
             # parameters=[{'x_offset': 3.0, 'y_offset': 0.5, 'z_offset': 1.5},
-            parameters=[{'x_offset': 1.0, 'y_offset': 0.0, 'z_offset': 1.5},
+            parameters=[{'x_offset': 0.5, 'y_offset': 0.0, 'z_offset': 1.25},
                         {'rate': 20.0},
                         {'model_name': model}]
     ))
