@@ -18,7 +18,7 @@ from Utilities.sets import HyperRectangle, Polytope
 from Utilities.rotations import euler_to_quat_np, euler_to_quat_cs
 from Utilities.rotations import x_ff_to_x_uw, x_uw_to_x_ff
 from Utilities.stl import Pred, Spec, quant_parse_operator, OptProbItems
-from Utilities.plotting.plotting import plot_planning_results
+from Utilities.plotting.plotting import plot_planning_results, animate_pose_trace
 from Utilities.smarc_modelling.src.smarc_modelling.vehicles.BlueROV import BlueROV 
 from Planning.bezier_fitting import bezier_fitting
 
@@ -32,8 +32,8 @@ bigM = 1e4
 euler_order = 'xyz'
 
 ### STL Specification
-scenario = 'paper2D'
-# scenario = 'paper3D'
+# scenario = 'paper2D'
+scenario = 'paper3D'
 
 if scenario == 'paper2D':
     sp_robot = LinearFreeFlyer6DoF(envelope=True, model="atmos")  # linearized 6DoF free-flyer
@@ -68,42 +68,84 @@ elif scenario == 'paper3D':
     N = 60
     dt = 1.5
     tf = (N-1)*dt   # final time
+    t_sp = np.linspace(0,(N-1)*dt, N)
 
     sp_robot = LinearFreeFlyer6DoF(envelope=True, model="astrobee")  # linearized 6DoF free-flyer
 
-    D3 = True
-    depth = 0.0
-    X0 = HyperRectangle(center=np.array([3.0, 0, depth]), size=np.array([0.5, 0.5, 0.5]))
-    Xf = HyperRectangle(center=np.array([3.0, 0, depth]), size=np.array([0.5, 0.5, 0.5]))
+    D3 = True # if true, it's considered a 3D plan with 3D plotting
+    depth = 0.0 # depth, currently we do this in the launch file instead!
+    X0 = HyperRectangle(center=np.array([2.0, 0, depth]), size=np.array([0.5, 0.5, 0.5]))
+    Xf = HyperRectangle(center=np.array([2.0, 0, depth]), size=np.array([0.5, 0.5, 0.5]))
 
     # Three observation tasks, each having two possible views around the Obstacle.
-    Obs1 = HyperRectangle(center=np.array([4.0, 0, depth]),                   size=np.array([0.5, 0.5, 0.5]))
-    XA1 = HyperRectangle(center=np.array([5.0, 0, depth, 0, -np.pi]),              size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    XA2 = HyperRectangle(center=np.array([3.0, 0, depth, 0, 0]),         size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    XB1 = HyperRectangle(center=np.array([4.0, -0.75, depth, 0, np.pi/2]),    size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    XB2 = HyperRectangle(center=np.array([4.0, 0.75, depth, 0, -np.pi/2]),    size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    XC1 = HyperRectangle(center=np.array([4.0, 0, depth+0.75, np.pi/2, 0]),      size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    XC2 = HyperRectangle(center=np.array([4.0, 0, depth-0.75, -np.pi/2, 0]),       size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    Obs1 = HyperRectangle(center=np.array([4.0, 0, depth]), size=np.array([0.5, 0.5, 0.5]))
+
+    Xfront  = HyperRectangle(center=np.array([3.0, 0, depth, 0, 0]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    Xback1   = HyperRectangle(center=np.array([5.0, 0, depth, 0, np.pi]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    Xback2   = HyperRectangle(center=np.array([5.0, 0, depth, 0, -np.pi]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    Xleft1   = HyperRectangle(center=np.array([4.0, -0.75, depth, 0, np.pi/2]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    Xleft2   = HyperRectangle(center=np.array([4.0, -0.75, depth, 0, -3*np.pi/2]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    Xright1  = HyperRectangle(center=np.array([4.0, 0.75, depth, 0, -np.pi/2]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    Xright2  = HyperRectangle(center=np.array([4.0, 0.75, depth, 0, 3*np.pi/2]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    Xtop1    = HyperRectangle(center=np.array([4.0, 0, depth+0.75, np.pi/2, 0]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    Xtop2    = HyperRectangle(center=np.array([4.0, 0, depth+0.75, -3*np.pi/2, 0]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    Xbottom1 = HyperRectangle(center=np.array([4.0, 0, depth-0.75, np.deg2rad(-80), 0]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    Xbottom2 = HyperRectangle(center=np.array([4.0, 0, depth-0.75, np.deg2rad(260), 0]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+
+    Xtopleftback   = HyperRectangle(center=np.array([5.0, -0.75, depth+0.75, np.pi/4, -3*np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    Xtopleftfront  = HyperRectangle(center=np.array([3.0, -0.75, depth+0.75, np.pi/4, -np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    Xtoprightfront = HyperRectangle(center=np.array([3.0, 0.75, depth+0.75, np.pi/4, np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    Xtoprightback  = HyperRectangle(center=np.array([5.0, 0.75, depth+0.75, np.pi/4, 3*np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+
+    Xbottomleftback   = HyperRectangle(center=np.array([5.0, -0.75, depth-0.75, -np.pi/4, -3*np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    Xbottomleftfront  = HyperRectangle(center=np.array([3.0, -0.75, depth-0.75, -np.pi/4, -np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    Xbottomrightfront = HyperRectangle(center=np.array([3.0, 0.75, depth-0.75, -np.pi/4, np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    Xbottomrightback  = HyperRectangle(center=np.array([5.0, 0.75, depth-0.75, -np.pi/4, 3*np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
 
     Obs = [Obs1]
-    RoIs = [XA1, XA2, XB1, XB2, XC1, XC2]
+    RoIs = [Xfront, Xback1, Xleft1, Xright1, Xtop1, Xbottom1]
 
+    I1 = [20,25]
+    I2 = [40,45]
+    I3 = [65,70]
     phi = Pred("AND", preds=[
         Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(rectangle=X0)], dims=[0,1,2])]),
         Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(rectangle=Xf)], dims=[0,1,2])]),
         Pred("G", [t0,tf], preds= [Pred("NEG", preds= [Pred("MU", preds=[Polytope(rectangle=Obs1)], dims=[0,1,2])] )] ),
         Pred("OR", preds=[
-            Pred("F", [tf/4,tf/4+1.5], preds=[Pred("MU", preds=[Polytope(rectangle=XA1)], dims=[0,1,2, 3,5])]),
-            Pred("F", [tf/4,tf/4+1.5], preds=[Pred("MU", preds=[Polytope(rectangle=XA2)], dims=[0,1,2, 3,5])])
+            Pred("G", I1, preds=[Pred("MU", preds=[Polytope(rectangle=Xfront)], dims=[0,1,2, 4,5])]),
+            Pred("OR", preds=[
+                Pred("G", I1, preds=[Pred("MU", preds=[Polytope(rectangle=Xback1)], dims=[0,1,2, 4,5])]),
+                Pred("G", I1, preds=[Pred("MU", preds=[Polytope(rectangle=Xback2)], dims=[0,1,2, 4,5])])
+            ])
         ]),
         Pred("OR", preds=[
-            Pred("F", [tf/2,tf/2+1.5], preds=[Pred("MU", preds=[Polytope(rectangle=XB1)], dims=[0,1,2, 3,5])]),
-            Pred("F", [tf/2,tf/2+1.5], preds=[Pred("MU", preds=[Polytope(rectangle=XB2)], dims=[0,1,2, 3,5])])
+            Pred("OR", preds=[
+                Pred("G", I2, preds=[Pred("MU", preds=[Polytope(rectangle=Xleft1)], dims=[0,1,2, 4,5])]),
+                Pred("G", I2, preds=[Pred("MU", preds=[Polytope(rectangle=Xleft2)], dims=[0,1,2, 4,5])])
+            ]),
+            Pred("OR", preds=[
+                Pred("G", I2, preds=[Pred("MU", preds=[Polytope(rectangle=Xright1)], dims=[0,1,2, 4,5])]),
+                Pred("G", I2, preds=[Pred("MU", preds=[Polytope(rectangle=Xright2)], dims=[0,1,2, 4,5])])
+            ]),
         ]),
         Pred("OR", preds=[
-            Pred("F", [3*tf/4,3*tf/4+1.5], preds=[Pred("MU", preds=[Polytope(rectangle=XC1)], dims=[0,1,2, 3,5])]),
-            Pred("F", [3*tf/4,3*tf/4+1.5], preds=[Pred("MU", preds=[Polytope(rectangle=XC2)], dims=[0,1,2, 3,5])])
-        ])
+            Pred("G", I3, preds=[Pred("MU", preds=[Polytope(rectangle=Xbottom1)], dims=[0,1,2, 4,5])]),
+            Pred("G", I3, preds=[Pred("MU", preds=[Polytope(rectangle=Xbottom2)], dims=[0,1,2, 4,5])])
+        ]),
+        # Pred("OR", preds=[
+        #     Pred("F", I3, preds=[Pred("MU", preds=[Polytope(rectangle=Xtopleftback)], dims=[0,1,2, 4,5])]),
+        #     Pred("F", I3, preds=[Pred("MU", preds=[Polytope(rectangle=Xtopleftfront)], dims=[0,1,2, 4,5])]),
+        #     Pred("F", I3, preds=[Pred("MU", preds=[Polytope(rectangle=Xtoprightfront)], dims=[0,1,2, 4,5])]),
+        #     Pred("F", I3, preds=[Pred("MU", preds=[Polytope(rectangle=Xtoprightback)], dims=[0,1,2, 4,5])]),
+        # ]),
+        # Pred("OR", preds=[
+        #     Pred("F", [3*tf/4,3*tf/4+1.5], preds=[Pred("MU", preds=[Polytope(rectangle=Xbottomleftback)], dims=[0,1,2, 4,5])]),
+        #     Pred("F", [3*tf/4,3*tf/4+1.5], preds=[Pred("MU", preds=[Polytope(rectangle=Xbottomleftfront)], dims=[0,1,2, 4,5])]),
+        #     Pred("F", [3*tf/4,3*tf/4+1.5], preds=[Pred("MU", preds=[Polytope(rectangle=Xbottomrightfront)], dims=[0,1,2, 4,5])]),
+        #     Pred("F", [3*tf/4,3*tf/4+1.5], preds=[Pred("MU", preds=[Polytope(rectangle=Xbottomrightback)], dims=[0,1,2, 4,5])]),
+        # ]),
+        
     ])
     spec = Spec(phi, t0, tf)
 
@@ -219,10 +261,14 @@ for i in range(u_ff.shape[0]):
 u_ff = u_ff_converted
 
 # plot the trajectory
-plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, RoIs, Obs, alpha=alpha, D3=D3,
+plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, RoIs, Obs, alpha=alpha, D3=D3, plot=True,
                       path="stl_mapping/Planning/figures/atmos_linear_trajectory.png")
 
 np.savez('stl_mapping/Planning/solutions/atmos_linear_solution_quat_body.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
+
+
+# animate_pose_trace(x_ff)
+
 
 #TODO: this is a valid conversion (Lin to non-lin) if the system (with zero roll) is differentially flat?
 #TODO: this means that this linear decoupling is valid, and x_ff and u_ff are valid for the nonlinear space robot
@@ -410,7 +456,7 @@ else:
 # print(f"Replanned dt_uw: {dt_uw} (was {dt}) which is {(dt_uw)/dt*100}%")
 
 # plot the trajectory
-plot_planning_results(uw_robot, t_uw, x_uw, u_uw, X0, Xf, RoIs, Obs, alpha=alpha, D3=D3,
+plot_planning_results(uw_robot, t_uw, x_uw, u_uw, X0, Xf, RoIs, Obs, alpha=alpha, D3=D3, plot=True,
                       path="stl_mapping/Planning/figures/bluerov_nonlinear_trajectory.png")
 
 # save the trajectory

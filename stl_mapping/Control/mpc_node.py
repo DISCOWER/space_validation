@@ -180,9 +180,8 @@ class MPCNode(Node):
             self.T_scaling = 4 * self.r_thruster * self.F_thruster if NORMALIZED_WRENCH else 1.0
         elif self.model_name == "bluerov":
             self.F_scaling = np.array([72, 72, 26])
-            # self.T_scaling = np.array([8, 7, 6.5])
-            # self.T_scaling = np.array([26, 14, 22])
-            self.T_scaling = np.array([12, 14, 22])
+            # self.T_scaling = np.array([12, 14, 22])
+            self.T_scaling = np.array([20, 14, 22])
         else:
             raise Exception("Unknown model name for wrench scaling")
 

@@ -723,12 +723,12 @@ void bluerov_acados_setup_nlp_in(bluerov_solver_capsule* capsule, const int N, d
     ubu[1] = 21.25;
     lbu[2] = -30;
     ubu[2] = 30;
-    lbu[3] = -6.5;
-    ubu[3] = 6.5;
-    lbu[4] = -3.5;
-    ubu[4] = 3.5;
-    lbu[5] = -5.5;
-    ubu[5] = 5.5;
+    lbu[3] = -19.5;
+    ubu[3] = 19.5;
+    lbu[4] = -10.5;
+    ubu[4] = 10.5;
+    lbu[5] = -16.5;
+    ubu[5] = 16.5;
 
     for (int i = 0; i < N; i++)
     {

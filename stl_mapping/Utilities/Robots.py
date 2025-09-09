@@ -218,8 +218,8 @@ class LinearFreeFlyer6DoF(Robot):
             # prog.addConstr(items.x_vars[i, 3] <= np.pi/2, f"pitch_upper_{i}")
 
             # Add constraints for roll to be 0
-            prog.addConstr(items.x_vars[i, 4] >= 0., f"roll_lower_{i}")
-            prog.addConstr(items.x_vars[i, 4] <= 0., f"roll_upper_{i}")
+            prog.addConstr(items.x_vars[i, 3] >= 0., f"roll_lower_{i}")
+            prog.addConstr(items.x_vars[i, 3] <= 0., f"roll_upper_{i}")
 
 
             # Add constraints for the angular velocities to be between [-pi/8, pi/8]

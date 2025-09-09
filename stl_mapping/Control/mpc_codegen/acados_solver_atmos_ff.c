@@ -694,15 +694,15 @@ void atmos_ff_acados_setup_nlp_in(atmos_ff_solver_capsule* capsule, const int N,
     lh_0[0] = -21.25;
     lh_0[1] = -21.25;
     lh_0[2] = -30;
-    lh_0[3] = -6.5;
-    lh_0[4] = -3.5;
-    lh_0[5] = -5.5;
+    lh_0[3] = -19.5;
+    lh_0[4] = -10.5;
+    lh_0[5] = -16.5;
     uh_0[0] = 21.25;
     uh_0[1] = 21.25;
     uh_0[2] = 30;
-    uh_0[3] = 6.5;
-    uh_0[4] = 3.5;
-    uh_0[5] = 5.5;
+    uh_0[3] = 19.5;
+    uh_0[4] = 10.5;
+    uh_0[5] = 16.5;
 
     ocp_nlp_constraints_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, 0, "nl_constr_h_fun_jac", &capsule->nl_constr_h_0_fun_jac);
     ocp_nlp_constraints_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, 0, "nl_constr_h_fun", &capsule->nl_constr_h_0_fun);
@@ -794,15 +794,15 @@ void atmos_ff_acados_setup_nlp_in(atmos_ff_solver_capsule* capsule, const int N,
     lh[0] = -21.25;
     lh[1] = -21.25;
     lh[2] = -30;
-    lh[3] = -6.5;
-    lh[4] = -3.5;
-    lh[5] = -5.5;
+    lh[3] = -19.5;
+    lh[4] = -10.5;
+    lh[5] = -16.5;
     uh[0] = 21.25;
     uh[1] = 21.25;
     uh[2] = 30;
-    uh[3] = 6.5;
-    uh[4] = 3.5;
-    uh[5] = 5.5;
+    uh[3] = 19.5;
+    uh[4] = 10.5;
+    uh[5] = 16.5;
 
     for (int i = 1; i < N; i++)
     {

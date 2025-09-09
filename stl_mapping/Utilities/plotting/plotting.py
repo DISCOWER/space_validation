@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 
 from Utilities.rotations import euler_to_quat_np, quat_to_euler_np
 from scipy.spatial.transform import Rotation as R
@@ -68,8 +69,9 @@ def plot_planning_results(robot, t, x, u,
             if q.shape[1] == 4:
                 Rot = R.from_quat(q[i, :],scalar_first=True)
             else:
-                Rot = R.from_euler('xyz', q[i, :], degrees=False)
+                Rot = R.from_euler('yxz', q[i, :], degrees=False)
             direction = Rot.apply(forward)
+            # print(f"direction: {direction}")
             ax_p.quiver(p[i, 0], p[i, 1], p[i, 2], 
                         direction[0], direction[1], direction[2], color='k')
 
@@ -179,3 +181,84 @@ def plot_planning_results(robot, t, x, u,
         plt.savefig(path)
     else:
         plt.show()
+
+
+def animate_pose_trace(x, interval=50, axis_len=0.2):
+    """
+    Animate a trajectory with position and quaternion orientation.
+
+
+    Args:
+    x: numpy array of shape (N, 7)
+    where each row is [px, py, pz, qx, qy, qz, qw]
+    interval: delay between frames in ms (default 50)
+    axis_len: length of orientation axes to draw (default 0.2)
+    """
+    assert x.shape[1] >= 7, "Input must be of shape (N, 7): [pos(3), quat(4)]"
+
+    pos = x[:, :3]
+    quats = x[:, 3:]
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot trajectory line
+    ax.plot(pos[:, 0], pos[:, 1], pos[:, 2], 'k--', alpha=0.3)
+
+    # Set axis limits
+    max_range = np.ptp(pos, axis=0).max() / 2
+    mid = pos.mean(axis=0)
+    ax.set_xlim(mid[0] - max_range, mid[0] + max_range)
+    ax.set_ylim(mid[1] - max_range, mid[1] + max_range)
+    ax.set_zlim(mid[2] - max_range, mid[2] + max_range)
+
+    # Initialize plot elements
+    point, = ax.plot([], [], [], 'bo')
+    x_axis, = ax.plot([], [], [], 'r-', lw=2)
+    y_axis, = ax.plot([], [], [], 'g-', lw=2)
+    z_axis, = ax.plot([], [], [], 'b-', lw=2)
+
+    def init():
+        point.set_data([], [])
+        point.set_3d_properties([])
+        for line in (x_axis, y_axis, z_axis):
+            line.set_data([], [])
+            line.set_3d_properties([])
+        return point, x_axis, y_axis, z_axis
+
+    def update(frame):
+        p = pos[frame]
+        q = quats[frame]
+
+
+        # Rotation matrix from quaternion
+        Rmat = R.from_quat(q).as_matrix()
+        axes = Rmat * axis_len
+
+
+        origin = p.reshape(3, 1)
+
+
+        point.set_data(p[0:2])
+        point.set_3d_properties(p[2])
+
+
+        x_axis.set_data([p[0], p[0] + axes[0, 0]], [p[1], p[1] + axes[1, 0]])
+        x_axis.set_3d_properties([p[2], p[2] + axes[2, 0]])
+
+
+        y_axis.set_data([p[0], p[0] + axes[0, 1]], [p[1], p[1] + axes[1, 1]])
+        y_axis.set_3d_properties([p[2], p[2] + axes[2, 1]])
+
+
+        z_axis.set_data([p[0], p[0] + axes[0, 2]], [p[1], p[1] + axes[1, 2]])
+        z_axis.set_3d_properties([p[2], p[2] + axes[2, 2]])
+
+
+        return point, x_axis, y_axis, z_axis
+
+
+    ani = FuncAnimation(fig, update, frames=len(pos), init_func=init,
+    blit=True, interval=interval)
+    plt.show()
+    return ani

@@ -174,16 +174,16 @@ def quant_NEG(opt:gp.Model, pred:Pred, items:OptProbItems):
                                     name=f"rho_NEG_{pred.print()}")
             try:
                 for i in range(items.x_vars.shape[0]):
-                    opt.addConstr(rhos[i] == -p.rhos[i], name=f"rho_NEG_{pred.print()}_i{i}")
+                    opt.addConstr(rhos[i] == -p.rhos[0][i], name=f"rho_NEG_{pred.print()}_i{i}")
             except Exception as e:
-                print(f"Error in quant_NEG: {e}")
+                print(f"Error in quant_NEG MU: {e}")
             pred.rhos.append(rhos)
         else:
             rhos = opt.addVar(vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY, 
                                 name=f"rho_NEG_{pred.print()}")
             try:
-                opt.addConstr(pred.rho == -p.rho, name=f"rho_NEG_{pred.print()}")
+                opt.addConstr(pred.rho == -p.rho[0], name=f"rho_NEG_{pred.print()}")
             except Exception as e:
-                print(f"Error in quant_NEG: {e}")
+                print(f"Error in quant_NEG not MU: {e}")
         pred.rhos.append(rhos)
     opt.update()

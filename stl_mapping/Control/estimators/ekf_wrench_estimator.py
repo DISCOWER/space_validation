@@ -45,7 +45,7 @@ class EKFWrenchEstimator(Node):
         qv = (0.6/self.mass * self.dt)**2
         qw = [(0.12 / self.inertia[i, i] * self.dt)**2 for i in range(3)]
         qfd = 15*(0.2*self.dt)**2      # 200mN/s
-        qtd = 10*(0.05*self.dt)**2
+        qtd = 1*(0.05*self.dt)**2
         rv = (1e-2*self.dt)**2
         rw = (0.05*self.dt)**2
         # else:
