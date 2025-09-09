@@ -8,12 +8,16 @@ from rosbags.typesys import Stores, get_types_from_msg, get_typestore
 import numpy as np
 import matplotlib.pyplot as plt
 from rosbag_class import RosBagClass
+import pandas as pd
 
 robot_name = 'bluerov'
 experiment = '2d'
-file_path = f'{str(Path.home())}/space_ws/rosbags/rosbag2_2025_08_08-16_47_48/'
+# file_path = f'{str(Path.home())}/space_ws/rosbags/rosbag2_2025_08_08-16_47_48/'
+file_path = f"{str(Path.home())}/space_ws/rosbag2_2025_09_09-10_40_02/plotjuggler.csv"
+csv_file  = pd.read_csv(file_path)
+
 # file_path = f'{str(Path.home())}/space_ws/rosbags/rosbag2_2025_08_29-12_35_02/'
-obj = RosBagClass(file_path=file_path,
+obj = RosBagClass(csv_file=csv_file,
                   robot_name=robot_name,
                   threeD=False)
 

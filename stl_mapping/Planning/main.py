@@ -40,28 +40,27 @@ if scenario == 'paper2D':
 
     D3 = False
     depth = 0.0
-    X0 = HyperRectangle(center=np.array([1.5, 0, depth]),      size=np.array([0.5, 0.5, 0.5]))
-    Xf = HyperRectangle(center=np.array([2.75, 0.75, depth]),   size=np.array([0.5, 0.5, 0.5]))
-    XA = HyperRectangle(center=np.array([2.5, -0.5, depth,  -np.pi/2]), size=np.array([0.5, 0.5, 0.5,  np.pi/4]))
-    XB = HyperRectangle(center=np.array([2.0, 0.5, depth,  np.pi/2]),  size=np.array([0.5, 0.5, 0.5,  np.pi/4]))
-    Xleft = HyperRectangle(center=np.array([1.5, 0, depth]), size=np.array([3.0, 1.0, 0.5]))
-    Xback = HyperRectangle(center=np.array([-1.0, 0, depth]), size=np.array([0.5, -0.5, 0.5]))
+    X0 = HyperRectangle(center=np.array([1.5, 0, depth]),                   size=np.array([0.5, 0.5, 0.5]))
+    Xf = HyperRectangle(center=np.array([4.0, 0, depth]),                   size=np.array([0.5, 0.5, 0.5]))
+    XA = HyperRectangle(center=np.array([2.25, -0.5, depth,  -np.pi/2]),    size=np.array([0.5, 0.5, 0.5,  np.pi/4]))
+    XB = HyperRectangle(center=np.array([2.0, 0.5, depth,  np.pi/2]),       size=np.array([0.5, 0.5, 0.5,  np.pi/4]))
+    XC1 = HyperRectangle(center=np.array([3.0, 0.5, depth,  np.pi/2]),      size=np.array([0.5, 0.5, 0.5,  np.pi/4]))
+    XC2 = HyperRectangle(center=np.array([3.25, -0.5, depth,  -np.pi/2]),    size=np.array([0.5, 0.5, 0.5,  np.pi/4]))
 
-    # testing without rotation
-    # XA = HyperRectangle(center=np.array([2.5, -1.25, depth]), size=np.array([0.5, 0.5, 0.5]))
-    # XB = HyperRectangle(center=np.array([2.0, 0.75, depth]),  size=np.array([0.5, 0.5, 0.5]))
     Obs = []
-    RoIs = [XA, XB]
+    RoIs = [XA, XB, XC1, XC2]
 
-    World = HyperRectangle(np.array([0, -1.5, -10, -10]), np.array([4, 1.5, 10, 10]))
+    World = HyperRectangle(np.array([0, -1.0, -10, -10]), np.array([5, 1.0, 10, 10]))
     phi = Pred("AND", preds=[
         Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(rectangle=X0)], dims=[0,1,2])]),
         Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(rectangle=Xf)], dims=[0,1,2])]),
-        Pred("F", [t0,tf/2], preds=[Pred("MU", preds=[Polytope(rectangle=XA)], dims=[0,1,2, 5])]),
-        Pred("F", [tf/2,tf], preds=[Pred("MU", preds=[Polytope(rectangle=XB)], dims=[0,1,2, 5])]),
-        # Pred("F", [t0,tf/2], preds=[Pred("MU", preds=[Polytope(rectangle=XA)], dims=[0,1,2])]),
-        # Pred("F", [tf/2,tf], preds=[Pred("MU", preds=[Polytope(rectangle=XB)], dims=[0,1,2])]),
+        Pred("F", [20,25], preds=[Pred("MU", preds=[Polytope(rectangle=XA)], dims=[0,1,2, 5])]),
+        Pred("F", [t0,tf/2], preds=[Pred("MU", preds=[Polytope(rectangle=XB)], dims=[0,1,2, 5])]),
         Pred("G", [t0,tf], preds=[Pred("MU", preds=[Polytope(rectangle=World)], dims=[0,1,6,7])]),
+        Pred("OR", preds=[
+            Pred("G", [50,55], preds=[Pred("MU", preds=[Polytope(rectangle=XC1)], dims=[0,1,2, 5])]),
+            Pred("G", [50,55], preds=[Pred("MU", preds=[Polytope(rectangle=XC2)], dims=[0,1,2, 5])])
+        ])
     ])
     spec = Spec(phi, t0, tf)
 
@@ -74,36 +73,36 @@ elif scenario == 'paper3D':
 
     D3 = True
     depth = 0.0
-    X0 = HyperRectangle(center=np.array([1.0, 0, depth]), size=np.array([0.5, 0.5, 0.5]))
-    Xf = HyperRectangle(center=np.array([1.0, 0, depth]), size=np.array([0.5, 0.5, 0.5]))
+    X0 = HyperRectangle(center=np.array([3.0, 0, depth]), size=np.array([0.5, 0.5, 0.5]))
+    Xf = HyperRectangle(center=np.array([3.0, 0, depth]), size=np.array([0.5, 0.5, 0.5]))
 
     # Three observation tasks, each having two possible views around the Obstacle.
-    Obs1 = HyperRectangle(center=np.array([4.0, 0, depth]),                   size=np.array([1.0, 1.5, 0.5]))
-    XA1 = HyperRectangle(center=np.array([5.0, 0, depth, 0, 0]),              size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    XA2 = HyperRectangle(center=np.array([2.0, 0, depth, 0, -np.pi]),         size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    XB1 = HyperRectangle(center=np.array([4.0, -1.25, depth, 0, np.pi/2]),    size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    XB2 = HyperRectangle(center=np.array([4.0, 1.25, depth, 0, -np.pi/2]),    size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    Obs1 = HyperRectangle(center=np.array([4.0, 0, depth]),                   size=np.array([0.5, 0.5, 0.5]))
+    XA1 = HyperRectangle(center=np.array([5.0, 0, depth, 0, -np.pi]),              size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    XA2 = HyperRectangle(center=np.array([3.0, 0, depth, 0, 0]),         size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    XB1 = HyperRectangle(center=np.array([4.0, -0.75, depth, 0, np.pi/2]),    size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    XB2 = HyperRectangle(center=np.array([4.0, 0.75, depth, 0, -np.pi/2]),    size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
     XC1 = HyperRectangle(center=np.array([4.0, 0, depth+0.75, np.pi/2, 0]),      size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
     XC2 = HyperRectangle(center=np.array([4.0, 0, depth-0.75, -np.pi/2, 0]),       size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
 
     Obs = [Obs1]
-    RoIs = [XA2, XB1, XB2, XC1, XC2]
+    RoIs = [XA1, XA2, XB1, XB2, XC1, XC2]
 
     phi = Pred("AND", preds=[
         Pred("G", [t0,t0], preds=[Pred("MU", preds=[Polytope(rectangle=X0)], dims=[0,1,2])]),
         Pred("G", [tf,tf], preds=[Pred("MU", preds=[Polytope(rectangle=Xf)], dims=[0,1,2])]),
         Pred("G", [t0,tf], preds= [Pred("NEG", preds= [Pred("MU", preds=[Polytope(rectangle=Obs1)], dims=[0,1,2])] )] ),
         Pred("OR", preds=[
-            Pred("F", [30,40], preds=[Pred("MU", preds=[Polytope(rectangle=XA1)], dims=[0,1,2, 3,5])]),
-            # Pred("F", [30,35], preds=[Pred("MU", preds=[Polytope(rectangle=XA2)], dims=[0,1,2, 3,5])])
+            Pred("F", [tf/4,tf/4+1.5], preds=[Pred("MU", preds=[Polytope(rectangle=XA1)], dims=[0,1,2, 3,5])]),
+            Pred("F", [tf/4,tf/4+1.5], preds=[Pred("MU", preds=[Polytope(rectangle=XA2)], dims=[0,1,2, 3,5])])
         ]),
         Pred("OR", preds=[
-            Pred("F", [65,70], preds=[Pred("MU", preds=[Polytope(rectangle=XB1)], dims=[0,1,2, 3,5])]),
-            Pred("F", [65,70], preds=[Pred("MU", preds=[Polytope(rectangle=XB2)], dims=[0,1,2, 3,5])])
+            Pred("F", [tf/2,tf/2+1.5], preds=[Pred("MU", preds=[Polytope(rectangle=XB1)], dims=[0,1,2, 3,5])]),
+            Pred("F", [tf/2,tf/2+1.5], preds=[Pred("MU", preds=[Polytope(rectangle=XB2)], dims=[0,1,2, 3,5])])
         ]),
         Pred("OR", preds=[
-            Pred("F", [80,90], preds=[Pred("MU", preds=[Polytope(rectangle=XC1)], dims=[0,1,2, 3,5])]),
-            Pred("F", [80,90], preds=[Pred("MU", preds=[Polytope(rectangle=XC2)], dims=[0,1,2, 3,5])])
+            Pred("F", [3*tf/4,3*tf/4+1.5], preds=[Pred("MU", preds=[Polytope(rectangle=XC1)], dims=[0,1,2, 3,5])]),
+            Pred("F", [3*tf/4,3*tf/4+1.5], preds=[Pred("MU", preds=[Polytope(rectangle=XC2)], dims=[0,1,2, 3,5])])
         ])
     ])
     spec = Spec(phi, t0, tf)
@@ -115,7 +114,7 @@ if True:
     u_vars = opt.addMVar((N-1, sp_robot.n_u), lb=-np.inf, ub=np.inf, name="U")
     t_sp = np.linspace(0,(N-1)*dt, N)
     # alpha_vars = opt.addVar(lb=0, ub=1, name="alpha")
-    alpha_vars = opt.addVar(lb=0.1, ub=100, name="alpha")
+    alpha_vars = opt.addVar(lb=0, ub=100, name="alpha")
     opt.update()
 
     items = OptProbItems(x_vars, u_vars, t_sp)
@@ -161,7 +160,7 @@ if True:
     opt.addConstr(act_absu_var == gp.quicksum([act_absu_scaled_vars[i, j] for i in range(N-1) for j in range(sp_robot.n_u)]), name="act_abs_sum")
 
     # Final cost
-    opt.addConstr(cost_var == -1*alpha_vars - 10000*spec.phi.rho + 0.01*act_absu_var)# - act_quadu_var)
+    opt.addConstr(cost_var == -1*alpha_vars - 10000*spec.phi.rho + 0.1*act_absu_var)# - act_quadu_var)
     opt.setObjective(cost_var, gp.GRB.MINIMIZE)
     opt.setParam('OutputFlag', 0)  # Suppress Gurobi output
     opt.optimize()
@@ -346,22 +345,15 @@ if True:
 
     ocp.set_initial(x_vars, x_uw_fbl_sp.T)
     ocp.set_initial(u_vars, u_uw_fbl_sp.T)
-    ocp.set_initial(dt_vars, 0.7)
+    ocp.set_initial(dt_vars, 0.5)
 
     ocp.subject_to(0.1 <= dt_vars)
-    ocp.subject_to(dt_vars <= dt)
+    ocp.subject_to(dt_vars <= 2*dt)
     ocp.subject_to(delta >= 0)
 
     for i in range(N):
         ocp.subject_to(u_vars[:,i] >= uw_robot.calculate_U_effective(x_vars[:,i],alpha).lower_bounds)
         ocp.subject_to(u_vars[:,i] <= uw_robot.calculate_U_effective(x_vars[:,i],alpha).upper_bounds)
-
-        # ocp.subject_to(u_vars[:,i] >= alpha * uw_robot.calculate_U_effective(x_vars[:,i]).lower_bounds)
-        # ocp.subject_to(u_vars[:,i] <= alpha * uw_robot.calculate_U_effective(x_vars[:,i]).upper_bounds)
-        # for j in range(6)
-        # for j in range(6):
-        #     ocp.subject_to(u_vars[j,i] >= uw_robot.U.lower_bounds[j] + alpha * uw_robot.calculate_sum_K_D(x_vars[:,i], uw_robot.D.lower_bounds)[j])
-        #     ocp.subject_to(u_vars[j,i] <= uw_robot.U.upper_bounds[j] + alpha * uw_robot.calculate_sum_K_D(x_vars[:,i], uw_robot.D.upper_bounds)[j])
 
     # constraints
     for i in range(N-1):
@@ -381,7 +373,7 @@ if True:
     Q = np.array([1., 1., 1., 10., 10., 10.])
     for i in range(N):
         quad_u_var += cs.mtimes(u_vars[:,i].T, Q * u_vars[:,i])
-    cost_var = 100*dt_vars + 1e3 * delta + 1e-4 * quad_u_var
+    cost_var = 10*dt_vars + 1e3*delta + 1e-2*quad_u_var
     ocp.minimize(cost_var)
     opts = {'ipopt.print_level': 0, 'print_time': 0, 'ipopt.sb': 'yes',
             'verbose':False, 'ipopt.tol': 1e-4, 'ipopt.max_iter': 1000}

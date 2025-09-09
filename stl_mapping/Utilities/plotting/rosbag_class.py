@@ -15,10 +15,10 @@ from Utilities.sets import HyperRectangle
 
 class RosBagClass():
     def __init__(self,
-                 file_path:str,
+                 csv_file:str,
                  robot_name:str='atmos',
                  threeD:bool=False):
-        self.file_path = file_path
+        self.csv_file = csv_file
         self.robot_name = robot_name
         self.threeD = threeD
 
