@@ -28,7 +28,8 @@ def compute_K(B, C, tol=1e-8):
 
 class HyperRectangle():
     def __init__(self, lower_bounds:np.ndarray=None, upper_bounds:np.ndarray=None,
-                 center:np.ndarray=None, size:np.ndarray=None):
+                 center:np.ndarray=None, size:np.ndarray=None, 
+                 color:str=None, name:str=None):
         if lower_bounds is None and upper_bounds is None:
             assert center is not None and size is not None, "Center and size must be provided if bounds are not."
             self.center = center
@@ -52,6 +53,9 @@ class HyperRectangle():
                            -self.lower_bounds[1],
                            self.upper_bounds[1]])
         self.dim = self.lower_bounds.shape[0]
+
+        self.color = color
+        self.name = name
 
     def sum(self, other):
         # assert self.dim == other.dim, "Hyperrectangles must have the same dimension."
@@ -82,11 +86,19 @@ class HyperRectangle():
         return np.all(point >= self.lower_bounds) and np.all(point <= self.upper_bounds)
     
     def plot(self, ax:plt.Axes, color='blue', alpha=0.5):
+        if self.color is not None:
+            color = self.color
         # check if ax is a 2D plot
         if ax.name == "rectilinear":
             rect = plt.Rectangle(self.lower_bounds[:2], self.size[0], self.size[1], 
-                                alpha=alpha, fc=color, lw=1, ec='black')
+                                alpha=alpha, fc=color, lw=2, ec='black')
             ax.add_patch(rect)
+            # if we have a name, add it to the lower left corner
+            if self.name is not None:
+                ax.text(self.lower_bounds[0], self.lower_bounds[1], f"${self.name}$", fontsize=12, ha='left', va='bottom')
+                # set the text to front
+                ax.texts[-1].set_zorder(10)
+
         elif ax.name == "3d":
             x, y, z = self.lower_bounds[0:3]
             dx, dy, dz = self.size[0:3]
@@ -112,7 +124,7 @@ class HyperRectangle():
             ax.add_collection3d(box)
 
 class Zonotope():
-    def __init__(self, x=None, G=None, Gdiag=None):
+    def __init__(self, x=None, G=None, Gdiag=None, color:str=None):
         # assert not both G and Gdiag are not given
         assert not (G is None and Gdiag is None)
 
@@ -126,6 +138,9 @@ class Zonotope():
                 self.G = np.diag(Gdiag)
             except:
                 self.G = None
+        self.dim = x.shape[0]
+        self.N_generators = self.G.shape[1] if self.G is not None else 0
+        self.color = color
 
     def compute_vertices(self):
         V = self.x.copy()
@@ -151,6 +166,8 @@ class Zonotope():
         vertices = np.vstack((vertices, vertices[0]))  # close the polygon
 
         # and plot
+        if self.color is not None:
+            color = self.color
         poly = patches.Polygon(vertices, closed=True, color=color, alpha=alpha)
         poly.set_label(label)
         ax.add_patch(poly)

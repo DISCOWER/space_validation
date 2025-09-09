@@ -21,3 +21,11 @@ Numpy, Scipy, Casadi, Gurobi and some basic stuff.
 3. start QGC with `./startQGC`
 
 Flashing BlueROV px4: `PX4_UXRCE_DDS_NS=itrl_rov_1 make px4_fmu-v6x_uuv upload`
+
+
+# Cropping images for plots:
+```
+for img in *.png; do
+  convert "$img" -crop $(identify -format "%[fx:w*0.7]" "$img")x$(identify -format "%[fx:h*0.3]" "$img")+$(identify -format "%[fx:w*0.1]" "$img")+$(identify -format "%[fx:h*0.35]" "$img") +repage "cropped_$img"
+done
+```

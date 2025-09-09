@@ -92,15 +92,15 @@ elif scenario == 'paper3D':
     Xbottom1 = HyperRectangle(center=np.array([4.0, 0, depth-0.75, np.deg2rad(-80), 0]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
     Xbottom2 = HyperRectangle(center=np.array([4.0, 0, depth-0.75, np.deg2rad(260), 0]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
 
-    Xtopleftback   = HyperRectangle(center=np.array([5.0, -0.75, depth+0.75, np.pi/4, -3*np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    Xtopleftfront  = HyperRectangle(center=np.array([3.0, -0.75, depth+0.75, np.pi/4, -np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    Xtoprightfront = HyperRectangle(center=np.array([3.0, 0.75, depth+0.75, np.pi/4, np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    Xtoprightback  = HyperRectangle(center=np.array([5.0, 0.75, depth+0.75, np.pi/4, 3*np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    # Xtopleftback   = HyperRectangle(center=np.array([5.0, -0.75, depth+0.75, np.pi/4, -3*np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    # Xtopleftfront  = HyperRectangle(center=np.array([3.0, -0.75, depth+0.75, np.pi/4, -np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    # Xtoprightfront = HyperRectangle(center=np.array([3.0, 0.75, depth+0.75, np.pi/4, np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    # Xtoprightback  = HyperRectangle(center=np.array([5.0, 0.75, depth+0.75, np.pi/4, 3*np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
 
-    Xbottomleftback   = HyperRectangle(center=np.array([5.0, -0.75, depth-0.75, -np.pi/4, -3*np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    Xbottomleftfront  = HyperRectangle(center=np.array([3.0, -0.75, depth-0.75, -np.pi/4, -np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    Xbottomrightfront = HyperRectangle(center=np.array([3.0, 0.75, depth-0.75, -np.pi/4, np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
-    Xbottomrightback  = HyperRectangle(center=np.array([5.0, 0.75, depth-0.75, -np.pi/4, 3*np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    # Xbottomleftback   = HyperRectangle(center=np.array([5.0, -0.75, depth-0.75, -np.pi/4, -3*np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    # Xbottomleftfront  = HyperRectangle(center=np.array([3.0, -0.75, depth-0.75, -np.pi/4, -np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    # Xbottomrightfront = HyperRectangle(center=np.array([3.0, 0.75, depth-0.75, -np.pi/4, np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
+    # Xbottomrightback  = HyperRectangle(center=np.array([5.0, 0.75, depth-0.75, -np.pi/4, 3*np.pi/4]), size=np.array([0.5, 0.5, 0.5, np.pi/8, np.pi/8]))
 
     Obs = [Obs1]
     RoIs = [Xfront, Xback1, Xleft1, Xright1, Xtop1, Xbottom1]
