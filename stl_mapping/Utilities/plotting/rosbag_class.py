@@ -339,6 +339,7 @@ class RosBagClass():
         ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.0), ncol=2)
 
     def plot_force(self,ax):
+        # TODO: add two y-axis for force and torque
         vehicle_thrust_setpoint = self.topics['post_fbl_force_setpoint']
         rosbag_time = (vehicle_thrust_setpoint['timestamp']-vehicle_thrust_setpoint['timestamp'][0])/1e6
 
@@ -349,7 +350,7 @@ class RosBagClass():
             ax.plot(rosbag_time, f[:,2], 'r-', label=r'$f_z$')
         ax.axhline(self.robot.U.lower_bounds[0], color='k', linestyle='--')
         ax.axhline(self.robot.U.upper_bounds[0], color='k', linestyle='--')
-        ax.set_title('Thrust Setpoint')
+        ax.set_title('Commanded Force and Torque')
         # ax.set_xlabel('time (s)')
         ax.set_ylabel('thrust (N)')
         ax.grid()
@@ -358,6 +359,7 @@ class RosBagClass():
     def plot_disturbance(self,ax,sigma=1):
         disturbance_estimate = self.topics['disturbance_estimate']
         # TODO: ensure time is properly recorded in message
+        # TODO: two y-axis
         # rosbag_time = np.array([float(t) for t in disturbance_estimate['time']])
         # rosbag_time = (rosbag_time - rosbag_time[0])
         rosbag_time = (self.topics['post_fbl_force_setpoint']['timestamp']-self.topics['post_fbl_force_setpoint']['timestamp'][0])/1e6

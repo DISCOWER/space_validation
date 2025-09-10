@@ -515,7 +515,7 @@ void atmos_ff_acados_setup_nlp_in(atmos_ff_solver_capsule* capsule, const int N,
     W_0[0+(NY0) * 0] = 100;
     W_0[1+(NY0) * 1] = 100;
     W_0[2+(NY0) * 2] = 100;
-    W_0[3+(NY0) * 3] = 5000;
+    W_0[3+(NY0) * 3] = 10000;
     W_0[4+(NY0) * 4] = 5000;
     W_0[5+(NY0) * 5] = 5000;
     W_0[6+(NY0) * 6] = 5000;
@@ -547,7 +547,7 @@ void atmos_ff_acados_setup_nlp_in(atmos_ff_solver_capsule* capsule, const int N,
     W[0+(NY) * 0] = 100;
     W[1+(NY) * 1] = 100;
     W[2+(NY) * 2] = 100;
-    W[3+(NY) * 3] = 5000;
+    W[3+(NY) * 3] = 10000;
     W[4+(NY) * 4] = 5000;
     W[5+(NY) * 5] = 5000;
     W[6+(NY) * 6] = 5000;
@@ -580,7 +580,7 @@ void atmos_ff_acados_setup_nlp_in(atmos_ff_solver_capsule* capsule, const int N,
     W_e[0+(NYN) * 0] = 1000;
     W_e[1+(NYN) * 1] = 1000;
     W_e[2+(NYN) * 2] = 1000;
-    W_e[3+(NYN) * 3] = 50000;
+    W_e[3+(NYN) * 3] = 100000;
     W_e[4+(NYN) * 4] = 50000;
     W_e[5+(NYN) * 5] = 50000;
     W_e[6+(NYN) * 6] = 50000;

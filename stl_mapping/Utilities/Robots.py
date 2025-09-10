@@ -245,7 +245,7 @@ class FreeFlyer(Robot):
         # dynamics in the form: dx = f(x) + g(x)u
         self.mass = 16.8 #(16.8: empty, 17.8: full)  # kg
         self.m = self.mass
-        self.inertia = np.diag((0.1454, 0.1366, 0.1594))
+        self.inertia = np.diag((0.315, 0.315, 0.315))
         max_thrust = 2.125
         max_torque = 0.714
         scale_thrust = 2/3

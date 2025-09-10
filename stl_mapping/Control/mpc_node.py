@@ -149,8 +149,8 @@ class MPCNode(Node):
         self.get_logger().info("MPC publishers initialized successfully")
 
         # Settings
-        self.offset_free = True
-        self.feedback_equivalence = True
+        self.offset_free = False
+        self.feedback_equivalence = False
 
         # Disturbance variables
         self.F_cmd = np.zeros((3, 1))  # Force commanded
@@ -199,7 +199,7 @@ class MPCNode(Node):
         # Load the plan from a file (declared as launch argument)
         self.plan_path = self.declare_parameter('plan_path', f'{self.model_name}_solution_bezier.npz').value
 
-        path = os.path.abspath(os.path.join(os.path.expanduser("~"), 'space_ws/src/stl_mapping/stl_mapping/Planning/solutions'))
+        path = os.path.abspath(os.path.join(os.path.expanduser("~"), 'space_ws/src/stl_mapping/stl_mapping/Planning/solutions/exp_1/'))
         # path = '/home/none/space_ws/src/stl_mapping/stl_mapping/Planning/solutions/'
         self.plan_path = os.path.join(path, self.plan_path)
         self.get_logger().info(f"Loaded plan from {self.plan_path}")
@@ -230,14 +230,32 @@ class MPCNode(Node):
         # times = np.linspace(0, self.reference.r.shape[0]*self.reference.dt, 250)
 
     def vehicle_attitude_callback(self, msg):
+        # if self.model_name == "bluerov":
         self.vehicle_attitude = np.array([msg.q[0], msg.q[1], msg.q[2], msg.q[3]], dtype=float)
+        # elif self.model_name == "atmos":
+        #     # if we're on atmos, we rotate the frame +90 degrees around z
+        #     q = R.from_euler('z', -np.pi/2)
+        #     q_msg = R.from_quat([msg.q[0], msg.q[1], msg.q[2], msg.q[3]], scalar_first=True)  # wxyz
+        #     q_total = q * q_msg
+        #     self.vehicle_attitude = q_total.as_quat(scalar_first=True)  # wxyz
+        #     # self.get_logger().info(f"q: {self.vehicle_attitude}")
 
     def vehicle_local_position_callback(self, msg):
+        # if self.model_name == "bluerov":
         self.vehicle_local_position = np.array([msg.x, msg.y, msg.z])
         self.vehicle_local_velocity = np.array([msg.vx, msg.vy, msg.vz])
         # get a body-frame velocity, because this is what the MPC model requires
         q = R.from_quat(self.vehicle_attitude,scalar_first=True)
         self.vehicle_local_velocity_body = q.inv().apply(self.vehicle_local_velocity)
+
+        # elif self.model_name == "atmos":
+        #     # if we're on atmos, we rotate the frame +90 degrees around z
+        #     q = R.from_euler('z', -np.pi/2)
+        #     self.vehicle_local_position = q.apply(np.array([msg.x, msg.y, msg.z]))
+        #     self.vehicle_local_velocity = q.apply(np.array([msg.vx, msg.vy, msg.vz]))
+        #     # get a body-frame velocity, because this is what the MPC model requires
+        #     q = R.from_quat(self.vehicle_attitude,scalar_first=True)
+        #     self.vehicle_local_velocity_body = q.apply(self.vehicle_local_velocity)
 
     def vehicle_angular_velocity_callback(self, msg):
         self.vehicle_angular_velocity = np.array([msg.xyz[0], msg.xyz[1], msg.xyz[2]])
@@ -511,14 +529,14 @@ class MPCNode(Node):
         #     self.get_logger().info(f"dt: {t-self.t0}")
         #     x_ref[:, idx] = test_points[test_idx]
             # self.get_logger().info(f"{x_ref[:, test_idx].flatten()}")
-            # x_ref[:, idx] = np.array([0.0, 1.5, -0.6,
-            #                           1.0, 0., 0., 0.,
-            #                         #   0.5, 0.5, 0.5, 0.5,
-            #                         #   1/np.sqrt(2), 0., 1/np.sqrt(2), 0.,
-            #                         # 1/np.sqrt(2), -1/np.sqrt(2), 0., 0.,
-            #                           0., 0., 0.,
-            #                           0., 0., 0.]).reshape(13,)
-            x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
+            x_ref[:, idx] = np.array([0., 1.5, -0.6,
+                                    #   1.0, 0., 0., 0.,
+                                    #   0.5, 0.5, 0.5, 0.5,
+                                      1/np.sqrt(2), 0., 0., 1/np.sqrt(2),
+                                    # 1/np.sqrt(2), -1/np.sqrt(2), 0., 0.,
+                                      0., 0., 0.,
+                                      0., 0., 0.]).reshape(13,)
+            # x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
 
         x_ref = np.vstack((x_ref, np.repeat(u_ref, x_ref.shape[1], axis=1)))  # Append u_ref to x_ref
         x_ref[:3, :] += self.offset.reshape(3, 1)

@@ -98,7 +98,7 @@ class MpcFBLWrench(Node):
         #! ATMOS weights
         self.Q = np.diag([          # State weighting matrix
             1e2, 1e2, 1e2,
-            5e3, 5e3, 5e3, 5e3,
+            10e3, 5e3, 5e3, 5e3,
             3e2, 3e2, 3e2,  
             3e2, 3e2, 3e2])          
         self.R = 0.1*np.diag([          # State weighting matrix

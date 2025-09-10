@@ -76,12 +76,12 @@ class MpcWrench(Node):
         if model_name == 'atmos':
             self.Q = np.diag([          # State weighting matrix
                 1e2, 1e2, 1e2,
-                5e1, 5e1, 5e1, 5e1,
-                3e1, 3e1, 3e1,  
+                10e1, 5e1, 5e1, 5e1,
+                8e1, 8e1, 8e1,  
                 3e1, 3e1, 3e1])             
-            self.R = 1*np.diag([          # State weighting matrix
+            self.R = 0.1*np.diag([          # State weighting matrix
                 1e0, 1e0, 1e0,
-                1e0, 1e0, 1e0]) 
+                1e1, 1e1, 1e1]) 
             self.P = 10 * self.Q        # Terminal state weighting matrix
             #! ATMOS Bounds
             self.lbx = np.array([0+0.25, -1.58+0.25, -0.5, -0.5, -3])
