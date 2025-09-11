@@ -74,19 +74,37 @@ class MpcWrench(Node):
 
         #! ATMOS weights
         if model_name == 'atmos':
+            #! ATMOS weights
             self.Q = np.diag([          # State weighting matrix
                 1e2, 1e2, 1e2,
-                10e1, 5e1, 5e1, 5e1,
-                8e1, 8e1, 8e1,  
-                3e1, 3e1, 3e1])             
-            self.R = 0.1*np.diag([          # State weighting matrix
+                10e3, 5e3, 5e3, 5e3,
+                3e2, 3e2, 3e2,  
+                3e2, 3e2, 3e2])          
+            self.R = 10*np.diag([          # State weighting matrix
                 1e0, 1e0, 1e0,
-                1e1, 1e1, 1e1]) 
+                2e1, 2e1, 2e1]) 
             self.P = 10 * self.Q        # Terminal state weighting matrix
             #! ATMOS Bounds
             self.lbx = np.array([0+0.25, -1.58+0.25, -0.5, -0.5, -3])
             self.ubx = np.array([4.1-0.25, 1.74-0.25, 0.5, 0.5, 3])
             self.idxbx = np.array([0, 1, 7, 8, 12]) # Indexes of states that are bounded
+
+        elif model_name == 'cubesat':
+            #! Cubesat weights
+            self.Q = np.diag([          # State weighting matrix
+                1e2, 1e2, 1e2,
+                5e2, 1e2, 1e2, 1e2,
+                3e2, 3e2, 3e2,  
+                3e2, 3e2, 3e2])          
+            self.R = 10*np.diag([          # State weighting matrix
+                1e0, 1e0, 1e0,
+                2e2, 2e2, 2e2]) 
+            self.P = 10 * self.Q        # Terminal state weighting matrix
+            #! Cubesat Bounds
+            self.lbx = np.array([-8, -8, -0.5, -0.5, -3])
+            self.ubx = np.array([8, 8, 0.5, 0.5, 3])
+            self.idxbx = np.array([0, 1, 7, 8, 12])
+
         elif model_name == 'bluerov':
             #! BlueROV weights
             self.Q = np.diag([          # State weighting matrix
@@ -158,7 +176,7 @@ class MpcWrench(Node):
         ocp.code_export_directory = codegen_dir
 
         # Define the model
-        if self.model_name == 'atmos':
+        if self.model_name == 'atmos' or self.model_name == 'cubesat':
             print("Using Atmos model")
             model = atmos_model_wrench()
         elif self.model_name == 'bluerov':
@@ -203,25 +221,6 @@ class MpcWrench(Node):
         q2 = q2 / ca.norm_2(q2)
         q_error = quat_mult(q1, ca.vertcat(q2[0], -q2[1], -q2[2], -q2[3]))
         q_error = q_error * ca.sign(q_error[0])
-
-        # Old quaternion error calculation
-        # Sice unit quaternion, quaternion inverse is equal to its conjugate
-        # q_conj = ca.vertcat(q2[0], -q2[1], -q2[2], -q2[3])
-        # q2 = q_conj/ca.norm_2(q2)
-        
-        # # q_error = q1 @ q2^-1
-        # q_w = q1[0] * q2[0] - q1[1] * q2[1] - q1[2] * q2[2] - q1[3] * q2[3]
-        # q_x = q1[0]    * q2[1] + q1[1] * q2[0] + q1[2] * q2[3] - q1[3] * q2[2]
-        # q_y = q1[0] * q2[2] - q1[1] * q2[3] + q1[2] * q2[0] + q1[3] * q2[1]
-        # q_z = q1[0] * q2[3] + q1[1] * q2[2] - q1[2] * q2[1] + q1[3] * q2[0]
-
-        # q_error = ca.vertcat(q_w, q_x, q_y, q_z)
-        # # q_error = ca.if_else(q_w < 0, -q_error, q_error)
-        # q_error = q_error * ca.sign(q_w)
-
-        #! old
-        # q_error = ca.fabs(model.x[6:10].T @ x_ref[6:10])
-        # q_error = (model.x[3:7].T @ x_ref[3:7])**2
 
         ocp.model.cost_y_expr = ca.vertcat(
             model.x[0:3] - x_ref[0:3],   # Position error

@@ -26,7 +26,9 @@ def generate_launch_description():
             namespace=namespace,
             executable='mpc_node',
             name='mpc_node_0',
-            parameters=[{'x_offset': -0.75, 'y_offset': 0.0, 'z_offset': 0.0},
+            parameters=[
+                #{'x_offset': -0.75, 'y_offset': 0.0, 'z_offset': 0.0}, # ATMOS experiment
+                        {'x_offset': -2.0, 'y_offset': 0.0, 'z_offset': 0.0},
                         {'rate': 20.0},
                         {'model_name': model}]
     ))

@@ -327,6 +327,9 @@ plot_planning_results(sp_robot_nl, t_ff_nl, x_ff_nl, u_ff_nl, X0, Xf, RoIs, Obs,
 np.savez('stl_mapping/Planning/solutions/atmos_nonlinear_solution.npz', x=x_ff_nl, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
 data = np.load('stl_mapping/Planning/solutions/atmos_nonlinear_solution.npz')
 bezier_fitting(data,'atmos')
+np.savez('stl_mapping/Planning/solutions/cubesat_nonlinear_solution.npz', x=x_ff_nl, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
+data = np.load('stl_mapping/Planning/solutions/cubesat_nonlinear_solution.npz')
+bezier_fitting(data,'cubesat')
 
 #TODO: Feedback linearization test
 #TODO: we test feedback linearization controller for the underwater robot to behave like a free flyer

@@ -37,7 +37,7 @@ class MPCNode(Node):
         self.offset = np.array([self.x_offset, self.y_offset, self.z_offset])
         self.rate = self.declare_parameter('rate', 5.0).value
 
-        if self.model_name == "atmos":
+        if self.model_name == "atmos" or self.model_name == "cubesat":
             self.robot = FreeFlyer()
         elif self.model_name == "bluerov":
             self.robot = BlueROV()
@@ -149,8 +149,8 @@ class MPCNode(Node):
         self.get_logger().info("MPC publishers initialized successfully")
 
         # Settings
-        self.offset_free = False
-        self.feedback_equivalence = False
+        self.offset_free = True
+        self.feedback_equivalence = True
 
         # Disturbance variables
         self.F_cmd = np.zeros((3, 1))  # Force commanded
@@ -175,7 +175,7 @@ class MPCNode(Node):
         NORMALIZED_WRENCH = True  # Use normalized wrench for control input
         self.F_thruster = 1.4  # Thrust force per motor
         self.r_thruster = 0.12  # Distance from center to thruster in meters
-        if self.model_name == "atmos":
+        if self.model_name == "atmos" or self.model_name == "cubesat":
             self.F_scaling = 2 * self.F_thruster if NORMALIZED_WRENCH else 1.0
             self.T_scaling = 4 * self.r_thruster * self.F_thruster if NORMALIZED_WRENCH else 1.0
         elif self.model_name == "bluerov":
@@ -199,7 +199,8 @@ class MPCNode(Node):
         # Load the plan from a file (declared as launch argument)
         self.plan_path = self.declare_parameter('plan_path', f'{self.model_name}_solution_bezier.npz').value
 
-        path = os.path.abspath(os.path.join(os.path.expanduser("~"), 'space_ws/src/stl_mapping/stl_mapping/Planning/solutions/exp_1/'))
+        exp = 'exp_2'
+        path = os.path.abspath(os.path.join(os.path.expanduser("~"), f'space_ws/src/stl_mapping/stl_mapping/Planning/solutions/{exp}/'))
         # path = '/home/none/space_ws/src/stl_mapping/stl_mapping/Planning/solutions/'
         self.plan_path = os.path.join(path, self.plan_path)
         self.get_logger().info(f"Loaded plan from {self.plan_path}")
@@ -230,32 +231,31 @@ class MPCNode(Node):
         # times = np.linspace(0, self.reference.r.shape[0]*self.reference.dt, 250)
 
     def vehicle_attitude_callback(self, msg):
-        # if self.model_name == "bluerov":
-        self.vehicle_attitude = np.array([msg.q[0], msg.q[1], msg.q[2], msg.q[3]], dtype=float)
-        # elif self.model_name == "atmos":
-        #     # if we're on atmos, we rotate the frame +90 degrees around z
-        #     q = R.from_euler('z', -np.pi/2)
-        #     q_msg = R.from_quat([msg.q[0], msg.q[1], msg.q[2], msg.q[3]], scalar_first=True)  # wxyz
-        #     q_total = q * q_msg
-        #     self.vehicle_attitude = q_total.as_quat(scalar_first=True)  # wxyz
-        #     # self.get_logger().info(f"q: {self.vehicle_attitude}")
+        if self.model_name == "bluerov":
+            self.vehicle_attitude = np.array([msg.q[0], msg.q[1], msg.q[2], msg.q[3]], dtype=float)
+        elif self.model_name == "atmos" or self.model_name == "cubesat":
+            # if we're on atmos, we rotate the frame +90 degrees around z
+            q = R.from_euler('z', -np.pi/2)
+            q_msg = R.from_quat([msg.q[0], msg.q[1], msg.q[2], msg.q[3]], scalar_first=True)  # wxyz
+            q_total = q * q_msg
+            self.vehicle_attitude = q_total.as_quat(scalar_first=True)  # wxyz
+            # self.get_logger().info(f"q: {self.vehicle_attitude}")
 
     def vehicle_local_position_callback(self, msg):
-        # if self.model_name == "bluerov":
-        self.vehicle_local_position = np.array([msg.x, msg.y, msg.z])
-        self.vehicle_local_velocity = np.array([msg.vx, msg.vy, msg.vz])
-        # get a body-frame velocity, because this is what the MPC model requires
-        q = R.from_quat(self.vehicle_attitude,scalar_first=True)
-        self.vehicle_local_velocity_body = q.inv().apply(self.vehicle_local_velocity)
-
-        # elif self.model_name == "atmos":
-        #     # if we're on atmos, we rotate the frame +90 degrees around z
-        #     q = R.from_euler('z', -np.pi/2)
-        #     self.vehicle_local_position = q.apply(np.array([msg.x, msg.y, msg.z]))
-        #     self.vehicle_local_velocity = q.apply(np.array([msg.vx, msg.vy, msg.vz]))
-        #     # get a body-frame velocity, because this is what the MPC model requires
-        #     q = R.from_quat(self.vehicle_attitude,scalar_first=True)
-        #     self.vehicle_local_velocity_body = q.apply(self.vehicle_local_velocity)
+        if self.model_name == "bluerov":
+            self.vehicle_local_position = np.array([msg.x, msg.y, msg.z])
+            self.vehicle_local_velocity = np.array([msg.vx, msg.vy, msg.vz])
+            # get a body-frame velocity, because this is what the MPC model requires
+            q = R.from_quat(self.vehicle_attitude,scalar_first=True)
+            self.vehicle_local_velocity_body = q.inv().apply(self.vehicle_local_velocity)
+        elif self.model_name == "atmos" or self.model_name == "cubesat":
+            # if we're on atmos, we rotate the frame +90 degrees around z
+            q = R.from_euler('z', -np.pi/2)
+            self.vehicle_local_position = q.apply(np.array([msg.x, msg.y, msg.z]))
+            self.vehicle_local_velocity = q.apply(np.array([msg.vx, msg.vy, msg.vz]))
+            # get a body-frame velocity, because this is what the MPC model requires
+            q = R.from_quat(self.vehicle_attitude,scalar_first=True)
+            self.vehicle_local_velocity_body = q.inv().apply(self.vehicle_local_velocity)
 
     def vehicle_angular_velocity_callback(self, msg):
         self.vehicle_angular_velocity = np.array([msg.xyz[0], msg.xyz[1], msg.xyz[2]])
@@ -264,33 +264,6 @@ class MPCNode(Node):
         # print("NAV_STATUS: ", msg.nav_state)
         # print("  - offboard status: ", VehicleStatus.NAVIGATION_STATE_OFFBOARD)
         self.nav_state = msg.nav_state
-
-    # def actuator_motors_callback(self, msg: ActuatorMotors):
-    #     B_F = self.F_thruster * np.array([
-    #         [1., -1., 1., -1., 0., 0., 0., 0.],
-    #         [0., 0., 0., 0., -1., 1., -1., 1.],
-    #         [0., 0., 0., 0., 0., 0., 0., 0.]
-    #         ])
-    #     B_T = self.F_thruster * self.r_thruster * np.array([
-    #         [0., 0., 0., 0., 0., 0., 0., 0.],
-    #         [0., 0., 0., 0., 0., 0., 0., 0.],
-    #         [-1., 1., 1., -1., -1., 1., 1., -1.]
-    #         ])
-    #     self.F_cmd = B_F @ np.array(msg.control[0:8]).reshape(8, 1)
-    #     self.T_cmd = B_T @ np.array(msg.control[0:8]).reshape(8, 1)
-
-    #     wrench_msg = WrenchStamped()
-    #     wrench_msg.header.stamp = self.get_clock().now().to_msg()
-    #     wrench_msg.header.frame_id = 'map'
-
-    #     wrench_msg.wrench.force.x = float(self.F_cmd[0])
-    #     wrench_msg.wrench.force.y = float(self.F_cmd[1])
-    #     wrench_msg.wrench.force.z = float(self.F_cmd[2])
-    #     wrench_msg.wrench.torque.x = float(self.T_cmd[0])
-    #     wrench_msg.wrench.torque.y = float(self.T_cmd[1])
-    #     wrench_msg.wrench.torque.z = float(self.T_cmd[2])
-
-    #     self.force_torque_cmd_pub.publish(wrench_msg)
 
     def start_callback(self, msg):
         if msg.data:
@@ -330,25 +303,11 @@ class MPCNode(Node):
         u[0:3] /= self.F_scaling
         u[3:6] /= self.T_scaling
 
-        # if self.model_name == "atmos":
-        #     # ENU -> NED transformation
-        #     force_output_msg.xyz = [u[0], -u[1], -u[2]]
-        #     torque_output_msg.xyz = [u[3], -u[4], -u[5]]
-        # else:
         force_output_msg.xyz = [u[0], u[1], u[2]]
         torque_output_msg.xyz = [u[3], u[4], u[5]]
-        # EKF in FLU frame so don't transform
-        # self.F_app = u[:3]
-        # self.T_app = u[3:6]
-        # self.get_logger().info(f"Applied force: {force_output_msg.xyz}")
-        # self.get_logger().info(f"Applied torque: {torque_output_msg.xyz}")
 
         self.publisher_thrust_setpoint.publish(force_output_msg)
         self.publisher_torque_setpoint.publish(torque_output_msg)
-        # force_output_msg.xyz = [0.0, 0.0, 0.0]
-        # torque_output_msg.xyz = [0.0, 0.0, 0.0]
-        # self.publisher_thrust_setpoint.publish(force_output_msg)
-        # self.publisher_torque_setpoint.publish(torque_output_msg)
 
     def publish_offboard_mode(self):
         # self.get_logger().info("Publishing offboard mode")
@@ -489,7 +448,7 @@ class MPCNode(Node):
                        self.vehicle_angular_velocity[1],
                        self.vehicle_angular_velocity[2]]).reshape(13, 1)
 
-        self.get_logger().info(f"x0: {x0.flatten()}")
+        # self.get_logger().info(f"x0: {x0.flatten()}")
         if not self.started:
             # self.get_logger().info("Mission not started, using constant reference (t=0)")
             times = np.zeros(self.mpc.Nx + 1)  # No time since start, constant reference
@@ -510,6 +469,7 @@ class MPCNode(Node):
             # rotation matrix of FRD in NED
             q = R.from_quat(self.vehicle_attitude, scalar_first=True)
             u_ref = -np.concatenate((q.inv().apply(fd_est), td_est), axis=0).reshape((6, 1))
+            # self.get_logger().info(f"u_ref: {u_ref.flatten()}")
         else:
             u_ref = np.zeros((6, 1))
             fd_est = np.zeros((3, 1))
@@ -529,14 +489,14 @@ class MPCNode(Node):
         #     self.get_logger().info(f"dt: {t-self.t0}")
         #     x_ref[:, idx] = test_points[test_idx]
             # self.get_logger().info(f"{x_ref[:, test_idx].flatten()}")
-            x_ref[:, idx] = np.array([0., 1.5, -0.6,
-                                    #   1.0, 0., 0., 0.,
-                                    #   0.5, 0.5, 0.5, 0.5,
-                                      1/np.sqrt(2), 0., 0., 1/np.sqrt(2),
-                                    # 1/np.sqrt(2), -1/np.sqrt(2), 0., 0.,
-                                      0., 0., 0.,
-                                      0., 0., 0.]).reshape(13,)
-            # x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
+            # x_ref[:, idx] = np.array([1.5, 0.0, -0.6,
+            #                            1.0, 0., 0., 0.,
+            #                         #   0.5, 0.5, 0.5, 0.5,
+            #                         #  1/np.sqrt(2), 0., 0., 1/np.sqrt(2),
+            #                         # 1/np.sqrt(2), -1/np.sqrt(2), 0., 0.,
+            #                           0., 0., 0.,
+            #                           0., 0., 0.]).reshape(13,)
+            x_ref[:, idx] = get_reference_trajectory(ti, self.reference, order='xyz')
 
         x_ref = np.vstack((x_ref, np.repeat(u_ref, x_ref.shape[1], axis=1)))  # Append u_ref to x_ref
         x_ref[:3, :] += self.offset.reshape(3, 1)
@@ -578,6 +538,8 @@ class MPCNode(Node):
             self.T_cmd = np.zeros((3, 1))
             self.other_F_cmd = np.zeros((3, 1))
             self.other_T_cmd = np.zeros((3, 1))
+
+        self.get_logger().info(f"Control (F,N; T,Nm): {self.control[0:3].flatten()}, {self.control[3:6].flatten()}")
 
         # quat_error = (x_pred[0, 6:10] @ x_ref[6:10, 0])**2
         # self.get_logger().warning(f"quat_error: {1-quat_error}")

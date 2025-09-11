@@ -11,23 +11,48 @@ import matplotlib.pyplot as plt
 from rosbag_class import RosBagClass
 import pandas as pd
 
-robot_name = 'bluerov'
-experiment = 1
 
 # 2D experiment bluerov
-folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_uw_2/rosbag2_2025_09_09-12_25_24/"
-offset=np.array([0.5,0,0])
-threeD=False
+# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_uw_2/rosbag2_2025_09_09-12_25_24/"
+# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_uw_2/rosbag2_2025_09_09-12_26_57/"
+# folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_uw_2/rosbag2_2025_09_09-12_29_00/"
+# offset=np.array([0.5,0,0])
+# threeD=False
+# robot_name = 'bluerov'
+# experiment = 1
 
-# # 3D experiment bluerov
+# 3D experiment bluerov
 # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_2_uw_1/rosbag2_2025_09_09-17_12_26/"
-# offset = np.array([0.3,0.3,1.6])
+# folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_2_uw_1/rosbag2_2025_09_09-17_14_20/"
+# folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_2_uw_1/rosbag2_2025_09_09-17_17_23/"
+folder_path = '/home/none/space_ws/rosbag2_2025_09_11-13_28_16'
+offset = np.array([0.3,0.3,1.6])
+threeD=True
+robot_name = 'bluerov'
+experiment = 2
+
+# 2D experiment ATMOS
+# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_sp_1/rosbag2_2025_09_10-12_45_33/"
+# folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_sp_1/rosbag2_2025_09_10-12_48_09/"
+# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_sp_1/rosbag2_2025_09_10-12_50_34/"
+# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_sp_1/rosbag2_2025_09_10-14_22_08/"
+# offset = np.array([0,-0.75,0])
+# threeD=False
+# robot_name = 'atmos'
+# experiment = 1
+
+# # 3D experiment cubesat
+# folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_2_sp_1/rosbag2_2025_09_10-16_17_46/"
+# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_2_sp_1/rosbag2_2025_09_10-16_29_39/"
+# offset = np.array([0,-2,0])
 # threeD=True
+# robot_name = 'cubesat'
+# experiment = 2
 
 csv_file_path = os.path.join(folder_path, 'plotjuggler.csv')
 csv_file  = pd.read_csv(csv_file_path)
 
-plan_file_path = os.path.join(folder_path, f'plans/{robot_name}_nonlinear_solution.npz')
+plan_file_path = os.path.join(folder_path, f'plans/exp_{experiment}/{robot_name}_nonlinear_solution.npz')
 plan = np.load(plan_file_path)
 
 images_path = os.path.join(folder_path, 'images')

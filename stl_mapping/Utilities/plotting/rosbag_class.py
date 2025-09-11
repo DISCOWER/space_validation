@@ -35,13 +35,17 @@ class RosBagClass():
 
         print(f"alpha: {self.plan['alpha']}")
         print(f"dt: {self.plan['dt']}")
+        print(f"Tf: {self.plan['times'][-1]}")
 
         if self.robot_name == 'atmos':
-            self.robot_ns = 'snap'
+            self.robot_ns = 'pop'
             self.robot = FreeFlyer()
         elif self.robot_name == 'bluerov':
             self.robot_ns = 'itrl_rov_1'
             self.robot = BlueROV()
+        elif self.robot_name == 'cubesat':
+            self.robot_ns = 'bskSat0'
+            self.robot = FreeFlyer()
 
         if exp == 1:
             X0 = HyperRectangle(center=np.array([0,1.5, 0]),                   size=np.array([0.5, 0.5, 0.5]), color='g', name=r'X0')
@@ -83,7 +87,10 @@ class RosBagClass():
                     data[field] = np.array([])
             return data
 
-        topic = f'/{self.robot_ns}/fmu/out/vehicle_local_position_v1/'
+        if self.robot_name == 'atmos':
+            topic = f'/{self.robot_ns}/fmu/out/vehicle_local_position/'
+        else:
+            topic = f'/{self.robot_ns}/fmu/out/vehicle_local_position_v1/'
         fields = ['timestamp','x','y','z','vx','vy','vz']
         topics['vehicle_local_position'] = get_data(topic, fields)
         # fix xyz with offset
@@ -125,7 +132,21 @@ class RosBagClass():
         fields = ['timestamp', 'xyz[0]', 'xyz[1]', 'xyz[2]']
         topics['post_fbl_torque_setpoint'] = get_data(topic, fields)
 
-        topic = f'/{self.robot_ns}/bluerov/disturbance_estimate/'
+        topic = f'/stl_mapping/force_setpoint/'
+        fields = ['timestamp', 'xyz[0]', 'xyz[1]', 'xyz[2]']
+        try:
+            topics['force_setpoint'] = get_data(topic, fields)
+        except:
+            print("Warning: Force setpoint topic not found in CSV file.")
+        
+        topic = f'/stl_mapping/torque_setpoint/'
+        fields = ['timestamp', 'xyz[0]', 'xyz[1]', 'xyz[2]']
+        try:
+            topics['torque_setpoint'] = get_data(topic, fields)
+        except:
+            print("Warning: Torque setpoint topic not found in CSV file.")
+
+        topic = f'/{self.robot_ns}/{self.robot_name}/disturbance_estimate/'
         fields = ['header/stamp/sec','twist/twist/linear/x','twist/twist/linear/y','twist/twist/linear/z',
                   'twist/twist/angular/x','twist/twist/angular/y','twist/twist/angular/z']
         fields += [f'twist/covariance[{i}]' for i in range(36)]
@@ -134,6 +155,25 @@ class RosBagClass():
 
         self.topics = topics
 
+        # fix order for plotting depending on robot (NED or ENU)
+        if self.robot_name == 'atmos' or self.robot_name == 'cubesat':
+            # swap x and y, invert z
+            x = topics['vehicle_local_position']['x'].copy()
+            y = topics['vehicle_local_position']['y'].copy()
+            z = topics['vehicle_local_position']['z'].copy()
+            topics['vehicle_local_position']['x'] = y
+            topics['vehicle_local_position']['y'] = -x
+            topics['vehicle_local_position']['z'] = -z
+
+            vx = topics['vehicle_local_position']['vx'].copy()
+            vy = topics['vehicle_local_position']['vy'].copy()
+            vz = topics['vehicle_local_position']['vz'].copy()
+            topics['vehicle_local_position']['vx'] = vy
+            topics['vehicle_local_position']['vy'] = vx
+            topics['vehicle_local_position']['vz'] = -vz
+        if self.robot_name == 'cubesat':
+            z = topics['vehicle_local_position']['z'].copy()
+            topics['vehicle_local_position']['z'] = -z
     #! Plotting individual topics
 
     def plot_images(self, fig: plt.Figure, ax: plt.Axes, images_path: str):
@@ -169,27 +209,6 @@ class RosBagClass():
 
         # hide the parent axes (so only children are visible)
         ax.axis("off")
-
-
-
-    # def plot_images(self,fig:plt.Figure, ax:plt.Axes, images_path:str):
-    #     vehicle_local_position = self.topics['vehicle_local_position']
-    #     loc_pos_time = (vehicle_local_position['timestamp']-vehicle_local_position['timestamp'][0])/1e6
-    #     indices = np.round(np.linspace(0, len(loc_pos_time)-1, 6)).astype(int)
-
-    #     # within images_path, find all png files and sort them
-    #     image_files = [f for f in os.listdir(images_path) if f.endswith('.png')]
-    #     image_files.sort()
-    #     # then count them 
-    #     N = len(image_files)
-    #     # and plot them in the axis in a N/2 x 2 grid
-    #     for i, image_file in enumerate(image_files):
-    #         img = plt.imread(os.path.join(images_path, image_file))
-    #         ax_img = fig.add_subplot(N//2, 2, i+1)
-    #         ax_img.imshow(img)
-    #         ax_img.axis('off')
-    #         # title is time rounded to 1 decimal place
-    #         ax_img.set_title(f'Time: {loc_pos_time[indices[i]]:.1f} s')
 
     def plot_position(self,ax:plt.Axes,plot_robot:int=0):
         vehicle_local_position = self.topics['vehicle_local_position']
@@ -245,28 +264,33 @@ class RosBagClass():
         ax.plot(self.plan['times'], self.plan['x'][:,1], 'g--')#, label=r'$y_{ref}$')
         if self.threeD:
             ax.plot(self.plan['times'], self.plan['x'][:,2], 'b--')#, label=r'$z_{ref}$')
+
         ax.plot(rosbag_time, vehicle_local_position['x'], 'r-', label=r'$x$')
         ax.plot(rosbag_time, vehicle_local_position['y'], 'g-', label=r'$y$')
         if self.threeD:
             ax.plot(rosbag_time, vehicle_local_position['z'], 'b-', label=r'$z$')
 
         # find the maximal spatial deviation
-        x_ex = np.array([vehicle_local_position['x'], vehicle_local_position['y'], vehicle_local_position['z']])
-        x_ref_interp = np.array([np.interp(np.array(rosbag_time), self.plan['times'], self.plan['x'][:,i]) for i in range(3)])
+        x_ex = np.array([vehicle_local_position['x'], vehicle_local_position['y']])
+        if self.threeD:
+            x_ex = np.vstack((x_ex, vehicle_local_position['z']))
+            n_dim = 3
+        else:
+            n_dim = 2
+        x_ref_interp = np.array([np.interp(np.array(rosbag_time), self.plan['times'], self.plan['x'][:,i]) for i in range(n_dim)])
         D = np.abs(x_ex - x_ref_interp)
         max_dev, max_idx, max_dim = -np.inf, 0, 0
-        for i, d in enumerate(D.T):
-            if np.max(d) > max_dev:
-                max_dev = np.max(d)
-                max_idx = i
-                max_dim = np.argmax(d)
+        for d in range(D.shape[0]):
+            for i in range(D.shape[1]):
+                if D[d,i] > max_dev:
+                    max_dev = D[d,i]
+                    max_idx = i
+                    max_dim = d
         t = rosbag_time[max_idx]
-        # print(f"t: {t}")
-
         ax.plot([t,t], [min(x_ref_interp[max_dim,max_idx], x_ex[max_dim,max_idx]), 
                         max(x_ref_interp[max_dim,max_idx], x_ex[max_dim,max_idx])],'k--',linewidth=3)
         # and add text with the value of it $\rho_{\phi}=max_dev$
-        ax.text(t, max(x_ref_interp[max_dim,max_idx], x_ex[max_dim,max_idx]), f"$\\rho_{{\\phi}}={max_dev:.2f}$", fontsize=12, ha='center')
+        ax.text(t, max(x_ref_interp[max_dim,max_idx], x_ex[max_dim,max_idx]), f"$\\delta_{{\\phi}}={max_dev:.2f}$", fontsize=12, ha='center')
 
         ax.set_title('Position over Time')
         # ax.set_xlabel('Time (s)')
@@ -300,6 +324,9 @@ class RosBagClass():
         rosbag_time = (vehicle_attitude['timestamp']-vehicle_attitude['timestamp'][0])/1e6
 
         q = np.array([vehicle_attitude['q[0]'], vehicle_attitude['q[1]'], vehicle_attitude['q[2]'], vehicle_attitude['q[3]']]).T
+        if self.robot_name == 'atmos' or self.robot_name == 'cubesat':
+            r = R.from_euler('xyz', [0, 0, 90], degrees=True)
+            q = (r * R.from_quat(q, scalar_first=True)).as_quat()  # rotate 90 degrees around z-axis to match ENU frame
 
         ax.plot(self.plan['times'], np.abs(self.plan['x'][:,3]), 'r--')#, label=r'$q^w_{ref}$')
         ax.plot(self.plan['times'], np.abs(self.plan['x'][:,4]), 'g--')#, label=r'$q^x_{ref}$')
@@ -310,7 +337,7 @@ class RosBagClass():
         ax.plot(rosbag_time, np.abs(q[:,2]), 'b-', label=r'$q^y$')
         ax.plot(rosbag_time, np.abs(q[:,3]), 'c-', label=r'$q^z$')
         ax.set_title('Attitude')
-        # ax.set_xlabel('time (s)')
+        ax.set_xlabel('time (s)')
         ax.set_ylabel('quaternion')
         ax.set_ylim([-0.1, 2.0])
         ax.grid()
@@ -340,7 +367,12 @@ class RosBagClass():
 
     def plot_force(self,ax):
         # TODO: add two y-axis for force and torque
-        vehicle_thrust_setpoint = self.topics['post_fbl_force_setpoint']
+        if self.robot_name == 'atmos' or self.robot_name == 'cubesat':
+            vehicle_thrust_setpoint = self.topics['force_setpoint']
+            vehicle_torque_setpoint = self.topics['torque_setpoint']
+        else:
+            vehicle_thrust_setpoint = self.topics['post_fbl_force_setpoint']
+            vehicle_torque_setpoint = self.topics['post_fbl_torque_setpoint']
         rosbag_time = (vehicle_thrust_setpoint['timestamp']-vehicle_thrust_setpoint['timestamp'][0])/1e6
 
         f = np.array([vehicle_thrust_setpoint['xyz[0]'], vehicle_thrust_setpoint['xyz[1]'], vehicle_thrust_setpoint['xyz[2]']]).T
@@ -354,22 +386,30 @@ class RosBagClass():
         # ax.set_xlabel('time (s)')
         ax.set_ylabel('thrust (N)')
         ax.grid()
+
+        # ------ second axis for torque -------
+        rosbag_time = (vehicle_torque_setpoint['timestamp']-vehicle_torque_setpoint['timestamp'][0])/1e6
+        ax2 = ax.twinx()
+        tau = np.array([vehicle_torque_setpoint['xyz[0]'], vehicle_torque_setpoint['xyz[1]'], vehicle_torque_setpoint['xyz[2]']]).T
+        if self.threeD:
+            ax2.plot(rosbag_time, tau[:,0], 'c-', label=r'$\tau_x$')
+            ax2.plot(rosbag_time, tau[:,1], 'm-', label=r'$\tau_y$')
+        ax2.plot(rosbag_time, tau[:,2], 'y-', label=r'$\tau_z$')
+        ax2.set_ylabel('torque (Nm)')
+        print(f"U_torque bounds: {self.robot.U.lower_bounds[-1]}, {self.robot.U.upper_bounds[-1]}")
+        ax2.axhline(self.robot.U.lower_bounds[-1], color='k', linestyle='--')
+        ax2.axhline(self.robot.U.upper_bounds[-1], color='k', linestyle='--')
+
         ax.legend()
 
     def plot_disturbance(self,ax,sigma=1):
         disturbance_estimate = self.topics['disturbance_estimate']
-        # TODO: ensure time is properly recorded in message
-        # TODO: two y-axis
-        # rosbag_time = np.array([float(t) for t in disturbance_estimate['time']])
-        # rosbag_time = (rosbag_time - rosbag_time[0])
         rosbag_time = (self.topics['post_fbl_force_setpoint']['timestamp']-self.topics['post_fbl_force_setpoint']['timestamp'][0])/1e6
         rosbag_time = np.linspace(rosbag_time[0], rosbag_time[-1], len(disturbance_estimate['twist/twist/linear/x']))
 
         dx = disturbance_estimate['twist/twist/linear/x']
         dy = disturbance_estimate['twist/twist/linear/y']
         dz = disturbance_estimate['twist/twist/linear/z']
-        # cov = disturbance_estimate['twist.covariance']
-
         cov_x = 3*disturbance_estimate['covariance'][:,0]
         cov_y = 3*disturbance_estimate['covariance'][:,7]
         cov_z = 3*disturbance_estimate['covariance'][:,14]
@@ -389,4 +429,28 @@ class RosBagClass():
         ax.set_xlabel('time (s)')
         ax.set_ylabel('disturbance (N)')
         ax.grid()
-        ax.legend()
+
+        # ------ second axis for torque -------
+        ax2 = ax.twinx()
+        tx = disturbance_estimate['twist/twist/angular/x']
+        ty = disturbance_estimate['twist/twist/angular/y']
+        tz = disturbance_estimate['twist/twist/angular/z']
+        cov_tx = 3*disturbance_estimate['covariance'][:,21]
+        cov_ty = 3*disturbance_estimate['covariance'][:,28]
+        cov_tz = 3*disturbance_estimate['covariance'][:,35]
+        if self.threeD:
+            ax2.plot(rosbag_time, tx, 'c-', label=r'$\tau_x$')
+            ax2.fill_between(rosbag_time, tx - sigma*cov_tx, tx + sigma*cov_tx, color='c', alpha=0.2)
+            ax2.plot(rosbag_time, ty, 'm-', label=r'$\tau_y$')
+            ax2.fill_between(rosbag_time, ty - sigma*cov_ty, ty + sigma*cov_ty, color='m', alpha=0.2)
+        ax2.plot(rosbag_time, tz, 'y-', label=r'$\tau_z$')
+        ax2.fill_between(rosbag_time, tz - sigma*cov_tz, tz + sigma*cov_tz, color='y', alpha=0.2)
+        ax2.set_ylabel('torque (Nm)')
+        print(f"D_torque bounds: {self.robot.D.lower_bounds[-1]}, {self.robot.D.upper_bounds[-1]}")
+        ax2.axhline(self.plan['alpha']*self.robot.D.lower_bounds[-1], color='k', linestyle='--')
+        ax2.axhline(self.plan['alpha']*self.robot.D.upper_bounds[-1], color='k', linestyle='--')
+
+        lines, labels = ax.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax2.legend(lines + lines2, labels + labels2, loc='upper right')
+        # ax.legend()

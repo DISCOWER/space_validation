@@ -9,7 +9,7 @@ class EKFWrenchEstimator(Node):
     def __init__(self, dt:float = 0.1, robot_name:str = 'atmos'):
         super().__init__('ekf_wrench_estimator')
         self.robot_name = robot_name
-        if robot_name == 'atmos':
+        if robot_name == 'atmos' or robot_name == 'cubesat':
             self.robot = FreeFlyer()
         elif robot_name == 'bluerov':
             self.robot = BlueROV()
@@ -34,22 +34,22 @@ class EKFWrenchEstimator(Node):
         self.inertia_inv = np.linalg.inv(self.inertia)
 
         # captures how quickly it can change per second 
-        # if self.robot_name == 'atmos':
-        #     qv = (0.6/self.mass * self.dt)**2
-        #     qw = [(0.12 / self.inertia[i, i] * self.dt)**2 for i in range(3)]
-        #     qfd = (0.2*self.dt)**2      # 200mN/s
-        #     qtd = (0.05*self.dt)**2
-        #     rv = (1e-2*self.dt)**2
-        #     rw = (0.05*self.dt)**2
-        # elif self.robot_name == 'bluerov':
-        qv = (0.6/self.mass * self.dt)**2
-        qw = [(0.12 / self.inertia[i, i] * self.dt)**2 for i in range(3)]
-        qfd = 15*(0.2*self.dt)**2      # 200mN/s
-        qtd = 1*(0.05*self.dt)**2
-        rv = (1e-2*self.dt)**2
-        rw = (0.05*self.dt)**2
-        # else:
-        #     raise ValueError(f"Unknown robot name: {robot_name}")
+        if self.robot_name == 'atmos' or self.robot_name == 'cubesat':
+            qv = (0.6/self.mass * self.dt)**2
+            qw = [(0.12 / self.inertia[i, i] * self.dt)**2 for i in range(3)]
+            qfd = (0.2*self.dt)**2      # 200mN/s
+            qtd = (0.05*self.dt)**2
+            rv = (1e-2*self.dt)**2
+            rw = (0.05*self.dt)**2
+        elif self.robot_name == 'bluerov':
+            qv = (0.6/self.mass * self.dt)**2
+            qw = [(0.12 / self.inertia[i, i] * self.dt)**2 for i in range(3)]
+            qfd = 15*(0.2*self.dt)**2      # 200mN/s
+            qtd = 1*(0.05*self.dt)**2
+            rv = (1e-2*self.dt)**2
+            rw = (0.05*self.dt)**2
+        else:
+            raise ValueError(f"Unknown robot name: {robot_name}")
 
         # State: [v, w, fd, td] in R^12
         self.x = np.zeros(12)  # Initial state vector
