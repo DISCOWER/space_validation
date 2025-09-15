@@ -93,12 +93,12 @@ class MpcWrench(Node):
             #! Cubesat weights
             self.Q = np.diag([          # State weighting matrix
                 1e2, 1e2, 1e2,
-                5e2, 1e2, 1e2, 1e2,
+                2e2, 1e2, 1e2, 1e2,
                 3e2, 3e2, 3e2,  
-                3e2, 3e2, 3e2])          
+                3e0, 3e0, 3e0])          
             self.R = 10*np.diag([          # State weighting matrix
                 1e0, 1e0, 1e0,
-                2e2, 2e2, 2e2]) 
+                2e1, 2e1, 2e1]) 
             self.P = 10 * self.Q        # Terminal state weighting matrix
             #! Cubesat Bounds
             self.lbx = np.array([-8, -8, -0.5, -0.5, -3])

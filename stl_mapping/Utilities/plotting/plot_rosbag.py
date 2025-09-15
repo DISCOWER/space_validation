@@ -13,37 +13,42 @@ import pandas as pd
 
 
 # 2D experiment bluerov
-# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_uw_2/rosbag2_2025_09_09-12_25_24/"
-# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_uw_2/rosbag2_2025_09_09-12_26_57/"
-# folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_uw_2/rosbag2_2025_09_09-12_29_00/"
-# offset=np.array([0.5,0,0])
+# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_uw/rosbag2_2025_09_11-15_40_04/"
+# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_uw/rosbag2_2025_09_11-15_41_34/"
+# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_uw/rosbag2_2025_09_11-15_43_16/"
+# folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_uw/rosbag2_2025_09_11-15_53_28/"
+# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_uw/rosbag2_2025_09_11-15_54_57/"
+# offset=np.array([1.2,0,1.25])
 # threeD=False
 # robot_name = 'bluerov'
 # experiment = 1
 
 # 3D experiment bluerov
-# folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_2_uw_1/rosbag2_2025_09_09-17_12_26/"
-# folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_2_uw_1/rosbag2_2025_09_09-17_14_20/"
-# folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_2_uw_1/rosbag2_2025_09_09-17_17_23/"
-folder_path = '/home/none/space_ws/rosbag2_2025_09_11-13_28_16'
-offset = np.array([0.3,0.3,1.6])
-threeD=True
-robot_name = 'bluerov'
-experiment = 2
+# folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_2_uw/rosbag2_2025_09_11-14_12_00/"
+# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_2_uw/rosbag2_2025_09_11-14_14_32/"
+# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_2_uw/rosbag2_2025_09_11-14_16_34/"
+# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_2_uw/rosbag2_2025_09_11-14_41_52/"
+# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_2_uw/rosbag2_2025_09_11-14_43_52/"
+# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_2_uw/rosbag2_2025_09_11-14_46_05/"
+# offset = np.array([0.65,0.2,1.7])
+# threeD=True
+# robot_name = 'bluerov'
+# experiment = 2
 
 # 2D experiment ATMOS
-# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_sp_1/rosbag2_2025_09_10-12_45_33/"
-# folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_sp_1/rosbag2_2025_09_10-12_48_09/"
-# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_sp_1/rosbag2_2025_09_10-12_50_34/"
-# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_sp_1/rosbag2_2025_09_10-14_22_08/"
-# offset = np.array([0,-0.75,0])
-# threeD=False
-# robot_name = 'atmos'
-# experiment = 1
+# folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_sp/rosbag2_2025_09_10-12_45_33/"
+folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_sp/rosbag2_2025_09_10-12_48_09/"
+# folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_sp/rosbag2_2025_09_10-12_50_34/"
+# folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_1_sp/rosbag2_2025_09_10-14_22_08/"
+offset = np.array([0,-0.75,0])
+threeD=False
+robot_name = 'atmos'
+experiment = 1
 
 # # 3D experiment cubesat
-# folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_2_sp_1/rosbag2_2025_09_10-16_17_46/"
-# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_2_sp_1/rosbag2_2025_09_10-16_29_39/"
+# folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_2_sp/rosbag2_2025_09_11-18_47_11/"
+# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_2_sp/rosbag2_2025_09_11-18_50_03/"
+# # folder_path = f"{str(Path.home())}/space_ws/rosbags/exp_2_sp/rosbag2_2025_09_11-18_50_03/"
 # offset = np.array([0,-2,0])
 # threeD=True
 # robot_name = 'cubesat'
@@ -107,11 +112,11 @@ ax_f = fig.add_subplot(gs[0,4])
 ax_d = fig.add_subplot(gs[1,4])
 
 obj.plot_images(fig, ax_img, images_path)
-obj.plot_position(ax_p,plot_robot=6)
-obj.plot_position_time(ax_p2)
-obj.plot_attitude(ax_q)
-obj.plot_force(ax_f)
-obj.plot_disturbance(ax_d,sigma=2)
+obj.plot_position(fig, ax_p,plot_robot=6)
+obj.plot_position_time(fig, ax_p2)
+obj.plot_attitude(fig, ax_q)
+obj.plot_force(fig, ax_f)
+obj.plot_disturbance(fig, ax_d,sigma=2)
 
 
 # plt.show()

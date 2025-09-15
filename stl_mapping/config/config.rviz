@@ -31,7 +31,9 @@ Panels:
         - /InteractiveMarkers4
         - /Path15
         - /Pose5
+        - /Pose6
         - /Path16
+        - /Path17
         - /Path18
       Splitter Ratio: 0.5
     Tree Height: 521
@@ -703,7 +705,6 @@ Visualization Manager:
         Value: /camera/camera/color/image_raw
       Value: true
       Visibility:
-        "": true
         Camera: true
         Grid: true
         Image: true
@@ -980,7 +981,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /bskSc/px4_visualizer/vehicle_pose
+        Value: /bskSc0/px4_visualizer/vehicle_pose
       Value: true
     - Alpha: 1
       Buffer Length: 1
@@ -1008,7 +1009,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /bskSc/px4_visualizer/setpoint_path
+        Value: /bskSc0/px4_visualizer/setpoint_path
       Value: true
     - Alpha: 1
       Buffer Length: 1
@@ -1064,7 +1065,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /bskSc/px4_visualizer/vehicle_path
+        Value: /bskSc0/px4_visualizer/vehicle_path
       Value: true
   Enabled: true
   Global Options:

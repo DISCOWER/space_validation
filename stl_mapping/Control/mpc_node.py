@@ -150,7 +150,7 @@ class MPCNode(Node):
 
         # Settings
         self.offset_free = True
-        self.feedback_equivalence = True
+        self.feedback_equivalence = False
 
         # Disturbance variables
         self.F_cmd = np.zeros((3, 1))  # Force commanded
@@ -175,13 +175,15 @@ class MPCNode(Node):
         NORMALIZED_WRENCH = True  # Use normalized wrench for control input
         self.F_thruster = 1.4  # Thrust force per motor
         self.r_thruster = 0.12  # Distance from center to thruster in meters
-        if self.model_name == "atmos" or self.model_name == "cubesat":
+        if self.model_name == "atmos":
             self.F_scaling = 2 * self.F_thruster if NORMALIZED_WRENCH else 1.0
             self.T_scaling = 4 * self.r_thruster * self.F_thruster if NORMALIZED_WRENCH else 1.0
         elif self.model_name == "bluerov":
             self.F_scaling = np.array([72, 72, 26])
-            # self.T_scaling = np.array([12, 14, 22])
             self.T_scaling = np.array([20, 14, 22])
+        elif self.model_name == "cubesat":
+            self.F_scaling = 1.0
+            self.T_scaling = 1.0
         else:
             raise Exception("Unknown model name for wrench scaling")
 
@@ -570,6 +572,7 @@ class MPCNode(Node):
         self.predicted_path_pub.publish(predicted_path_msg)
 
         if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+            self.get_logger().info("In OFFBOARD mode, publishing wrench setpoint")
             self.publish_wrench_setpoint(self.control)
 
 
