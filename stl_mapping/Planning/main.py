@@ -32,8 +32,8 @@ bigM = 1e4
 euler_order = 'xyz'
 
 ### STL Specification
-# scenario = 'paper2D'
-scenario = 'paper3D'
+scenario = 'paper2D'
+# scenario = 'paper3D'
 
 if scenario == 'paper2D':
     sp_robot = LinearFreeFlyer6DoF(envelope=True, model="atmos")  # linearized 6DoF free-flyer

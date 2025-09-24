@@ -33,7 +33,9 @@ class RosBagClass():
         self.plan = plan
         self.offset = offset
 
-        print(f"alpha: {self.plan['alpha']}")
+        self.alpha = self.plan['alpha']
+
+        print(f"alpha: {self.alpha}")
         print(f"dt: {self.plan['dt']}")
         print(f"Tf: {self.plan['times'][-1]}")
 
@@ -234,6 +236,8 @@ class RosBagClass():
         # inset.axis('off')
         # hide the parent axes (so only children are visible)
         ax.axis("off")
+        # (a) label in the top left
+        ax.text(0.05, 1.08, '(a)', transform=ax.transAxes, fontsize=12, fontweight='bold', va='top', ha='right')
 
     def plot_position(self, fig: plt.Figure, ax: plt.Axes, plot_robot: int = 0):
         vehicle_local_position = self.topics['vehicle_local_position']
@@ -282,6 +286,9 @@ class RosBagClass():
         ax.grid()
         ax.legend(**self.legend_kwargs, bbox_to_anchor=(0.5, -0.2), loc='lower center', ncol=2)
 
+        # (b) label in the top left
+        ax.text(-0.1, 1.08, '(b)', transform=ax.transAxes, fontsize=12, fontweight='bold', va='top', ha='right')
+
     def plot_position_time(self, fig: plt.Figure, ax: plt.Axes):
         vehicle_local_position = self.topics['vehicle_local_position']
         rosbag_time = (vehicle_local_position['timestamp']-vehicle_local_position['timestamp'][0])/1e6
@@ -324,6 +331,8 @@ class RosBagClass():
         
         ax.legend(**self.legend_kwargs, 
                   loc='lower center', ncol=(self.threeD+2), bbox_to_anchor=(0.5, -0.35))
+        
+        ax.text(-0.05, 1.2, '(c)', transform=ax.transAxes, fontsize=12, fontweight='bold', va='top', ha='right')
 
     def plot_velocity(self, fig: plt.Figure, ax: plt.Axes):
         vehicle_local_position = self.topics['vehicle_local_position']
@@ -375,6 +384,8 @@ class RosBagClass():
 
         ax.legend(**self.legend_kwargs, 
                   loc='lower center', bbox_to_anchor=(0.5, -0.5), ncol=4)
+        
+        ax.text(-0.05, 1.2, '(e)', transform=ax.transAxes, fontsize=12, fontweight='bold', va='top', ha='right')
 
     def plot_angular_velocity(self, fig: plt.Figure, ax: plt.Axes):
         vehicle_angular_velocity = self.topics['vehicle_angular_velocity']
@@ -440,6 +451,8 @@ class RosBagClass():
         lines2, labels2 = ax2.get_legend_handles_labels()
         ax2.legend(lines + lines2, labels + labels2, **self.legend_kwargs, 
                    loc='lower center', ncol=(self.threeD+1)*3, bbox_to_anchor=(0.5, -0.35))
+        
+        ax.text(-0.05, 1.2, '(d)', transform=ax.transAxes, fontsize=12, fontweight='bold', va='top', ha='right')
 
     def plot_disturbance(self, fig: plt.Figure, ax: plt.Axes, sigma=1):
         disturbance_estimate = self.topics['disturbance_estimate']
@@ -461,9 +474,9 @@ class RosBagClass():
             ax.plot(rosbag_time, dz, 'r-', label=r'$d_z$')
             ax.fill_between(rosbag_time, dz - sigma*cov_z, dz + sigma*cov_z, color='r', alpha=0.2)
         # vertical lines of \alpha D
-        ax.axhline(self.plan['alpha']*self.robot.D.lower_bounds[0], color='k', linestyle='--')
-        ax.axhline(self.plan['alpha']*self.robot.D.upper_bounds[0], color='k', linestyle='--')
-        ax.set_ylim([self.plan['alpha']*self.robot.D.lower_bounds[0]*1.1, self.plan['alpha']*self.robot.D.upper_bounds[0]*1.1])
+        ax.axhline(self.alpha*self.robot.D.lower_bounds[0], color='k', linestyle='--')
+        ax.axhline(self.alpha*self.robot.D.upper_bounds[0], color='k', linestyle='--')
+        ax.set_ylim([self.alpha*self.robot.D.lower_bounds[0]*1.1, self.alpha*self.robot.D.upper_bounds[0]*1.1])
         # ax.set_ylim([-10,10])
         ax.set_title('Estimated Disturbance')
         ax.set_xlabel('time (s)')
@@ -487,9 +500,9 @@ class RosBagClass():
         ax2.fill_between(rosbag_time, tz - sigma*cov_tz, tz + sigma*cov_tz, color='y', alpha=0.2)
         ax2.set_ylabel('torque (Nm)')
         print(f"D_torque bounds: {self.robot.D.lower_bounds[-1]}, {self.robot.D.upper_bounds[-1]}")
-        ax2.axhline(self.plan['alpha']*self.robot.D.lower_bounds[-1], color='k', linestyle='--')
-        ax2.axhline(self.plan['alpha']*self.robot.D.upper_bounds[-1], color='k', linestyle='--')
-        ax2.set_ylim([self.plan['alpha']*self.robot.D.lower_bounds[-1]*1.1, self.plan['alpha']*self.robot.D.upper_bounds[-1]*1.1])
+        ax2.axhline(self.alpha*self.robot.D.lower_bounds[-1], color='k', linestyle='--')
+        ax2.axhline(self.alpha*self.robot.D.upper_bounds[-1], color='k', linestyle='--')
+        ax2.set_ylim([self.alpha*self.robot.D.lower_bounds[-1]*1.1, self.alpha*self.robot.D.upper_bounds[-1]*1.1])
 
         # gs_pos = ax.get_subplotspec().get_position(fig)
         # ax.set_position([gs_pos.x0, gs_pos.y0 + 0.02, gs_pos.width, gs_pos.height])
@@ -499,3 +512,8 @@ class RosBagClass():
         lines2, labels2 = ax2.get_legend_handles_labels()
         ax2.legend(lines + lines2, labels + labels2, **self.legend_kwargs,
                    loc='lower center', ncol=(self.threeD+1)*3, bbox_to_anchor=(0.5, -0.5))
+
+        ax.text(-0.05, 1.2, '(f)', transform=ax.transAxes, fontsize=12, fontweight='bold', va='top', ha='right')
+
+
+        
