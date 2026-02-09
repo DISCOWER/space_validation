@@ -1,6 +1,7 @@
-name: stl_mapping
+name: space_validation
 channels:
   - defaults
+  - conda-forge
   - https://repo.anaconda.com/pkgs/main
   - https://repo.anaconda.com/pkgs/r
 dependencies:
@@ -229,7 +230,6 @@ dependencies:
   - markdown=3.4.1=py310h06a4308_0
   - markdown-it-py=2.2.0=py310h06a4308_1
   - markupsafe=3.0.2=py310h5eee18b_0
-  - matplotlib=3.10.0=py310h06a4308_0
   - matplotlib-base=3.10.0=py310hbfdbfaf_0
   - matplotlib-inline=0.1.6=py310h06a4308_0
   - mccabe=0.7.0=pyhd3eb1b0_0
@@ -464,5 +464,6 @@ dependencies:
   - zope.interface=7.1.1=py310h5eee18b_0
   - zstd=1.5.6=hc292b87_0
   - pip:
+      - matplotlib==3.10.5
       - pypolycontain==1.4
-prefix: /home/none/anaconda3/envs/stl_mapping
+prefix: /home/none/anaconda3/envs/space_validation
