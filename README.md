@@ -7,13 +7,14 @@ While neutral buoyancy conditions make underwater robotics an excellent platform
 Given a high-level space mission specification, expressed in terms of a Signal Temporal Logic specification, we overcome these differences via the notion of *maximal disturbance robustness* of the mission. We formulate the motion planning problem such that the original space mission and the validation mission achieve the same disturbance robustness degree.
 The validation platform then executes its mission plan using a near-identical control strategy to the space mission where the closed-loop controller considers the spacecraft dynamics.
 Evaluating our validation framework relies on estimating disturbances during execution and comparing them to the disturbance robustness degree, providing practical evidence of operation in the space environment.
+
 Our evaluation features a dual-experiment setup: an underwater robot operating under near-neutral buoyancy conditions to validate the planning and control strategy of either an experimental planar spacecraft platform or a CubeSat in a high-fidelity space dynamics simulator.
 
 ![Fig 1 gradient](media/fig1_gradient.png)
 
 ## External Requirements
-- Planner: create a python environment using the `environment.yml` file. Solving the planner requires a Gurobi license, which can be freely obtained for academic users.
-- Control: the MPC control node relies on ROS 2 Humble and the acados optimization library. The robots (in SITL and hardware) rely on the PX4-Autopilot firmware and the micro-ROS agent for ROS 2 communication. 
+- Planner: create a python environment using the `environment.yml` file. Solving the planner requires a [Gurobi license](https://www.gurobi.com/academia/academic-program-and-licenses/), which can be freely obtained for academic users.
+- Control: the MPC control node relies on [ROS 2 Humble](https://docs.ros.org/en/humble/index.html) and the [acados](https://docs.acados.org/index.html) optimization library. The robots (in SITL and hardware) rely on the [PX4-Autopilot](https://github.com/PX4/PX4-Autopilot) firmware and the micro-ROS agent for ROS 2 communication. 
 
 ## Workspace setup
 Create a new ROS 2 workspace and clone this repo plus px4-offboard inside it.
@@ -33,10 +34,10 @@ git submodule update --init --recursive
 ```
 
 ### Install PX4-Autopilot
-Follow the official PX4-Autopilot installation instructions and keep all defaults. Also ensure to create a ros2 workspace of the px4_msgs package and build it. Add the `install/setup.bash` to the `.bashrc` file and be sure to export `PX4_SPACE_SYSTEMS_DIR`.
+Follow the official [PX4-Autopilot](https://github.com/PX4/PX4-Autopilot) installation instructions and keep all defaults. Also ensure to create a ros2 workspace of the px4_msgs package and build it. Add the `install/setup.bash` to the `.bashrc` file and be sure to export `PX4_SPACE_SYSTEMS_DIR`.
 
 ### Install acados
-Follow the official acados installation instructions and keep all defaults
+Follow the official [acados](https://docs.acados.org/index.html) installation instructions and keep all defaults
 (default options, default build type, default dependencies). Be sure to update the `LD_LIBRARY_PATH` in the `.bashrc` file to include the path to the acados library.
 
 ## BlueROV setup
@@ -63,7 +64,7 @@ source install/setup.bash
 And add the source command to the `.bashrc` file.
 
 ## ATMOS setup
-We refer to https://atmos.discower.io/ for the latest instructions on how to set up ATMOS. 
+We refer to [atmos.discower.io](https://atmos.discower.io/) for the latest instructions on how to set up ATMOS. 
 If you're on hardware, everything should be good to go.
 
 For SITL, you can run the following command to start the simulator:
@@ -85,11 +86,22 @@ python3 -m space_validation.Planning.main
 ```
 
 You can add new scenarios after which all results are dumped into the `Planning/solutions` folder. 
-In order for the controller to later use these solutions, create a new subfolder in `Planning/solutions` with the name of the experiment (e.g., `exp_3`) and move the generated solution file into that folder!
+In order for the controller to later use these solutions, create a new subfolder in `Planning/solutions` with the name of the experiment (e.g., `exp_3`) and move all the generated solution files into that folder!
 
 ## Running the ROS 2 node
-Build the workspace and launch the MPC control node.
 
+### On ATMOS
+Make sure the motion-capture PC is running the mo-cap node and that you are on the correct network. Then follow the instructions below.
+
+### On the BlueROV
+Make sure the motion-capture PC is running downstairs. Connect the BlueROV to the computer via the USB interface and run the following command to start the micro-ROS agent and start the mo-cap node locally:
+```bash
+micro-xrce-dds-agent udp4 -p 8888
+ros2 launch bluerov_launch bluerov_obc.launch.py
+```
+
+### Always
+Build the space_validation workspace and source the setup file:
 ```bash
 cd ~/space_validation_ws
 colcon build --symlink-install
