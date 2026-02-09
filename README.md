@@ -1,131 +1,53 @@
-
-# space_validation: 
-**Validation of Space Robotics in Underwater Environments via Disturbance Robustness Equivalency.**
-
-This is the code accompanying the paper in which we present an experimental validation framework for space robotics that leverages underwater environments to approximate microgravity dynamics. 
-While neutral buoyancy conditions make underwater robotics an excellent platform for space robotics validation, there are still dynamical and environmental differences that need to be overcome. 
-Given a high-level space mission specification, expressed in terms of a Signal Temporal Logic specification, we overcome these differences via the notion of *maximal disturbance robustness* of the mission. We formulate the motion planning problem such that the original space mission and the validation mission achieve the same disturbance robustness degree.
-The validation platform then executes its mission plan using a near-identical control strategy to the space mission where the closed-loop controller considers the spacecraft dynamics.
-Evaluating our validation framework relies on estimating disturbances during execution and comparing them to the disturbance robustness degree, providing practical evidence of operation in the space environment.
-
-Our evaluation features a dual-experiment setup: an underwater robot operating under near-neutral buoyancy conditions to validate the planning and control strategy of either an experimental planar spacecraft platform or a CubeSat in a high-fidelity space dynamics simulator.
-
-![Fig 1 gradient](media/fig1_gradient.png)
-
-## External Requirements
-- Planner: create a python environment using the `environment.yml` file. Solving the planner requires a [Gurobi license](https://www.gurobi.com/academia/academic-program-and-licenses/), which can be freely obtained for academic users.
-- Control: the MPC control node relies on [ROS 2 Humble](https://docs.ros.org/en/humble/index.html) and the [acados](https://docs.acados.org/index.html) optimization library. The robots (in SITL and hardware) rely on the [PX4-Autopilot](https://github.com/PX4/PX4-Autopilot) firmware and the micro-ROS agent for ROS 2 communication. 
-
-## Workspace setup
-Create a new ROS 2 workspace and clone this repo plus px4-offboard inside it.
-
-```bash
-mkdir -p ~/space_validation_ws/src
-cd ~/space_validation_ws/src
-git clone <this_repo_url> space_validation
-git clone https://github.com/joris997/px4-offboard
-```
-
-Initialize submodules for this repo (this gets the BlueROV dynamics model in the correct place):
-
-```bash
-cd ~/space_validation_ws/src/space_validation
-git submodule update --init --recursive
-```
-
-### Install PX4-Autopilot
-Follow the official [PX4-Autopilot](https://github.com/PX4/PX4-Autopilot) installation instructions and keep all defaults. Also ensure to create a ros2 workspace of the px4_msgs package and build it. Add the `install/setup.bash` to the `.bashrc` file and be sure to export `PX4_SPACE_SYSTEMS_DIR`.
-
-### Install acados
-Follow the official [acados](https://docs.acados.org/index.html) installation instructions and keep all defaults
-(default options, default build type, default dependencies). Be sure to update the `LD_LIBRARY_PATH` in the `.bashrc` file to include the path to the acados library.
-
-## BlueROV setup
-Ensure the BlueROV is equiped with a PX4 FMU v6x and that the micro-ROS agent is running on the same network as the BlueROV. Flash the BlueROV with the px4_fmu-v6x_uuv firmware.
-
-1. In `PX4-Autopilot`, run `PX4_UXRCE_DDS_NS=snap make px4_sitl_uuv gz_uuv_bluerov2_heavy`
-2. Start microros: `micro-xrce-dds-agent udp4 -p 8888`
-
-Flashing BlueROV px4: `PX4_UXRCE_DDS_NS=itrl_rov_1 make px4_fmu-v6x_uuv upload` given that the BlueROV is connected to the computer via USB.
-
-Then create a second workspace `utils_ws` for the BlueROV2 utilities. Most importantly, we run the motion capture node locally:
-
-```bash
-mkdir -p ~/utils_ws/src
-cd ~/utils_ws/src
-git clone git@github.com:smarc-project/motion_capture_system.git
-git clone git@github.com:DISCOWER/discower_launch.git
-git clone git@github.com:DISCOWER/bluerov_launch.git
-git clone git@github.com:DISCOWER/srl_vehicle_mocap_odom.git
-cd ~/utils_ws
-colcon build --symlink-install
-source install/setup.bash
-``` 
-And add the source command to the `.bashrc` file.
-
-## ATMOS setup
-We refer to [atmos.discower.io](https://atmos.discower.io/) for the latest instructions on how to set up ATMOS. 
-If you're on hardware, everything should be good to go.
-
-For SITL, you can run the following command to start the simulator:
-
-```bash
-PX4_UXRCE_DDS_NS=snap make px4_sitl_spacecraft gz_atmos
-micro-xrce-dds-agent udp4 -p 8888
-./startQGC
-```
-
-## Running the planner
-The planner lives in the Planning package. Run it from the workspace so it can
-access configuration and solution files.
-
-```bash
-cd ~/space_validation_ws/src/space_validation
-conda activate space_validation
-python3 -m space_validation.Planning.main
-```
-
-You can add new scenarios after which all results are dumped into the `Planning/solutions` folder. 
-In order for the controller to later use these solutions, create a new subfolder in `Planning/solutions` with the name of the experiment (e.g., `exp_3`) and move all the generated solution files into that folder!
-
-## Running the ROS 2 node
-
-### On ATMOS
-Make sure the motion-capture PC is running the mo-cap node and that you are on the correct network. Then follow the instructions below.
-
-### On the BlueROV
-Make sure the motion-capture PC is running downstairs. Connect the BlueROV to the computer via the USB interface and run the following command to start the micro-ROS agent and start the mo-cap node locally:
-```bash
-micro-xrce-dds-agent udp4 -p 8888
-ros2 launch bluerov_launch bluerov_obc.launch.py
-```
-
-### Always
-Build the space_validation workspace and source the setup file:
-```bash
-cd ~/space_validation_ws
-colcon build --symlink-install
-source install/setup.bash
-```
-
-Now we decide which experiment to run. Please take a look at the launch files in `space_validation/space_validation/Launch` to see how we enable Feedback Equivalence Control and Offset-Free MPC.
-
-First determine whether you want to run in sitl or hardware
-
-```bash
-# For SITL
-ros2 launch space_validation sitl.launch.py
-# For hardware
-ros2 launch space_validation hardware.launch.py
-```
-
-Now determine whether you want to run the spacecraft or underwater experiment
-
-```bash
-# For spacecraft
-ros2 launch space_validation space_mpc.launch.py
-# For underwater
-ros2 launch space_validation subsea_mpc.launch.py
-```
+# Academic Project Page Template
+This is an academic paper project page template.
 
 
+Example project pages built using this template are:
+- https://horwitz.ai/probex
+- https://vision.huji.ac.il/probegen
+- https://horwitz.ai/mother
+- https://horwitz.ai/spectral_detuning
+- https://vision.huji.ac.il/ladeda
+- https://vision.huji.ac.il/dsire
+- https://horwitz.ai/podd
+- https://dreamix-video-editing.github.io
+- https://horwitz.ai/conffusion
+- https://horwitz.ai/3d_ads/
+- https://vision.huji.ac.il/ssrl_ad
+- https://vision.huji.ac.il/deepsim
+
+
+
+## Start using the template
+To start using the template click on `Use this Template`.
+
+The template uses html for controlling the content and css for controlling the style. 
+To edit the websites contents edit the `index.html` file. It contains different HTML "building blocks", use whichever ones you need and comment out the rest.  
+
+**IMPORTANT!** Make sure to replace the `favicon.ico` under `static/images/` with one of your own, otherwise your favicon is going to be a dreambooth image of me.
+
+## Components
+- Teaser video
+- Images Carousel
+- Youtube embedding
+- Video Carousel
+- PDF Poster
+- Bibtex citation
+
+## Tips:
+- The `index.html` file contains comments instructing you what to replace, you should follow these comments.
+- The `meta` tags in the `index.html` file are used to provide metadata about your paper 
+(e.g. helping search engine index the website, showing a preview image when sharing the website, etc.)
+- The resolution of images and videos can usually be around 1920-2048, there rarely a need for better resolution that take longer to load. 
+- All the images and videos you use should be compressed to allow for fast loading of the website (and thus better indexing by search engines). For images, you can use [TinyPNG](https://tinypng.com), for videos you can need to find the tradeoff between size and quality.
+- When using large video files (larger than 10MB), it's better to use youtube for hosting the video as serving the video from the website can take time.
+- Using a tracker can help you analyze the traffic and see where users came from. [statcounter](https://statcounter.com) is a free, easy to use tracker that takes under 5 minutes to set up. 
+- This project page can also be made into a github pages website.
+- Replace the favicon to one of your choosing (the default one is of the Hebrew University). 
+- Suggestions, improvements and comments are welcome, simply open an issue or contact me. You can find my contact information at [https://horwitz.ai](https://horwitz.ai)
+
+## Acknowledgments
+Parts of this project page were adopted from the [Nerfies](https://nerfies.github.io/) page.
+
+## Website License
+<a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-sa/4.0/88x31.png" /></a><br />This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>.

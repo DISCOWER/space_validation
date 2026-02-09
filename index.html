@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <!-- Meta tags for social media banners, these should be filled in appropriatly as they are your "business card" -->
+  <!-- Replace the content tag with appropriate information -->
+  <meta name="description" content="DESCRIPTION META TAG">
+  <meta property="og:title" content="SOCIAL MEDIA TITLE TAG"/>
+  <meta property="og:description" content="SOCIAL MEDIA DESCRIPTION TAG TAG"/>
+  <meta property="og:url" content="URL OF THE WEBSITE"/>
+  <!-- Path to banner image, should be in the path listed below. Optimal dimenssions are 1200X630-->
+  <meta property="og:image" content="static/image/your_banner_image.png" />
+  <meta property="og:image:width" content="1200"/>
+  <meta property="og:image:height" content="630"/>
+
+
+  <meta name="twitter:title" content="TWITTER BANNER TITLE META TAG">
+  <meta name="twitter:description" content="TWITTER BANNER DESCRIPTION META TAG">
+  <!-- Path to banner image, should be in the path listed below. Optimal dimenssions are 1200X600-->
+  <meta name="twitter:image" content="static/images/your_twitter_banner_image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <!-- Keywords for your paper to be indexed by-->
+  <meta name="keywords" content="RSS, robotics, impact, STL, planning, control, microgravity, space, transportation">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+  <title>Impact STL</title>
+  <!-- <link rel="icon" type="image/x-icon" href="static/images/favicon.ico"> -->
+  <link rel="icon" type="image/x-icon" href="static/images/icon.png">
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro"
+  rel="stylesheet">
+
+  <link rel="stylesheet" href="static/css/bulma.min.css">
+  <link rel="stylesheet" href="static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="static/css/fontawesome.all.min.css">
+  <link rel="stylesheet"
+  href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="static/css/index.css">
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://documentcloud.adobe.com/view-sdk/main.js"></script>
+  <script defer src="static/js/fontawesome.all.min.js"></script>
+  <script src="static/js/bulma-carousel.min.js"></script>
+  <script src="static/js/bulma-slider.min.js"></script>
+  <script src="static/js/index.js"></script>
+</head>
+<body>
+
+
+  <section class="hero">
+    <div class="hero-body">
+      <div class="container is-max-desktop">
+        <div class="columns is-centered">
+          <div class="column has-text-centered">
+            <h1 class="title is-1 publication-title">Collaborative Object Transportation in Space via Impact Interactions</h1>
+            <div class="is-size-5 publication-authors">
+              <!-- Paper authors -->
+              <span class="author-block">
+                <a href="https://www.jorisverhagen.com/" target="_blank">Joris Verhagen</a>,</span>
+                <span class="author-block">
+                  <a href="https://sites.google.com/view/janatumova/home" target="_blank">Jana Tumova</a>,</span>
+                  </div>
+
+                  <div class="is-size-5 publication-authors">
+                    <span class="author-block">KTH Royal Institute of Technology<br>RSS 2025</span>
+                  </div>
+
+                  <div class="column has-text-centered">
+                    <div class="publication-links">
+                         <!-- Arxiv PDF link -->
+                      <span class="link-block">
+                        <a href="https://arxiv.org/abs/2504.18667" target="_blank"
+                        class="external-link button is-normal is-rounded is-dark">
+                        <span class="icon">
+                          <i class="fas fa-file-pdf"></i>
+                        </span>
+                        <span>Paper</span>
+                      </a>
+                    </span>
+
+                    <!-- Supplementary PDF link -->
+                    <!-- <span class="link-block">
+                      <a href="static/pdfs/supplementary_material.pdf" target="_blank"
+                      class="external-link button is-normal is-rounded is-dark">
+                      <span class="icon">
+                        <i class="fas fa-file-pdf"></i>
+                      </span>
+                      <span>Supplementary</span>
+                    </a>
+                  </span> -->
+
+                  <!-- Github link -->
+                  <span class="link-block">
+                    <a href="https://github.com/joris997/impact_stl" target="_blank"
+                    class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <i class="fab fa-github"></i>
+                    </span>
+                    <span>Code</span>
+                  </a>
+                </span>
+
+                <!-- ArXiv abstract Link -->
+                <!-- <span class="link-block">
+                  <a href="https://arxiv.org/abs/<ARXIV PAPER ID>" target="_blank"
+                  class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                    <i class="ai ai-arxiv"></i>
+                  </span>
+                  <span>arXiv</span>
+                </a>
+              </span> -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- Teaser video-->
+<section class="hero teaser">
+  <div class="container is-max-desktop">
+    <div class="hero-body">
+      <title class="title is-2 has-text-centered">Teaser Video</title>
+      <video poster="" id="tree" autoplay controls muted loop height="100%">
+        <!-- Your video here -->
+        <source src="static/videos/obstacle_avoidance_4_cut.mp4"
+        type="video/mp4">
+      </video>
+      <h2 class="subtitle has-text-centered">
+        The absense of gravity allows for a new way of thinking about object transportation.
+        <br> The robots can use impact interactions to control the object.
+      </h2>
+    </div>
+  </div>
+</section>
+<!-- End teaser video -->
+
+<!-- Paper abstract -->
+<section class="section hero is-light">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Abstract</h2>
+        <div class="content has-text-justified">
+          <p>
+            We present a planning and control approach for collaborative transportation of objects in space by a team of robots. Object and robots in microgravity environments are not subject to friction but are instead free floating. This property is key to how we approach the transportation problem: the passive objects are controlled by impact interactions with the controlled robots.
+In particular, given a high-level Signal Temporal Logic (STL) specification of the transportation task, we synthesize motion plans for the robots to maximize the specification satisfaction in terms of spatial STL robustness.
+Given that the physical impact interactions are complex and hard to model precisely, we also present an alternative formulation maximizing the permissible uncertainty in a simplified kinematic impact model.
+We define the full planning and control stack required to solve the object transportation problem; an offline planner, an online replanner, and a low-level model-predictive control scheme for each of the robots. 
+We show the method in a high-fidelity simulator for a variety of scenarios and present experimental validation of 2-robot, 1-object scenarios on a freeflyer platform.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End paper abstract -->
+
+<!-- Paper abstract -->
+<section class="section hero is-light">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Method</h2>
+        <div class="content has-text-justified">
+          <p>We present the following method for the object transportation problem:</p>
+          <ol>
+            <li><b>Offline Planner:</b> An offline Mixed-Integer Program generates kinematically feasible trajectories satisfying a high-level STL specification. The planner resolves where, when and with whom objects should impact to fulfill this specification.</li>
+            <li><b>Online Replanner:</b> The replanner updates the trajectories based on the current state of the system. It considers the updated positions and velocities of the objects and the physical sizes of objects and robots.</li>
+            <li><b>Low-level Controller:</b> The low-level controller tracks the motion plan and controls the robots. It uses an impact-aware model-predictive control scheme to ensure that the robots follow the planned trajectories.</li>
+          </ol>
+          <img src="static/images/beziers.png" alt="Bezier curves" style="width: 100%; max-width: 600px; margin: 1.5rem auto; display: block;">
+          <p class="has-text-centered is-size-6">
+            We parametrize trajectories for objects as 1<sup>st</sup>-order Bézier curves and robots as d<sup>th</sup>-order Bézier curves.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End paper abstract -->
+
+
+
+<section class="hero is-small">
+  <div class="hero-body">
+    <div class="container">
+      <h2 class="title is-3">Software-In-The-Loop Corridor Scenario</h2>
+      <p>
+        An intuitive example: transport a free-floating object from an initial state to a goal state (green) while avoiding obstacles (red).
+        Two robots are used to transport the object by using impact interactions.
+        We present the STL planner with spatial robustness and impact robustness.
+        Spatial robustness maximizes (informally) the distance to obstacles and the distance inside areas of interest.
+        Impact robustness maximizes the permissible uncertainty in the post-impact velocity of the object, capturing the uncertainty in the impact model.
+      </p>
+
+      <!-- <div id="results-carousel" class="carousel results-carousel"> -->
+
+        <!-- Slide 1: Spatially robust -->
+        <div class="item">
+          <div class="columns is-vcentered">
+            <div class="column is-half">
+              <img src="static/images/corridor_space_robust.png" alt="Spatially robust scenario"/>
+              <h2 class="subtitle has-text-centered">
+                Spatially robust corridor travel scenario.
+              </h2>
+            </div>
+            <div class="column is-half">
+              <video autoplay controls muted loop style="width: 100%;">
+                <source src="static/videos/throw_and_catch_bestcase_4.mp4" type="video/mp4">
+              </video>
+            </div>
+          </div>
+        </div>
+
+        <!-- Slide 2: Impact robust -->
+        <div class="item">
+          <div class="columns is-vcentered">
+            <div class="column is-half">
+              <img src="static/images/corridor_impact_robust.png" alt="Impact robust scenario"/>
+              <h2 class="subtitle has-text-centered">
+                Impact robust corridor travel scenario.
+              </h2>
+            </div>
+            <div class="column is-half">
+              <video autoplay controls muted loop style="width: 100%;">
+                <source src="static/videos/throw_and_catch_worstcase_4.mp4" type="video/mp4">
+              </video>
+            </div>
+          </div>
+        </div>
+
+      <!-- </div> -->
+    </div>
+  </div>
+</section>
+
+
+
+
+
+<section class="hero is-small">
+  <div class="hero-body">
+    <div class="container">
+      <h2 class="title is-3">Hardware validation</h2>
+      <p>
+        We perform the corridor scenario on the <a href="https://atmos.discower.io/" target="_blank">ATMOS platform at KTH</a>.
+        We additionally show a scenario with a more complex STL specification: the object should visit each region within the time horizon.
+      </p>
+
+      <!-- <div id="results-carousel" class="carousel results-carousel"> -->
+
+        <!-- Slide 1: Spatially robust -->
+        <div class="item">
+          <div class="columns is-vcentered">
+            <div class="column is-half">
+              <img src="static/images/lab_test_2.png" alt="Spatially robust scenario"/>
+              <h2 class="subtitle has-text-centered">
+                Spatially robust corridor travel scenario.
+              </h2>
+            </div>
+            <div class="column is-half">
+              <video autoplay controls muted loop style="width: 100%;">
+                <source src="static/videos/throw_and_catch_exp_4.mp4" type="video/mp4">
+              </video>
+            </div>
+          </div>
+        </div>
+
+        <!-- Slide 2: Impact robust -->
+        <div class="item">
+          <div class="columns is-vcentered">
+            <div class="column is-half">
+              <img src="static/images/pingpong_exp_new.png" alt="Impact robust scenario"/>
+              <h2 class="subtitle has-text-centered">
+                Spatially robust pong scenario.
+                (a): planned trajectories, (b): executed trajectories.
+              </h2>
+            </div>
+            <div class="column is-half">
+              <video autoplay controls muted loop style="width: 100%;">
+                <source src="static/videos/rss_presentation/pong_from_paper_4_cut.mp4" type="video/mp4">
+              </video>
+            </div>
+          </div>
+        </div>
+
+      <!-- </div> -->
+    </div>
+  </div>
+</section>
+
+
+
+<!-- Youtube video -->
+<!-- <section class="hero is-small is-light">
+  <div class="hero-body">
+    <div class="container">
+      <h2 class="title is-3">Video Presentation</h2>
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-four-fifths">
+          
+          <div class="publication-video">
+            <iframe src="https://www.youtube.com/embed/JkaxUblCGz0" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section> -->
+<!-- End youtube video -->
+
+
+<!--BibTex citation -->
+  <section class="section" id="BibTeX">
+    <div class="container is-max-desktop content">
+      <h2 class="title">BibTeX</h2>
+      <pre><code>@article{verhagen2025collaborative,
+        title={Collaborative Object Transportation in Space via Impact Interactions},
+        author={Verhagen, Joris and Tumova, Jana},
+        journal={arXiv preprint arXiv:2504.18667},
+        year={2025}
+      }</code></pre>
+    </div>
+</section>
+<!--End BibTex citation -->
+
+
+<footer class="footer">
+  <div class="container">
+    <div class="columns is-centered">
+      <div class="column is-8">
+        <div class="content">
+
+          <p>
+            This page was built using the <a href="https://github.com/eliahuhorwitz/Academic-project-page-template" target="_blank">Academic Project Page Template</a> which was adopted from the <a href="https://nerfies.github.io" target="_blank">Nerfies</a> project page.
+            You are free to borrow the source code of this website, we just ask that you link back to this page in the footer. <br> This website is licensed under a <a rel="license"  href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">Creative
+            Commons Attribution-ShareAlike 4.0 International License</a>.
+          </p>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- Statcounter tracking code -->
+  
+<!-- You can add a tracker to track page visits by creating an account at statcounter.com -->
+
+    <!-- End of Statcounter Code -->
+
+  </body>
+  </html>
