@@ -20,12 +20,12 @@
   <meta name="twitter:image" content="static/images/your_twitter_banner_image.png">
   <meta name="twitter:card" content="summary_large_image">
   <!-- Keywords for your paper to be indexed by-->
-  <meta name="keywords" content="RSS, robotics, impact, STL, planning, control, microgravity, space, transportation">
+  <meta name="keywords" content="ICRA, robotics, underwater, STL, planning, control, microgravity, space, inspection">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
 
-  <title>Impact STL</title>
-  <!-- <link rel="icon" type="image/x-icon" href="static/images/favicon.ico"> -->
+  <title>Space Validation</title>
+  <!-- <link rel="icon" type="image/x-icon" href="static/images/favico"> -->
   <link rel="icon" type="image/x-icon" href="static/images/icon.png">
   <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro"
   rel="stylesheet">
@@ -38,6 +38,14 @@
   href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
   <link rel="stylesheet" href="static/css/index.css">
 
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']]
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
   <script src="https://documentcloud.adobe.com/view-sdk/main.js"></script>
   <script defer src="static/js/fontawesome.all.min.js"></script>
@@ -63,7 +71,7 @@
                 <span class="author-block">
                 <a href="https://www.chelseasidrane.com/" target="_blank">Chelsea Sidrane</a>,</span>
                 <span class="author-block">
-                <a href="https://www.kth.se/profile/ddorner" target="_blank">David D\"orner</a>,</span>
+                <a href="https://www.kth.se/profile/ddorner" target="_blank">David Dörner</a>,</span>
 
                 <span class="author-block">
                 <a href="https://www.kth.se/profile/ndc" target="_blank">Nicola De Carli</a>,</span>
@@ -150,7 +158,7 @@
       <title class="title is-2 has-text-centered">Teaser Video</title>
       <video poster="" id="tree" autoplay controls muted loop height="100%">
         <!-- Your video here -->
-        <source src="static/videos/obstacle_avoidance_4_cut.mp4"
+        <source src="static/videos/exp2_1.mp4"
         type="video/mp4">
       </video>
       <h2 class="subtitle has-text-centered">
@@ -192,7 +200,7 @@ Evaluating our validation framework relies on estimating disturbances during exe
         <h2 class="title is-3">Method</h2>
         <div class="content has-text-justified">
           <p>We present the following method for the object transportation problem:</p>
-          <img src="static/images/box_diagram.png" alt="Box diagram" style="width: 100%; max-width: 600px; margin: 1.5rem auto; display: block;">
+          <img src="static/images/box_diagram.png" alt="Box diagram" style="width: 200%; max-width: 1200px; margin: 1.5rem auto; display: block;">
           <p class="has-text-centered is-size-6">
             The space planner is ran, quantifying the disturbance robustness degree of the space mission. The validation mission is constructed to ensure an equal disturbance robustness.
             Online control is performed using feedback equivalent Model Predictive Control making the underwater platform internally control the space platform.
@@ -219,21 +227,21 @@ Evaluating our validation framework relies on estimating disturbances during exe
       <!-- <div id="results-carousel" class="carousel results-carousel"> -->
 
         <!-- Slide 1: Spatially robust -->
-        <div class="item">
+        <!-- <div class="item">
           <div class="columns is-vcentered">
             <div class="column is-half">
               <img src="static/images/corridor_space_robust.png" alt="Spatially robust scenario"/>
               <h2 class="subtitle has-text-centered">
                 Spatially robust corridor travel scenario.
               </h2>
-            </div>
+            </div> -->
             <div class="column is-half">
               <video autoplay controls muted loop style="width: 100%;">
                 <source src="static/videos/exp1_1.mp4" type="video/mp4">
               </video>
             </div>
-          </div>
-        </div>
+          <!-- </div>
+        </div> -->
       <!-- </div> -->
     </div>
   </div>
@@ -247,7 +255,7 @@ Evaluating our validation framework relies on estimating disturbances during exe
       For the planar space mission we assume access to the real spacecraft environment via our ATMOS platform.
       <div class="columns is-centered">
         <div class="column is-half">
-          <img src="static/images/platforms.png" alt="Platforms" style="width: 100%; max-width: 600px; margin: 1.5rem auto; display: block;">
+          <img src="static/images/atmos_bluerov.jpg" alt="Platforms" style="width: 100%; max-width: 600px; margin: 1.5rem auto; display: block;">
         </div>
     </div>
 </section>
