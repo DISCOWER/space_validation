@@ -219,9 +219,11 @@ Evaluating our validation framework relies on estimating disturbances during exe
 <section class="hero is-small">
   <div class="hero-body">
     <div class="container">
-      <h2 class="title is-3">Planar Inspection Task</h2>
-      <p>
-        A planar spacecraft is tasked with an inspection mission: 
+      <h2 class="title is-3 has-text-centered">Planar Inspection Task</h2>
+      <p class="has-text-centered">
+        A planar spacecraft is tasked with an inspection mission:
+      </p>
+      <p class="has-text-centered">
         $\phi_{sp} = \diamondsuit_{[20,25]}(\vec{\eta}\in red) \land \diamondsuit_{[0,37]}(\vec{\eta} \in blue) \land (\Box_{[50,55]}(\vec{\eta}\in white_1) \lor \Box_{[50,55]}(\vec{\eta} \in white_2))$
       </p>
             <div class="column is-centered">
@@ -236,10 +238,14 @@ Evaluating our validation framework relies on estimating disturbances during exe
 <section class="hero is-small">
   <div class="hero-body">
     <div class="container">
-      <h2 class="title is-3">6DoF Inspection Task</h2>
-      <p>
-        A 6DoF CubeSat spacecraft is tasked with an inspection mission of a passive satellite in a stable orbit around earth: 
+      <h2 class="title is-3 has-text-centered">6DoF Inspection Task</h2>
+      <p class="has-text-centered">
+        A 6DoF CubeSat spacecraft is tasked with an inspection mission of a passive satellite in a stable orbit around earth:
+      </p>
+      <p class="has-text-centered">
         $\phi_{sp} = \bigwedge_{k={x,y,z}}\diamondsuit_{[\underline{t}_k,\overline{t}_k]}(\vec{\eta} \in \underline{A}_k \lor \vec{\eta} \in \overline{A}_k) \land \Box_{[0,90]}(\vec{\eta} \notin \textrm{Obj})$
+      </p>
+      <p class="has-text-centered">
         The specification requires the CubeSat to observe the satellite from either the positive or negative side of all three axis.
       </p>
             <div class="column is-centered">
@@ -255,8 +261,8 @@ Evaluating our validation framework relies on estimating disturbances during exe
   <section class="section" id="Platforms">
     <div class="container is-max-desktop content">
       <h2 class="title">Platforms</h2>
-      We utilize the BlueRobotics BlueROV2 in the heavy configuration as our underwater validation platform.
-      For the planar space mission we assume access to the real spacecraft environment via our ATMOS platform.
+      We utilize the <a href="https://bluerobotics.com/store/rov/bluerov2/" target="_blank">BlueRobotics BlueROV2</a> in the heavy configuration as our underwater validation platform.
+      For the planar space mission we assume access to the real spacecraft environment via our <a href="https://atmos.discower.io/" target="_blank">ATMOS</a> platform.
       <div class="columns is-centered">
         <div class="column is-half">
           <img src="static/images/atmos_bluerov.jpg" alt="Platforms" style="width: 100%; max-width: 600px; margin: 1.5rem auto; display: block;">
