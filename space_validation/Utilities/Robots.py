@@ -7,6 +7,9 @@ from Utilities.rotations import euler_to_quat_cs, euler_to_quat_np
 from Utilities.rotations import quat_mult
 from Utilities.sets import compute_K
 from Utilities.stl import OptProbItems
+import os
+# Package root, resolved from this file's location (independent of the working directory)
+PKG_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 
 class Robot:
@@ -127,8 +130,8 @@ class LinearFreeFlyer6DoF(Robot):
         # Define the control input bounds
         if envelope:
             if model == "atmos":
-                A_f, b_f = np.load("space_validation/Planning/solutions/polytopes/force_polytope_atmos.npz", allow_pickle=True).values()
-                A_t, b_t = np.load("space_validation/Planning/solutions/polytopes/torque_polytope_atmos.npz", allow_pickle=True).values()
+                A_f, b_f = np.load(f"{PKG_ROOT}/Planning/solutions/polytopes/force_polytope_atmos.npz", allow_pickle=True).values()
+                A_t, b_t = np.load(f"{PKG_ROOT}/Planning/solutions/polytopes/torque_polytope_atmos.npz", allow_pickle=True).values()
                 A_t = np.array([A_t[1:3,0]]).T
                 b_t = b_t[1:3]
                 self.U = Polytope(
@@ -147,8 +150,8 @@ class LinearFreeFlyer6DoF(Robot):
                         np.array(2*[max_floor_force] + [0] + [0,0] + [max_floor_torque])
                     )
             else:
-                A_f, b_f = np.load("space_validation/Planning/solutions/polytopes/force_polytope_astrobee.npz", allow_pickle=True).values()
-                A_t, b_t = np.load("space_validation/Planning/solutions/polytopes/torque_polytope_astrobee.npz", allow_pickle=True).values()
+                A_f, b_f = np.load(f"{PKG_ROOT}/Planning/solutions/polytopes/force_polytope_astrobee.npz", allow_pickle=True).values()
+                A_t, b_t = np.load(f"{PKG_ROOT}/Planning/solutions/polytopes/torque_polytope_astrobee.npz", allow_pickle=True).values()
                 self.U = Polytope(
                     H=np.vstack((np.hstack((A_f,np.zeros((A_f.shape[0], 3)))),
                                 np.hstack((np.zeros((A_t.shape[0],3)), A_t)))),

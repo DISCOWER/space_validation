@@ -16,6 +16,8 @@ import os
 import sys
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
+# Package root, resolved from this file's location (independent of the working directory)
+PKG_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 from Utilities.Robots import FreeFlyer, LinearFreeFlyer6DoF
 from Utilities.sets import HyperRectangle, Polytope
 from Utilities.rotations import euler_to_quat_np, euler_to_quat_cs
@@ -200,10 +202,10 @@ if True:
     u_ff = u_vars.X
     alpha = alpha_vars.X
     # save x_ff and u_ff to a csv file
-    np.savez('space_validation/Planning/solutions/atmos_linear_solution.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
+    np.savez(f'{PKG_ROOT}/Planning/solutions/atmos_linear_solution.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
 else:
     # or load instead
-    data = np.load('space_validation/Planning/solutions/atmos_linear_solution.npz')
+    data = np.load(f'{PKG_ROOT}/Planning/solutions/atmos_linear_solution.npz')
     x_ff = data['x']
     u_ff = data['u']
     alpha = float(data['alpha'])
@@ -213,9 +215,9 @@ else:
     
 
 plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, RoIs, Obs, alpha=alpha, D3=D3, plot=True,
-                      path="space_validation/Planning/figures/atmos_linear_trajectory_euler.png")
+                      path=f"{PKG_ROOT}/Planning/figures/atmos_linear_trajectory_euler.png")
 
-np.savez('space_validation/Planning/solutions/atmos_linear_solution_euler_inertial.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
+np.savez(f'{PKG_ROOT}/Planning/solutions/atmos_linear_solution_euler_inertial.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
 
 #! Convert [p:ENU, e:FLU->ENU, v:ENU, w:FLU] to [p:ENU, q:FLU->ENU, v:FLU, w:FLU]
 x_ff_converted = np.zeros((x_ff.shape[0], x_ff.shape[1] + 1))
@@ -239,9 +241,9 @@ u_ff = u_ff_converted
 
 # plot the trajectory
 plot_planning_results(sp_robot, t_sp, x_ff, u_ff, X0, Xf, RoIs, Obs, alpha=alpha, D3=D3, plot=True,
-                      path="space_validation/Planning/figures/atmos_linear_trajectory.png")
+                      path=f"{PKG_ROOT}/Planning/figures/atmos_linear_trajectory.png")
 
-np.savez('space_validation/Planning/solutions/atmos_linear_solution_quat_body.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
+np.savez(f'{PKG_ROOT}/Planning/solutions/atmos_linear_solution_quat_body.npz', x=x_ff, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
 # animate_pose_trace(x_ff)
 
 
@@ -296,13 +298,13 @@ if True:
         print(f"Solution not found: {e}")
 
 plot_planning_results(sp_robot_nl, t_ff_nl, x_ff_nl, u_ff_nl, X0, Xf, RoIs, Obs, alpha=alpha, D3=D3,
-                      path="space_validation/Planning/figures/atmos_opt_nonlinear_trajectory.png")
+                      path=f"{PKG_ROOT}/Planning/figures/atmos_opt_nonlinear_trajectory.png")
 
-np.savez('space_validation/Planning/solutions/atmos_nonlinear_solution.npz', x=x_ff_nl, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
-data = np.load('space_validation/Planning/solutions/atmos_nonlinear_solution.npz')
+np.savez(f'{PKG_ROOT}/Planning/solutions/atmos_nonlinear_solution.npz', x=x_ff_nl, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
+data = np.load(f'{PKG_ROOT}/Planning/solutions/atmos_nonlinear_solution.npz')
 bezier_fitting(data,'atmos')
-np.savez('space_validation/Planning/solutions/cubesat_nonlinear_solution.npz', x=x_ff_nl, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
-data = np.load('space_validation/Planning/solutions/cubesat_nonlinear_solution.npz')
+np.savez(f'{PKG_ROOT}/Planning/solutions/cubesat_nonlinear_solution.npz', x=x_ff_nl, u=u_ff, dt=dt, alpha=alpha, times=t_sp)
+data = np.load(f'{PKG_ROOT}/Planning/solutions/cubesat_nonlinear_solution.npz')
 bezier_fitting(data,'cubesat')
 
 
@@ -347,11 +349,11 @@ for i in range(N-1):
 
 
 # save the trajectory
-np.savez('space_validation/Planning/solutions/bluerov_nonlinear_solution_fbl.npz', x=x_uw_fbl_sp, u=u_uw_fbl_sp, dt=dt, alpha=alpha, times=t_sp)
+np.savez(f'{PKG_ROOT}/Planning/solutions/bluerov_nonlinear_solution_fbl.npz', x=x_uw_fbl_sp, u=u_uw_fbl_sp, dt=dt, alpha=alpha, times=t_sp)
 
 # plot the trajectory
 plot_planning_results(uw_robot, t_sp, x_uw_fbl_sp, u_uw_fbl_sp, X0, Xf, RoIs, Obs, alpha=alpha, D3=D3,
-                      path="space_validation/Planning/figures/bluerov_nonlinear_trajectory_fbl.png")
+                      path=f"{PKG_ROOT}/Planning/figures/bluerov_nonlinear_trajectory_fbl.png")
 
 #! Solve the constrained optimization time-scaling problem according to Eq. (15) in the paper
 uw_robot = BlueROV(iX=cs.MX)
@@ -417,7 +419,7 @@ if True:
         dt_uw = dt
 else:
     # load the solution
-    data = np.load("solutions/bluerov_solution.npz")
+    data = np.load(f"{PKG_ROOT}/Planning/solutions/bluerov_solution.npz")
     x_uw = data['x_uw']
     u_uw = data['u_uw']
     dt_uw = data['dt_uw']
@@ -431,9 +433,9 @@ else:
 
 # plot the trajectory
 plot_planning_results(uw_robot, t_uw, x_uw, u_uw, X0, Xf, RoIs, Obs, alpha=alpha, D3=D3, plot=True,
-                      path="space_validation/Planning/figures/bluerov_nonlinear_trajectory.png")
+                      path=f"{PKG_ROOT}/Planning/figures/bluerov_nonlinear_trajectory.png")
 
 # save the trajectory
-np.savez('space_validation/Planning/solutions/bluerov_nonlinear_solution.npz', x=x_uw, u=u_uw, dt=dt_uw, alpha=alpha, times=t_uw)
-data = np.load('space_validation/Planning/solutions/bluerov_nonlinear_solution.npz')
+np.savez(f'{PKG_ROOT}/Planning/solutions/bluerov_nonlinear_solution.npz', x=x_uw, u=u_uw, dt=dt_uw, alpha=alpha, times=t_uw)
+data = np.load(f'{PKG_ROOT}/Planning/solutions/bluerov_nonlinear_solution.npz')
 bezier_fitting(data, 'bluerov')

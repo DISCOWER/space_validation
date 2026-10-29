@@ -4,11 +4,14 @@ from matplotlib.animation import FuncAnimation
 
 from Utilities.rotations import euler_to_quat_np, quat_to_euler_np
 from scipy.spatial.transform import Rotation as R
+import os
+# Package root, resolved from this file's location (independent of the working directory)
+PKG_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 def plot_planning_results(robot, t, x, u, 
                           X0=None, Xf=None, ROIs=None, Obs=None, alpha=1.0,
                           in_axs = None, plot=True, D3=False,
-                          path="space_validation/Planning/figures/sp_trajectory.png"):
+                          path=f"{PKG_ROOT}/Planning/figures/sp_trajectory.png"):
     # if x.shape[1] == 12:
     #     p, e, v, w = x[:, 0:3], x[:, 3:6], x[:, 6:9], x[:, 9:12]
     #     q = np.zeros((x.shape[0], 4))

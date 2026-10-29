@@ -75,6 +75,8 @@ micro-xrce-dds-agent udp4 -p 8888
 ./startQGC
 ```
 
+However, you can also run the SITL launch file in the `space_validation` package, which will start the gazebo and the micro-ROS agent for you.
+
 ## Running the planner
 The planner lives in the Planning package. Run it from the workspace so it can
 access configuration and solution files.
@@ -107,8 +109,9 @@ cd ~/space_validation_ws
 colcon build --symlink-install
 source install/setup.bash
 ```
+You need to use the `--symlink-install` option so that the planner can access the solution files during execution.
 
-Now we decide which experiment to run. Please take a look at the launch files in `space_validation/space_validation/Launch` to see how we enable Feedback Equivalence Control and Offset-Free MPC.
+Now we decide which experiment to run. Please take a look at the launch files in `space_validation/space_validation/launch` to see how we enable Feedback Equivalence Control and Offset-Free MPC.
 
 First determine whether you want to run in sitl or hardware
 
@@ -116,7 +119,7 @@ First determine whether you want to run in sitl or hardware
 # For SITL
 ros2 launch space_validation sitl.launch.py
 # For hardware
-ros2 launch space_validation hardware.launch.py
+ros2 launch space_validation hw.launch.py
 ```
 
 Now determine whether you want to run the spacecraft or underwater experiment

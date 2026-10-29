@@ -8,11 +8,13 @@ import os
 import sys
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
+# Package root, resolved from this file's location (independent of the working directory)
+PKG_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from Utilities.beziers import eval_bezier
 from Utilities.Robots import FreeFlyer, LinearFreeFlyer6DoF
 from space_validation.Utilities.plotting.plotting import plot_planning_results
 
-data = np.load('space_validation/Planning/solutions/sp_solution_nl.npz')
+data = np.load(f'{PKG_ROOT}/Planning/solutions/sp_solution_nl.npz')
 
 ff_lin = LinearFreeFlyer6DoF()
 x_lin = data['x_ff']
@@ -44,9 +46,9 @@ print(f"x_lin[0,:]: {x_lin[0,:]}")
 fig, axs = plt.subplots(1,4, figsize=(15,5))
 axs = plot_planning_results(ff_lin, times, x_lin, u_lin,
                       in_axs=None, plot=True,
-                      path="space_validation/Planning/figures/test_flatness_lin.png")
+                      path=f"{PKG_ROOT}/Planning/figures/test_flatness_lin.png")
 fig, axs = plt.subplots(1,4, figsize=(15,5))
 plot_planning_results(ff, times, x_nl, u_lin,
                       in_axs=None, plot=True,
-                      path="space_validation/Planning/figures/test_flatness_nl.png")
+                      path=f"{PKG_ROOT}/Planning/figures/test_flatness_nl.png")
 

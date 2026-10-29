@@ -5,11 +5,13 @@ import os
 import sys
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
+# Package root, resolved from this file's location (independent of the working directory)
+PKG_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from Utilities.Robots import FreeFlyer, LinearFreeFlyer6DoF
 from Utilities.beziers import eval_bezier
 
 model_name = 'atmos' # Change to 'atmos' or 'bluerov if needed
-data = np.load(f'space_validation/Planning/solutions/{model_name}_solution.npz')
+data = np.load(f'{PKG_ROOT}/Planning/solutions/{model_name}_solution.npz')
 
 x = data['x']
 u = data['u']

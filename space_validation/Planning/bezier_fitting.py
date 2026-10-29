@@ -10,6 +10,8 @@ import os
 import sys
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
+# Package root, resolved from this file's location (independent of the working directory)
+PKG_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 from Utilities.beziers import eval_bezier
 
 def solve_position(x):
@@ -128,7 +130,7 @@ def bezier_fitting(data, model_name):
     q_sols = np.array(q_sols)
     # print(f"q_sols: {q_sols}")
 
-    np.savez(f'space_validation/Planning/solutions/{model_name}_solution_bezier.npz',
+    np.savez(f'{PKG_ROOT}/Planning/solutions/{model_name}_solution_bezier.npz',
             r=r_sols, dr=dr_sols, q=q_sols, dt=dt, alpha=alpha, times=times)
 
 
@@ -189,11 +191,11 @@ def bezier_fitting(data, model_name):
     # axs[3].set_title('Acceleration Bezier Curve')
     # axs[3].set_xlabel('ax')
     # axs[3].set_ylabel('ay')
-    plt.savefig(f'space_validation/Planning/figures/{model_name}_solution_bezier.png',dpi=300)
+    plt.savefig(f'{PKG_ROOT}/Planning/figures/{model_name}_solution_bezier.png',dpi=300)
 
 
 
 if __name__ == "__main__":
     model_name = 'bluerov' # Change to 'atmos' or 'bluerov if needed
-    data = np.load(f'space_validation/Planning/solutions/{model_name}_nonlinear_solution.npz')
+    data = np.load(f'{PKG_ROOT}/Planning/solutions/{model_name}_nonlinear_solution.npz')
     bezier_fitting(data, model_name)

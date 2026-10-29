@@ -82,7 +82,7 @@ class RosBagClass():
         else:
             raise ValueError("Experiment not recognized.")
             
-        self.robot_img = plt.imread(f'{str(Path.home())}/space_validation_ws/src/space_validation/space_validation/Utilities/plotting/assets/{self.robot_name}.png')   
+        self.robot_img = plt.imread(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'assets', f'{self.robot_name}.png'))   
         self.get_topic_data()     
 
     def get_topic_data(self):

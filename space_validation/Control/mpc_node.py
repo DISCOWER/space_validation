@@ -215,7 +215,9 @@ class MPCNode(Node):
 
         # Load the plan from a file (declared as launch argument)
         self.plan_path = self.declare_parameter('plan_path', f'{self.model_name}_solution_bezier.npz').value
-        path = os.path.abspath(os.path.join(os.path.expanduser("~"), f'space_validation_ws/src/space_validation/space_validation/Planning/solutions/{exp}/'))
+        # Resolve relative to this file (follows the colcon --symlink-install link back to src)
+        pkg_root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+        path = os.path.join(pkg_root, 'Planning', 'solutions', exp)
         self.plan_path = os.path.join(path, self.plan_path)
         self.get_logger().info(f"Loaded plan from {self.plan_path}")
 

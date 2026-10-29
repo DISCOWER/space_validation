@@ -5,6 +5,8 @@ import os
 import sys
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
+# Package root, resolved from this file's location (independent of the working directory)
+PKG_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 from Utilities.beziers import value_bezier
 from Utilities.rotations import quat_to_euler_np, euler_to_quat_np
@@ -40,12 +42,12 @@ def get_reference_trajectory(t:float, trajectory:ReferenceTrajectory, order:str=
 
 if __name__ == "__main__":
 
-    data = np.load('space_validation/Planning/solutions/sp_solution_quat.npz')
+    data = np.load(f'{PKG_ROOT}/Planning/solutions/sp_solution_quat.npz')
     x_ff = data['x_ff']
     u_ff = data['u_ff']
     dt = data['dt']
 
-    data = np.load('space_validation/Planning/solutions/sp_solution_bezier.npz')
+    data = np.load(f'{PKG_ROOT}/Planning/solutions/sp_solution_bezier.npz')
     r = data['r']
     dr = data['dr']
     ddr = data['ddr']

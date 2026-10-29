@@ -7,6 +7,8 @@ import os
 import sys
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.insert(0, parent_dir)
+# Package root, resolved from this file's location (independent of the working directory)
+PKG_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 from Utilities.smarc_modelling.src.smarc_modelling.vehicles.BlueROV import BlueROV
 from Utilities.get_reference_trajectory import get_reference_trajectory, ReferenceTrajectory
 from Utilities.Robots import FreeFlyer
@@ -109,7 +111,7 @@ if __name__ == "__main__":
     fig, axs = plt.subplots(1, 3, figsize=(10, 8))
 
     # load the reference trajectory
-    data = np.load('space_validation/Planning/solutions/bluerov_solution_bezier.npz')
+    data = np.load(f'{PKG_ROOT}/Planning/solutions/bluerov_solution_bezier.npz')
     reference = ReferenceTrajectory(
         r = data['r'],
         dr=data['dr'],

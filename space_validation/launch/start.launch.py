@@ -9,11 +9,14 @@ from launch.actions import ExecuteProcess, RegisterEventHandler, TimerAction
 from launch.event_handlers import OnProcessStart
 from launch_ros.actions import Node, PushRosNamespace
 from ament_index_python.packages import get_package_share_directory
+import os
+
+# Package root, resolved from this file's location (follows the --symlink-install link back to src)
+PKG_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 def generate_launch_description():
     #! If errors occur, run this on the mo-cap PC 
     #! recording the cameras seems to cause issues
-    HOME = str(Path.home())
 
     ld = LaunchDescription()
 
@@ -37,8 +40,8 @@ def generate_launch_description():
     #! Copy the planning files to the rosbag directory
     copy_proc = ExecuteProcess(
         cmd=[
-            f'cp -r {HOME}/space_validation_ws/src/space_validation/Planning/solutions \
-                {HOME}/space_validation_ws/{rosbag_name}/'
+            f'cp -r {PKG_ROOT}/Planning/solutions \
+                {os.getcwd()}/{rosbag_name}'
         ], shell=True)
     
     # Add it all together

@@ -47,10 +47,10 @@ def generate_launch_description():
             arguments=['-d', [os.path.join(get_package_share_directory('space_validation'), 'config.rviz')]]
     ))
 
-    # # microros
-    # ld.add_action(ExecuteProcess(
-    #     cmd=["micro-xrce-dds-agent", "udp4", "-p", "8888"], output="screen",
-    # ))
+    # Micro XRCE-DDS agent: bridges PX4's uxrce_dds_client to ROS 2 (/<ns>/fmu/in|out/*)
+    ld.add_action(ExecuteProcess(
+        cmd=["micro-xrce-dds-agent", "udp4", "-p", "8888"], output="screen",
+    ))
 
 #     # Plotjuggler
 #     ld.add_action(Node(

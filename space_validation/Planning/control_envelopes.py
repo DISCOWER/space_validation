@@ -6,6 +6,9 @@ from scipy.spatial import ConvexHull
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from itertools import product
+import os
+# Package root, resolved from this file's location (independent of the working directory)
+PKG_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 
 # ================= Thruster Geometry =================
@@ -411,7 +414,7 @@ def compute_polytope(
                 )
 
         plt.tight_layout()
-        plt.savefig(f"space_validation/Planning/figures/polytopes/{robot_type}_{kind}_polytope.png")
+        plt.savefig(f"{PKG_ROOT}/Planning/figures/polytopes/{robot_type}_{kind}_polytope.png")
         # plt.show()
 
     return A_inscribed, b_inscribed, radius_nominal, radius_eff, gyro_bound
@@ -428,14 +431,14 @@ if __name__ == "__main__":
     )
     print("Force polytope A matrix:\n", A_F_br)
     print("Force polytope b vector:\n", b_F_br)
-    np.savez("space_validation/Planning/solutions/polytopes/force_polytope_bluerov.npz", A=A_F_br, b=b_F_br)
+    np.savez(f"{PKG_ROOT}/Planning/solutions/polytopes/force_polytope_bluerov.npz", A=A_F_br, b=b_F_br)
 
     A_T_br, b_T_br, rT_nom_br, rT_eff_br, gyro_br = compute_polytope(
         "bluerov", "torque", "cube", True, J=J_bluerov, W_max=W_max_bluerov
     )
     print("Torque polytope A matrix:\n", A_T_br)
     print("Torque polytope b vector:\n", b_T_br)
-    np.savez("space_validation/Planning/solutions/polytopes/torque_polytope_bluerov.npz", A=A_T_br, b=b_T_br)
+    np.savez(f"{PKG_ROOT}/Planning/solutions/polytopes/torque_polytope_bluerov.npz", A=A_T_br, b=b_T_br)
 
     # --- ATMOS Robot Analysis ---
     print("\n--- ATMOS Robot Analysis ---")
@@ -444,14 +447,14 @@ if __name__ == "__main__":
     )
     print("Force polytope A matrix:\n", A_F_atmos)
     print("Force polytope b vector:\n", b_F_atmos)
-    np.savez("space_validation/Planning/solutions/polytopes/force_polytope_atmos.npz", A=A_F_atmos, b=b_F_atmos)
+    np.savez(f"{PKG_ROOT}/Planning/solutions/polytopes/force_polytope_atmos.npz", A=A_F_atmos, b=b_F_atmos)
 
     A_T_atmos, b_T_atmos, rT_nom_atmos, rT_eff_atmos, _ = compute_polytope(
         "atmos", "torque", "cube", True
     )
     print("Torque polytope A matrix:\n", A_T_atmos)
     print("Torque polytope b vector:\n", b_T_atmos)
-    np.savez("space_validation/Planning/solutions/polytopes/torque_polytope_atmos.npz", A=A_T_atmos, b=b_T_atmos)
+    np.savez(f"{PKG_ROOT}/Planning/solutions/polytopes/torque_polytope_atmos.npz", A=A_T_atmos, b=b_T_atmos)
 
     # --- Astrobee Robot Analysis ---
     print("\n--- Astrobee Robot Analysis ---")
@@ -464,11 +467,11 @@ if __name__ == "__main__":
     )
     print("Force polytope A matrix:\n", A_F_ast)
     print("Force polytope b vector:\n", b_F_ast)
-    np.savez("space_validation/Planning/solutions/polytopes/force_polytope_astrobee.npz", A=A_F_ast, b=b_F_ast)
+    np.savez(f"{PKG_ROOT}/Planning/solutions/polytopes/force_polytope_astrobee.npz", A=A_F_ast, b=b_F_ast)
 
     A_T_ast, b_T_ast, rT_nom_ast, rT_eff_ast, gyro_ast = compute_polytope(
         "astrobee", "torque", "icosahedron", True, J=J_astrobee, W_max=W_max_astrobee
     )
     print("Torque polytope A matrix:\n", A_T_ast)
     print("Torque polytope b vector:\n", b_T_ast)
-    np.savez("space_validation/Planning/solutions/polytopes/torque_polytope_astrobee.npz", A=A_T_ast, b=b_T_ast)
+    np.savez(f"{PKG_ROOT}/Planning/solutions/polytopes/torque_polytope_astrobee.npz", A=A_T_ast, b=b_T_ast)

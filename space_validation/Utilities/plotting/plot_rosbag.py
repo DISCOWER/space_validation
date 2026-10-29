@@ -10,6 +10,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from rosbag_class import RosBagClass
 import pandas as pd
+# Package root, resolved from this file's location (independent of the working directory)
+PKG_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+# Rosbags live in <workspace>/rosbags (package is at <workspace>/src/space_validation/space_validation)
+ROSBAG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(PKG_ROOT))), 'rosbags')
 
 # Set up plot style
 plt.style.use(['science'])
@@ -24,42 +28,42 @@ plt.rcParams['legend.loc'] = 'best'
 
 
 # 2D experiment bluerov
-# folder_path = f"{str(Path.home())}/space_validation_ws/rosbags/exp_1_uw/rosbag2_2025_09_11-15_40_04/"
-# folder_path = f"{str(Path.home())}/space_validation_ws/rosbags/exp_1_uw/rosbag2_2025_09_11-15_41_34/"
-# folder_path = f"{str(Path.home())}/space_validation_ws/rosbags/exp_1_uw/rosbag2_2025_09_11-15_43_16/"
-folder_path = f"{str(Path.home())}/space_validation_ws/rosbags/exp_1_uw/rosbag2_2025_09_11-15_53_28/"
-# folder_path = f"{str(Path.home())}/space_validation_ws/rosbags/exp_1_uw/rosbag2_2025_09_11-15_54_57/"
+# folder_path = f"{ROSBAG_DIR}/exp_1_uw/rosbag2_2025_09_11-15_40_04/"
+# folder_path = f"{ROSBAG_DIR}/exp_1_uw/rosbag2_2025_09_11-15_41_34/"
+# folder_path = f"{ROSBAG_DIR}/exp_1_uw/rosbag2_2025_09_11-15_43_16/"
+folder_path = f"{ROSBAG_DIR}/exp_1_uw/rosbag2_2025_09_11-15_53_28/"
+# folder_path = f"{ROSBAG_DIR}/exp_1_uw/rosbag2_2025_09_11-15_54_57/"
 offset=np.array([1.2,0,1.25])
 threeD=False
 robot_name = 'bluerov'
 experiment = 1
 
 # 3D experiment bluerov
-# folder_path = f"{str(Path.home())}/space_validation_ws/rosbags/exp_2_uw/rosbag2_2025_09_11-14_12_00/"
-# # folder_path = f"{str(Path.home())}/space_validation_ws/rosbags/exp_2_uw/rosbag2_2025_09_11-14_14_32/"
-# # folder_path = f"{str(Path.home())}/space_validation_ws/rosbags/exp_2_uw/rosbag2_2025_09_11-14_16_34/"
-# # folder_path = f"{str(Path.home())}/space_validation_ws/rosbags/exp_2_uw/rosbag2_2025_09_11-14_41_52/"
-# # folder_path = f"{str(Path.home())}/space_validation_ws/rosbags/exp_2_uw/rosbag2_2025_09_11-14_43_52/"
-# # folder_path = f"{str(Path.home())}/space_validation_ws/rosbags/exp_2_uw/rosbag2_2025_09_11-14_46_05/"
+# folder_path = f"{ROSBAG_DIR}/exp_2_uw/rosbag2_2025_09_11-14_12_00/"
+# # folder_path = f"{ROSBAG_DIR}/exp_2_uw/rosbag2_2025_09_11-14_14_32/"
+# # folder_path = f"{ROSBAG_DIR}/exp_2_uw/rosbag2_2025_09_11-14_16_34/"
+# # folder_path = f"{ROSBAG_DIR}/exp_2_uw/rosbag2_2025_09_11-14_41_52/"
+# # folder_path = f"{ROSBAG_DIR}/exp_2_uw/rosbag2_2025_09_11-14_43_52/"
+# # folder_path = f"{ROSBAG_DIR}/exp_2_uw/rosbag2_2025_09_11-14_46_05/"
 # offset = np.array([0.65,0.2,1.7])
 # threeD=True
 # robot_name = 'bluerov'
 # experiment = 2
 
 # 2D experiment ATMOS
-# # folder_path = f"{str(Path.home())}/space_validation_ws/rosbags/exp_1_sp/rosbag2_2025_09_10-12_45_33/"
-# folder_path = f"{str(Path.home())}/space_validation_ws/rosbags/exp_1_sp/rosbag2_2025_09_10-12_48_09/"
-# # folder_path = f"{str(Path.home())}/space_validation_ws/rosbags/exp_1_sp/rosbag2_2025_09_10-12_50_34/"
-# # folder_path = f"{str(Path.home())}/space_validation_ws/rosbags/exp_1_sp/rosbag2_2025_09_10-14_22_08/"
+# # folder_path = f"{ROSBAG_DIR}/exp_1_sp/rosbag2_2025_09_10-12_45_33/"
+# folder_path = f"{ROSBAG_DIR}/exp_1_sp/rosbag2_2025_09_10-12_48_09/"
+# # folder_path = f"{ROSBAG_DIR}/exp_1_sp/rosbag2_2025_09_10-12_50_34/"
+# # folder_path = f"{ROSBAG_DIR}/exp_1_sp/rosbag2_2025_09_10-14_22_08/"
 # offset = np.array([0,-0.75,0])
 # threeD=False
 # robot_name = 'atmos'
 # experiment = 1
 
 # 3D experiment cubesat
-folder_path = f"{str(Path.home())}/space_validation_ws/rosbags/exp_2_sp/rosbag2_2025_09_11-18_47_11/"
-# folder_path = f"{str(Path.home())}/space_validation_ws/rosbags/exp_2_sp/rosbag2_2025_09_11-18_50_03/"
-# folder_path = f"{str(Path.home())}/space_validation_ws/rosbags/exp_2_sp/rosbag2_2025_09_11-18_50_03/"
+folder_path = f"{ROSBAG_DIR}/exp_2_sp/rosbag2_2025_09_11-18_47_11/"
+# folder_path = f"{ROSBAG_DIR}/exp_2_sp/rosbag2_2025_09_11-18_50_03/"
+# folder_path = f"{ROSBAG_DIR}/exp_2_sp/rosbag2_2025_09_11-18_50_03/"
 offset = np.array([0,-2,0])
 threeD=True
 robot_name = 'cubesat'
@@ -99,4 +103,4 @@ obj.plot_disturbance(fig, ax_d,sigma=2)
 
 
 # plt.show()
-plt.savefig(f'space_validation/Utilities/plotting/figures/{robot_name}_{experiment}.pdf')
+plt.savefig(f'{PKG_ROOT}/Utilities/plotting/figures/{robot_name}_{experiment}.pdf')
